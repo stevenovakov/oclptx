@@ -13,6 +13,11 @@ Fifo::Fifo(int order):
   fifo_ = new void*[1<<order];
 }
 
+Fifo::~Fifo()
+{
+  delete[] fifo_;
+}
+
 void Fifo::PushOrDie(void *val)
 {
   std::lock_guard<std::mutex> lock(head_mutex_);

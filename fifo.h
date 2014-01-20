@@ -40,6 +40,7 @@ class Fifo
   void PushOrDie(void *val);
   void *Pop();
   Fifo(int order);
+  ~Fifo();
  private:
   int order_;
   int head_; // front of queue---points to open slot
