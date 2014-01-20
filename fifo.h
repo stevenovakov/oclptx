@@ -10,6 +10,12 @@
 //
 // If the FIFO is empty, pop will return NULL.  If it is full, push will DIE.
 //
+// There's a reason for the latter.  I could include a IsFifoFull() method,
+// but this is likely to create races (check for full, and then push, but
+// something may have happened in between).  Alternatively, we could return
+// some error code.  This doesn't accomplish anything except to put the
+// responsibility on the caller, who must either abort(), or block.
+//
 // In general, if you push an item onto the FIFO, you shouldn't touch its
 // contents anymore, and when you pull an item off the FIFO, it belongs to you.
 // It is your responsibility to either give the FIFO to someone else or delete
