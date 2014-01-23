@@ -1,3 +1,5 @@
+// Copyright 2014 Jeff Taylor
+//
 // A minimal atomic FIFO with thread safe operations.
 // The exclusion of a check_empty and check_full function is intentional, as
 // these encourage thread-unsafe behaviour.

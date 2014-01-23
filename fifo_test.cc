@@ -1,3 +1,4 @@
+// Copyright 2014 Jeff Taylor
 // Test case for fifo
 
 #include "fifo.h"
@@ -11,9 +12,9 @@ int main()
 {
   // First things first, does usage example work?
 
-  Fifo myfifo(3); // create a FIFO with room for 7 entries.
-  int *in = new int; // create an integer
-  myfifo.PushOrDie((void*) in); // Put it onto the fifo (not mine anymore)
+  Fifo myfifo(3);  // create a FIFO with room for 7 entries.
+  int *in = new int;  // create an integer
+  myfifo.PushOrDie((void*) in);  // Put it onto the fifo (not mine anymore)
   int *out;
   out = (int*)myfifo.Pop();
 
