@@ -39,23 +39,70 @@
 //
 //   delete now_my_int;
 //
+#ifndef FIFO_H_
+#define FIFO_H_
 
+#include <cstdlib>
 #include <mutex>
 
-class Fifo
+template<typename T> class Fifo
 {
  public:
-  void PushOrDie(void *val);
-  void *Pop();
-  Fifo(int order);
+  explicit Fifo(int order);
   ~Fifo();
+  void PushOrDie(T *val);
+  T *Pop();
  private:
   int order_;
-  int head_; // front of queue---points to open slot
-  int tail_; // back of queue---points to full slot
-  void **fifo_;
+  int head_;  // front of queue---points to open slot
+  int tail_;  // back of queue---points to full slot
+  T **fifo_;
 
   std::mutex head_mutex_;
   std::mutex tail_mutex_;
 };
 
+template<typename T> Fifo<T>::Fifo(int order):
+  order_(order),
+  head_(0),
+  tail_(0)
+{
+  fifo_ = new T*[1 << order];
+}
+
+template<typename T> Fifo<T>::~Fifo()
+{
+  delete[] fifo_;
+}
+
+template<typename T> void Fifo<T>::PushOrDie(T *val)
+{
+  std::lock_guard<std::mutex> lock(head_mutex_);
+
+  if (1 == (tail_ - head_ & ((1 << order_) - 1)))
+    // FIFO Overflow
+    abort();
+
+  fifo_[head_] = val;
+  head_ = (head_ + 1) & ((1 << order_)-1);
+
+  // lock_guard releases head_mutex automatically
+  return;
+}
+
+template<typename T> T *Fifo<T>::Pop()
+{
+  std::lock_guard<std::mutex> lock(tail_mutex_);
+
+  if (head_ == tail_)  // FIFO Empty
+    return NULL;
+
+  T *retval = fifo_[tail_];
+
+  tail_ = (tail_ + 1) & ((1 << order_) - 1);
+
+  // lock_guard releases tail_mutex automatically
+  return retval;
+}
+
+#endif  // FIFO_H_
