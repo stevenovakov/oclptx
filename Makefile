@@ -20,3 +20,6 @@ all: ${OCLPTX}
 
 ${OCLPTX}: ${OCLPTXOBJ}
 	${CXX} ${CXXFLAGS} ${LDFLAGS} -o $@ $^ ${DLIBS}
+
+lint: *.cc *.h *.cl
+	bash -c 'python cpplint.py --extensions=cc,h,cl --filter=-whitespace/braces $^ > lint 2>&1'
