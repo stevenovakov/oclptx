@@ -9,16 +9,16 @@
 int main(int argc, char **argv)
 {
   // Create a GPU
-  Gpu gpu(1,3);
+  Gpu gpu(1, 3);
 
   assert(1 == gpu.SpaceRemaining());
   assert(0 == gpu.SpaceUsed());
 
   // Create two particles, check that Gpu only accepts one.
-  struct threading::collatz_data data[2] = {{17,0},{32,0}};
+  struct threading::collatz_data data[2] = {{17, 0}, {32, 0}};
   struct threading::collatz_data_chunk chunk = {data, 2, 2};
 
-  gpu.WriteChunk(&chunk); 
+  gpu.WriteChunk(&chunk);
 
   assert(1 == chunk.last);
   assert(1 == gpu.SpaceUsed());
@@ -28,7 +28,7 @@ int main(int argc, char **argv)
   gpu.RunKernel();
 
   // Now read the data into a new chunk.
-  struct threading::collatz_data data2[2] = {{0,0},{0,0}};
+  struct threading::collatz_data data2[2] = {{0, 0}, {0, 0}};
   struct threading::collatz_data_chunk chunk2 = {data2, 0, 2};
 
   gpu.ReadChunk(&chunk2);
