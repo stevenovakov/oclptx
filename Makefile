@@ -3,6 +3,7 @@ include $(FSLCONFDIR)/default.mk
 PROJNAME = fdt
 
 DBGFLAGS=-g
+USRCXXFLAGS=-std=c++0x
 
 # TODO: Move LIB_OPENCL and INC_OPENCL into systemvars.mk
 LIB_OPENCL=/usr/lib64/nvidia
