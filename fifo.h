@@ -79,7 +79,7 @@ template<typename T> void Fifo<T>::PushOrDie(T *val)
 {
   std::lock_guard<std::mutex> lock(head_mutex_);
 
-  if (1 == (tail_ - head_ & ((1 << order_) - 1)))
+  if (1 == ((tail_ - head_) & ((1 << order_) - 1)))
     // FIFO Overflow
     abort();
 

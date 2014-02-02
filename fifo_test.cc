@@ -1,7 +1,7 @@
 // Copyright 2014 Jeff Taylor
 // Test case for fifo
 
-#include "fifo.h"
+#include "oclptx/fifo.h"
 
 #include<cassert>
 #include<cstdio>
@@ -18,8 +18,8 @@ int main()
   out = myfifo.Pop();
 
   assert(out == in);
-  printf("out: %p\n", out);
-  printf("in:  %p\n", in);
+  printf("out: %p\n", static_cast<void*>(out));
+  printf("in:  %p\n", static_cast<void*>(in));
 
   delete out;
 

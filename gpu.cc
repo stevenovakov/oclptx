@@ -1,6 +1,6 @@
 // Copyright 2014 Jeff Taylor
 
-#include "gpu.h"
+#include "oclptx/gpu.h"
 
 Gpu::Gpu(int particles_per_chunk, int steps_per_kernel)
 {

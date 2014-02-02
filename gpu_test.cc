@@ -3,8 +3,8 @@
 // Test our GPU class.
 
 #include <cassert>
-#include "gpu.h"
-#include "structs.h"
+#include "oclptx/gpu.h"
+#include "oclptx/structs.h"
 
 int main(int argc, char **argv)
 {
