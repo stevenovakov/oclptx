@@ -3,22 +3,22 @@
  *    Steve Novakov
  *    Jeff Taylor
  */
- 
+
 /* samplemanager.cc
  *
  *
- * Part of 
+ * Part of
  *    oclptx
  * OpenCL-based, GPU accelerated probtrackx algorithm module, to be used
  * with FSL - FMRIB's Software Library
  *
  * This file is part of oclptx.
- * 
+ *
  * oclptx is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * oclptx is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -35,7 +35,7 @@
 #include <sstream>
 
 
-#define __CL_ENABLE_EXCEPTIONS 
+#define __CL_ENABLE_EXCEPTIONS
 // adds exception support from CL libraries
 // define before CL headers inclusion
 
@@ -63,22 +63,22 @@ void SampleManager::LoadBedpostDataToMatrix(
    volume4D<float> loadedVolume4DTheta;
    volume4D<float> loadedVolume4DPhi;
    volume4D<float> loadedVolume4Df;
-   
+
    //Load Theta/Phi/f samples
    NEWIMAGE::read_volume4D(loadedVolume4DTheta, aThetaSampleName);
    NEWIMAGE::read_volume4D(loadedVolume4DPhi, aPhiSampleName);
    NEWIMAGE::read_volume4D(loadedVolume4Df, afSampleName);
-   
+
    if(aMask.xsize() > 0)
    {
       _thetaSamples.push_back(loadedVolume4DTheta.matrix(aMask));
-      _phiSamples.push_back(loadedVolume4DPhi.matrix(aMask));   
+      _phiSamples.push_back(loadedVolume4DPhi.matrix(aMask));
       _fSamples.push_back(loadedVolume4Df.matrix(aMask));
    }
    else
    {
       _thetaSamples.push_back(loadedVolume4DTheta.matrix());
-      _phiSamples.push_back(loadedVolume4DPhi.matrix());   
+      _phiSamples.push_back(loadedVolume4DPhi.matrix());
       _fSamples.push_back(loadedVolume4Df.matrix());
    }
 }
@@ -92,12 +92,12 @@ void SampleManager::LoadBedpostData(const std::string& aBasename)
       std::cout<< "Bad File Name"<<std::endl;
       return;
    }
-   
+
    //volume4D<float> loadedVolume4D;
    std::string thetaSampleNames;
-   std::string phiSampleNames; 
+   std::string phiSampleNames;
    std::string fSampleNames;
-   
+
    //Single Fiber Case.
    if(NEWIMAGE::fsl_imageexists(aBasename+"_thsamples"))
    {
@@ -109,7 +109,7 @@ void SampleManager::LoadBedpostData(const std::string& aBasename)
    //Multiple Fiber Case.
    else
    {
-      int fiberNum = 1;       
+      int fiberNum = 1;
       std::string fiberNumAsstring = IntTostring(fiberNum);
       thetaSampleNames = aBasename+"_th"+fiberNumAsstring+"samples";
       bool doesFiberExist = NEWIMAGE::fsl_imageexists(thetaSampleNames);
@@ -117,7 +117,7 @@ void SampleManager::LoadBedpostData(const std::string& aBasename)
       {
          phiSampleNames = aBasename+"_ph"+fiberNumAsstring+"samples";
          fSampleNames = aBasename+"_f"+fiberNumAsstring+"samples";
-         
+
          LoadBedpostDataToMatrix(thetaSampleNames,phiSampleNames,fSampleNames);
 
          fiberNum++;
@@ -137,12 +137,12 @@ void SampleManager::LoadBedpostData(const std::string& aBasename)
 void SampleManager::ParseCommandLine(int argc, char** argv)
 {
    _oclptxOptions.parse_command_line(argc, argv);
-   
+
    if(_oclptxOptions.verbose.value()>0)
    {
       _oclptxOptions.status();
    }
-   
+
    if(_oclptxOptions.simple.value())
    {
       if(_oclptxOptions.matrix1out.value() || _oclptxOptions.matrix3out.value())

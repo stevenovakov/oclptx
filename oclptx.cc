@@ -3,22 +3,22 @@
  *    Steve Novakov
  *    Jeff Taylor
  */
- 
+
 /* oclptx.cc
  *
  *
- * Part of 
+ * Part of
  *    oclptx
  * OpenCL-based, GPU accelerated probtrackx algorithm module, to be used
  * with FSL - FMRIB's Software Library
  *
  * This file is part of oclptx.
- * 
+ *
  * oclptx is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * oclptx is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -28,11 +28,11 @@
  * along with oclptx.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
- 
+
 
 #include <iostream>
 
-#define __CL_ENABLE_EXCEPTIONS 
+#define __CL_ENABLE_EXCEPTIONS
 // adds exception support from CL libraries
 // define before CL headers inclusion
 
@@ -61,7 +61,7 @@ void SimpleInterpolationTest();
 
 int main(int argc, char *argv[] )
 {
-  
+
   SampleManager& s_manager = SampleManager::GetInstance();
   if(&s_manager == NULL)
   {
@@ -78,7 +78,7 @@ int main(int argc, char *argv[] )
      //Matrix thetaMatrix = thetaSamples->at(0);
      //Matrix phiMatrix = phiSamples->at(0);
      //Matrix fMatrix = fSamples->at(0);
-     
+
      //for (int row = 1; row < thetaMatrix.Nrows(); row++)
      //{
         //for (int col = 1; col < thetaMatrix.Ncols(); col++)
@@ -94,17 +94,17 @@ int main(int argc, char *argv[] )
               //  col<<" "<<phiTest<<std::endl;
               //cout <<"\n Rows f:"<<row<<" Cols f:"<<
               //  col<<" "<<fTest<<std::endl;
-              
+
            //}
         //}
      //}
   }
-  
-  
+
+
   //Test Routine
   //SimpleInterpolationTest();
 
-  
+
   std::cout<<"\n\nExiting...\n\n";
   return 0;
 }
@@ -118,29 +118,29 @@ int main(int argc, char *argv[] )
 
 void SimpleInterpolationTest()
 {
-  
+
   OclPtxHandler * ptx_handler;
-  
+
   ptx_handler = new OclPtxHandler("interptest");
-  
+
   //*******************************************************************
-  // 
+  //
   //  TEST ROUTINE
-  // 
+  //
   //*******************************************************************
-  
+
   unsigned int XN = 20;
   unsigned int YN = 20;
   unsigned int ZN = 20;
-  
+
   unsigned int nseeds = 200;
   unsigned int nsteps = 200;
-  
+
   std::cout<<"\n\nInterpolation Test\n"<<"\n";
   std::cout<<"\tSeeds :" << nseeds << " Steps:" << nsteps <<"\n";
   std::cout<<"\tXN: " << XN << " YN: " << YN << " ZN: " << ZN <<"\n";
   std::cout<<"\n\n";
-  
+
   float3 mins;
   mins.x = 8.0;
   mins.y = 8.0;
@@ -149,44 +149,44 @@ void SimpleInterpolationTest()
   maxs.x = 12.0;
   maxs.y = 12.0;
   maxs.z = 1.0;
-  
+
   float4 min_bounds;
   min_bounds.x = 0.0;
   min_bounds.y = 0.0;
   min_bounds.z = 0.0;
   min_bounds.t = 0.0;
-  
+
   float4 max_bounds;
   max_bounds.x = 20.0;
   max_bounds.y = 20.0;
   max_bounds.z = 20.0;
   max_bounds.t = 0.0;
-  
-  float dr = 0.1;  
-  
+
+  float dr = 0.1;
+
   FloatVolume voxel_space = CreateVoxelSpace( XN, YN, ZN,
     min_bounds, max_bounds);
-    
+
   float3 setpts;
   setpts.z = max_bounds.z - min_bounds.z;
-  setpts.y = (max_bounds.y + min_bounds.y)/2.0;  
-  setpts.x = (max_bounds.x + min_bounds.x)/2.0;  
-    
+  setpts.y = (max_bounds.y + min_bounds.y)/2.0;
+  setpts.x = (max_bounds.x + min_bounds.x)/2.0;
+
   FloatVolume flow_space = CreateFlowSpace( voxel_space, dr, setpts);
-  std::vector<unsigned int> seed_elem = RandSeedElem(  
+  std::vector<unsigned int> seed_elem = RandSeedElem(
     nseeds,
     mins,
     maxs,
     voxel_space
-  );                  
-  
-  std::vector<float4> seed_space = RandSeedPoints(  nseeds, 
+  );
+
+  std::vector<float4> seed_space = RandSeedPoints(  nseeds,
                                                     voxel_space,
                                                     seed_elem
                                                   );
 
   VolumeToFile(voxel_space, flow_space);
-  
+
   PathsToFile(  ptx_handler->InterpolationTestRoutine(  voxel_space,
                                                         flow_space,
                                                         seed_space,
@@ -200,7 +200,7 @@ void SimpleInterpolationTest()
                 nseeds,
                 nsteps
   );
-  
+
   delete ptx_handler;
-  
+
 }

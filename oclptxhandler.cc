@@ -3,22 +3,22 @@
  *    Steve Novakov
  *    Jeff Taylor
  */
- 
+
 /* oclptxhandler.cc
  *
  *
- * Part of 
+ * Part of
  *    oclptx
  * OpenCL-based, GPU accelerated probtrackx algorithm module, to be used
  * with FSL - FMRIB's Software Library
  *
  * This file is part of oclptx.
- * 
+ *
  * oclptx is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * oclptx is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -39,7 +39,7 @@
 //#include <thread>
 
 
-#define __CL_ENABLE_EXCEPTIONS 
+#define __CL_ENABLE_EXCEPTIONS
 // adds exception support from CL libraries
 // define before CL headers inclusion
 
@@ -69,12 +69,12 @@ std::string oclErrorStrings(cl_int error);
 OclPtxHandler::OclPtxHandler(
   std::string ocl_routine
 )
-{  
+{
   this->ocl_routine_name = ocl_routine;
-  
+
   this->ocl_profiling = true;
   this->interpolation_complete = true;
-  
+
   this->OclInit();
   this->OclDeviceInfo();
   std::cout<<"init\n";
@@ -82,7 +82,7 @@ OclPtxHandler::OclPtxHandler(
   std::cout<<"cq\n";
   this->CreateProgram();
   std::cout<<"cprog\n";
-  
+
 }
 
 //
@@ -119,8 +119,8 @@ void OclPtxHandler::SetOclRoutine(std::string new_routine)
 void OclPtxHandler::PTStart()
 {
   this->interpolation_complete = false;
-  
-  
+
+
 }
 
 
@@ -131,18 +131,18 @@ void OclPtxHandler::ThreadController()
 {
   while(!(this->interpolation_complete))
   {
-    
+
     //
     // One while/for loop for thread CREATION/QUEUEING/EXECUTION
-    // 
-    
+    //
+
     //
     // One while/for loop for thread collection/joining
     //
-    
+
     //if(termination_condition)
     // this->interpolation_complete = true;
-    
+
   }
 
 }
@@ -159,23 +159,23 @@ void OclPtxHandler::ThreadController()
 //
 void OclPtxHandler::OclInit()
 {
-  
+
   cl::Platform::get(&(this->ocl_platforms));
-  
+
   cl_context_properties con_prop[3] =
   {
     CL_CONTEXT_PLATFORM,
     (cl_context_properties) (this->ocl_platforms[0]) (),
     0
   };
-  
+
   this->ocl_platforms.at(0);
-  
+
   this->ocl_context = cl::Context(CL_DEVICE_TYPE_GPU, con_prop);
   // GPU DEVICES ONLY, FOR CPU, (don't use CPU unless informed, not
   // quite the same physical interface):
   //this->oclContext = cl::Context(CL_DEVICE_TYPE_CPU, conProp);
-  
+
   this->ocl_devices = this->ocl_context.getInfo<CL_CONTEXT_DEVICES>();
 
 }
@@ -184,32 +184,32 @@ void OclPtxHandler::OclDeviceInfo()
 {
 
   std::cout<<"\nLocal OpenCL Devices\n\n";
-  
+
   size_t siT[3];
   cl_uint print_int;
   cl_ulong print_ulong;
   std::string print_string;
-  
+
   std::string device_name;
-          
+
   for(std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
     dit != this->ocl_devices.end(); ++dit){
-        
+
     dit->getInfo(CL_DEVICE_NAME, &print_string);
     dit->getInfo(CL_DEVICE_NAME, &device_name);
     dit->getInfo(CL_DEVICE_MAX_COMPUTE_UNITS, &print_int);
     dit->getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE, &siT);
     dit->getInfo(CL_DEVICE_MAX_WORK_ITEM_SIZES, &siT);
-    
+
 
     std::cout<<"\tDEVICE\n\n";
-    std::cout<<"\tDevice Name: " << print_string << "\n";   
-    std::cout<<"\tMax Compute Units: " << print_int << "\n";      
-    std::cout<<"\tMax Work Group Size (x*y*z): " << siT[0] << "\n";     
-    std::cout<<"\tMax Work Item Sizes (x, y, z): " << siT[0] << 
+    std::cout<<"\tDevice Name: " << print_string << "\n";
+    std::cout<<"\tMax Compute Units: " << print_int << "\n";
+    std::cout<<"\tMax Work Group Size (x*y*z): " << siT[0] << "\n";
+    std::cout<<"\tMax Work Item Sizes (x, y, z): " << siT[0] <<
       ", " << siT[1] << ", " << siT[2] << "\n";
-    
-    
+
+
     dit->getInfo(CL_DEVICE_MAX_MEM_ALLOC_SIZE, &print_ulong);
     std::cout<<"\tMax Mem Alloc Size: " << print_ulong << "\n";
 
@@ -221,10 +221,10 @@ void OclPtxHandler::OclDeviceInfo()
 //
 void OclPtxHandler::NewCLCommandQueues()
 {
-  
+
   this->ocl_device_queues.clear();
   //this->ocl_device_queue_mutexs.clear();
-  
+
   for(unsigned int k = 0; k < this->ocl_devices.size(); k++ )
   {
 
@@ -244,12 +244,12 @@ void OclPtxHandler::NewCLCommandQueues()
                                             this->ocl_context,
                                             this->ocl_devices[k]
                                           )
-                                        );  
+                                        );
     }
-    
+
     //this->ocl_device_queue_mutexs.push_back(MutexWrapper());
-    
-  } 
+
+  }
 }
 
 
@@ -258,18 +258,18 @@ void OclPtxHandler::NewCLCommandQueues()
 //
 cl::Program OclPtxHandler::CreateProgram()
 {
-  
-  this->ocl_kernel_set.clear();  
-  
+
+  this->ocl_kernel_set.clear();
+
   // Read Source
-  
+
   std::string line_str, kernel_source;
-  
+
   std::ifstream source_file;
-  
+
   std::vector<std::string> source_list;
   std::vector<std::string>::iterator sit;
-  
+
   if(this->ocl_routine_name == "oclptx")
   {
     source_list.push_back("prngmethods.cl");
@@ -278,105 +278,105 @@ cl::Program OclPtxHandler::CreateProgram()
   else if( this->ocl_routine_name == "prngtest")
   {
     source_list.push_back("prngmethods.cl");
-    source_list.push_back("prngtest.cl");    
+    source_list.push_back("prngtest.cl");
   }
   else if(this->ocl_routine_name == "interptest")
   {
     //source_list.push_back("prngmethods.cl");
-    source_list.push_back("interptest.cl");    
+    source_list.push_back("interptest.cl");
   }
-  
+
   for(sit = source_list.begin(); sit != source_list.end(); ++sit)
   {
-    
+
     line_str = *sit;
     source_file.open(line_str.c_str());
-    
+
     std::getline(source_file, line_str);
-    
+
     while(source_file){
-      
+
       kernel_source += line_str + "\n";
-    
+
       std::getline(source_file, line_str);
-    
+
     }
-    
+
     source_file.close();
   }
   //TODO
   // no else  because we will check for routine_name at init
   //
-  
+
   //
   // Build Program files here
   //
-  
+
   //std::cout<<kernel_source;
-  
-    
-  cl::Program::Sources prog_source(  
+
+
+  cl::Program::Sources prog_source(
     1,
     std::make_pair(kernel_source.c_str(), kernel_source.length())
   );
-  
+
   cl::Program ocl_program(this->ocl_context, prog_source);
-    
+
   try{
-    
+
     ocl_program.build(this->ocl_devices);
-    
+
   }
   catch(cl::Error err){
-    
-    // TODO 
+
+    // TODO
     //  dump all error logging to logfile
     //  maybe differentiate b/w regular errors and cl errors
-    
+
     if( oclErrorStrings(err.err()) != "CL_SUCCESS")
     {
       std::cout<<"ERROR: " << err.what() <<
         " ( " << oclErrorStrings(err.err()) << ")\n";
       std::cin.get();
-    
+
       for(std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
         dit != this->ocl_devices.end(); dit++)
       {
-      
-        std::cout<<"BUILD OPTIONS: \n" << 
+
+        std::cout<<"BUILD OPTIONS: \n" <<
           ocl_program.getBuildInfo<CL_PROGRAM_BUILD_OPTIONS>(*dit) <<
            "\n";
-        std::cout<<"BUILD LOG: \n" << 
+        std::cout<<"BUILD LOG: \n" <<
           ocl_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*dit) <<"\n";
       }
     }
   }
-  
+
   //
   // Compile Kernels from Program
   //
   if( this->ocl_routine_name == "oclptx" )
   {
-    this->ocl_kernel_set.push_back(cl::Kernel(  ocl_program, 
+    this->ocl_kernel_set.push_back(cl::Kernel(  ocl_program,
                                                 "InterpolateKernel",
                                                 NULL
                                               ));
   }
   else if( this->ocl_routine_name == "oclptx" )
   {
-    this->ocl_kernel_set.push_back(cl::Kernel(  ocl_program, 
+    this->ocl_kernel_set.push_back(cl::Kernel(  ocl_program,
                                                 "PrngTestKernel",
                                                 NULL
                                               ));
   }
   else if( this->ocl_routine_name == "interptest" )
   {
-    this->ocl_kernel_set.push_back(cl::Kernel(  ocl_program, 
+    this->ocl_kernel_set.push_back(cl::Kernel(  ocl_program,
                                                 "InterpolateTestKernel",
                                                 NULL
                                               ));
   }
-  
+
   return ocl_program;
 }
 
@@ -386,44 +386,44 @@ cl::Program OclPtxHandler::CreateProgram()
 //
 void OclPtxHandler::InstantiateBuffers()
 {
-  
+
   this->read_buffer_set.clear();
   this->write_buffer_set.clear();
-  
+
   try{
     for( unsigned int i = 0;
       i < this->read_buffer_set_sizes.size(); i++)
-    { 
+    {
       std::cout<<"RBUF: "<<this->read_buffer_set_sizes.at(i)<<"\n";
       this->read_buffer_set.push_back(
             cl::Buffer( this->ocl_context,
                         CL_MEM_READ_ONLY,
                         this->read_buffer_set_sizes.at(i),
                         NULL,
-                        NULL                            
+                        NULL
                       )
       );
     }
     for( unsigned int i = 0;
       i < this->write_buffer_set_sizes.size(); i++)
-    { 
-      std::cout<<"WBUF: "<<this->write_buffer_set_sizes.at(i)<<"\n"; 
+    {
+      std::cout<<"WBUF: "<<this->write_buffer_set_sizes.at(i)<<"\n";
       this->write_buffer_set.push_back(
         cl::Buffer( this->ocl_context,
                     CL_MEM_READ_WRITE,
                     this->write_buffer_set_sizes.at(i),
                     NULL,
-                    NULL                            
+                    NULL
                   )
-      );      
-    }  
+      );
+    }
   }
   catch(cl::Error err){
-    
-    // TODO 
+
+    // TODO
     //  dump all error logging to logfile
     //  maybe differentiate b/w regular errors and cl errors
-    
+
     if( oclErrorStrings(err.err()) != "CL_SUCCESS")
     {
       std::cout<<"ERROR: " << err.what() <<
@@ -443,45 +443,45 @@ void OclPtxHandler::InstantiateBuffers()
 // Single Device Interpolation Test
 //
 std::vector<float4> OclPtxHandler::InterpolationTestRoutine
-    ( 
+    (
       FloatVolume voxel_space,
-      FloatVolume flow_space, 
+      FloatVolume flow_space,
       std::vector<float4> seed_space,
       std::vector<unsigned int> seed_elem,
       unsigned int n_seeds,
       unsigned int n_steps,
-      float dr, 
-      float4 min_bounds, 
+      float dr,
+      float4 min_bounds,
       float4 max_bounds
     )
 {
-  
+
   bool blocking_write = false;
 
   this->write_buffer_set_sizes.clear();
   this->read_buffer_set_sizes.clear();
-  
+
   unsigned int vol_size = voxel_space.vol.size();
   unsigned int vol_item_size = sizeof(voxel_space.vol.at(0));
-  
+
   unsigned int flow_size = flow_space.vol.size();
   unsigned int flow_item_size = sizeof(flow_space.vol.at(0));
-  
+
   unsigned int seed_size = seed_space.size();
   unsigned int seed_item_size = sizeof(seed_space.at(0));
 
   unsigned int vol_mem_size = vol_size * vol_item_size;
-  unsigned int flow_mem_size = flow_size*flow_item_size;  
+  unsigned int flow_mem_size = flow_size*flow_item_size;
   unsigned int seed_mem_size = seed_size*seed_item_size;
-  
+
   read_buffer_set_sizes.push_back(vol_mem_size); //1
   read_buffer_set_sizes.push_back(flow_mem_size); //2
   read_buffer_set_sizes.push_back(seed_mem_size); //3
-  
+
   unsigned int result_num = n_seeds*n_steps;
   unsigned int result_mem_size = result_num * flow_item_size;
   unsigned int seed_elem_mem_size = n_seeds*sizeof(seed_elem.at(0));
-  
+
   write_buffer_set_sizes.push_back(result_mem_size); //1
   write_buffer_set_sizes.push_back(seed_elem_mem_size); //2
 
@@ -513,7 +513,7 @@ std::vector<float4> OclPtxHandler::InterpolationTestRoutine
         flow_space.vol.data(),
         NULL,
         NULL
-  ); 
+  );
   //seed initial pos
   this->ocl_device_queues.at(0).enqueueWriteBuffer(
         this->read_buffer_set.at(2),
@@ -523,7 +523,7 @@ std::vector<float4> OclPtxHandler::InterpolationTestRoutine
         seed_space.data(),
         NULL,
         NULL
-  ); 
+  );
   // seed elem
   this->ocl_device_queues.at(0).enqueueWriteBuffer(
         this->write_buffer_set.at(1),
@@ -534,10 +534,10 @@ std::vector<float4> OclPtxHandler::InterpolationTestRoutine
         NULL,
         NULL
   );
-  
+
   cl::Kernel * test_kernel = &(this->ocl_kernel_set.at(0));
   // do NOT call delete on this.
-  
+
   test_kernel->setArg(0, this->read_buffer_set.at(0)); //voxels
   test_kernel->setArg(1, this->read_buffer_set.at(1)); //flow
   test_kernel->setArg(2, this->read_buffer_set.at(2)); //seed pts
@@ -553,7 +553,7 @@ std::vector<float4> OclPtxHandler::InterpolationTestRoutine
   // OCL CQ BLOCK
   this->ocl_device_queues.at(0).finish();
   // OCL CQ BLOCK
-  
+
   this->ocl_device_queues.at(0).enqueueNDRangeKernel(
     *test_kernel,
     cl::NullRange,
@@ -564,10 +564,10 @@ std::vector<float4> OclPtxHandler::InterpolationTestRoutine
   );
 
   this->ocl_device_queues.at(0).finish();
-  
+
   //instantiate return container
   std::vector<float4> return_container(result_num);
-  
+
   std::cout<<return_container.size()*sizeof(return_container.at(result_num))<<"\n";
   std::cout<<n_seeds*n_steps*sizeof(float4)<<"\n";
   std::cout<<result_mem_size<<"\n";
@@ -580,8 +580,8 @@ std::vector<float4> OclPtxHandler::InterpolationTestRoutine
     result_mem_size,
     &return_container[0]
   );
-  
-  return return_container;  
+
+  return return_container;
 }
 
 
@@ -596,12 +596,12 @@ std::vector<float4> OclPtxHandler::InterpolationTestRoutine
 //
 std::string oclErrorStrings(cl_int error)
 {
-  
+
   //
-  // redeclaration on each call obviously not efficient, but had some 
+  // redeclaration on each call obviously not efficient, but had some
   // problems putting this as a global variable, revisit later
   //
-  std::string error_string[] = 
+  std::string error_string[] =
   {
         "CL_SUCCESS",
         "CL_DEVICE_NOT_FOUND",
@@ -668,7 +668,7 @@ std::string oclErrorStrings(cl_int error)
         "CL_INVALID_MIP_LEVEL",
         "CL_INVALID_GLOBAL_WORK_SIZE",
     };
-    
+
     return error_string[ -1*error];
 }
 
