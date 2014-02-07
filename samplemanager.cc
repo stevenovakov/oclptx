@@ -31,10 +31,8 @@
 
 
 
-#include <iostream>
 #include <fstream>
 #include <sstream>
-#include <vector>
 
 
 #define __CL_ENABLE_EXCEPTIONS 
@@ -42,20 +40,25 @@
 // define before CL headers inclusion
 
 #include "samplemanager.h"
+#include "oclptxOptions.h"
 
 //
 // Assorted Functions Declerations
 //
 
-string SampleManager::IntToString(const int& value)
+std::string SampleManager::IntTostring(const int& value)
 {
-   stringstream s;
+   std::stringstream s;
    s << value;
    return s.str();
 }
 
 //Private method: Used for loading data directly into member containers
-void SampleManager::LoadBedpostDataToMatrix(const string& aThetaSampleName, const string& aPhiSampleName, const string& afSampleName, const volume<float>& aMask)
+void SampleManager::LoadBedpostDataToMatrix(
+  const std::string& aThetaSampleName,
+  const std::string& aPhiSampleName,
+  const std::string& afSampleName,
+  const volume<float>& aMask  )
 {
    volume4D<float> loadedVolume4DTheta;
    volume4D<float> loadedVolume4DPhi;
@@ -78,24 +81,22 @@ void SampleManager::LoadBedpostDataToMatrix(const string& aThetaSampleName, cons
       _phiSamples.push_back(loadedVolume4DPhi.matrix());   
       _fSamples.push_back(loadedVolume4Df.matrix());
    }
-   
-
 }
 
 //Loading BedpostData: No Masks.
-void SampleManager::LoadBedpostData(const string& aBasename)
+void SampleManager::LoadBedpostData(const std::string& aBasename)
 {
-   cout<<"Loading Bedpost samples....."<<endl;
+   std::cout<<"Loading Bedpost samples....."<<std::endl;
    if(aBasename == "")
    {
-      cout<< "Bad File Name"<<endl;
+      std::cout<< "Bad File Name"<<std::endl;
       return;
    }
    
    //volume4D<float> loadedVolume4D;
-   string thetaSampleNames;
-   string phiSampleNames; 
-   string fSampleNames;
+   std::string thetaSampleNames;
+   std::string phiSampleNames; 
+   std::string fSampleNames;
    
    //Single Fiber Case.
    if(NEWIMAGE::fsl_imageexists(aBasename+"_thsamples"))
@@ -109,27 +110,56 @@ void SampleManager::LoadBedpostData(const string& aBasename)
    else
    {
       int fiberNum = 1;       
-      string fiberNumAsString = IntToString(fiberNum);
-      thetaSampleNames = aBasename+"_th"+fiberNumAsString+"samples";
+      std::string fiberNumAsstring = IntTostring(fiberNum);
+      thetaSampleNames = aBasename+"_th"+fiberNumAsstring+"samples";
       bool doesFiberExist = NEWIMAGE::fsl_imageexists(thetaSampleNames);
       while(doesFiberExist)
       {
-         phiSampleNames = aBasename+"_ph"+fiberNumAsString+"samples";
-         fSampleNames = aBasename+"_f"+fiberNumAsString+"samples";
+         phiSampleNames = aBasename+"_ph"+fiberNumAsstring+"samples";
+         fSampleNames = aBasename+"_f"+fiberNumAsstring+"samples";
          
          LoadBedpostDataToMatrix(thetaSampleNames,phiSampleNames,fSampleNames);
 
          fiberNum++;
-         fiberNumAsString = IntToString(fiberNum);
-         thetaSampleNames = aBasename+"_th"+fiberNumAsString+"samples";
+         fiberNumAsstring = IntTostring(fiberNum);
+         thetaSampleNames = aBasename+"_th"+fiberNumAsstring+"samples";
          doesFiberExist = NEWIMAGE::fsl_imageexists(thetaSampleNames);
       }
       if(fiberNum == 1)
       {
-         cout<<"Could not find samples"<<endl;
+         std::cout<<"Could not find samples. Exiting Program..."<<std::endl;
          exit(1);
       }
-      cout<<"Finished Loading Samples from Bedpost"<<endl;
+      std::cout<<"Finished Loading Samples from Bedpost"<<std::endl;
+   }
+}
+
+void SampleManager::ParseCommandLine(int argc, char** argv)
+{
+   _oclptxOptions.parse_command_line(argc, argv);
+   
+   if(_oclptxOptions.verbose.value()>0)
+   {
+      _oclptxOptions.status();
+   }
+   
+   if(_oclptxOptions.simple.value())
+   {
+      if(_oclptxOptions.matrix1out.value() || _oclptxOptions.matrix3out.value())
+      {
+         std::cout<<"Error: cannot use matrix1 and matrix3 in simple mode"<<std::endl;
+         exit(1);
+      }
+      std::cout<<"Running in simple mode"<<std::endl;
+      this->LoadBedpostData(_oclptxOptions.basename.value());
+   }
+   else if (_oclptxOptions.network.value())
+   {
+      std::cout<<"Running in network mode"<<std::endl;
+   }
+   else
+   {
+      std::cout<<"Running in seedmask mode"<<std::endl;
    }
 }
 
@@ -167,6 +197,7 @@ const vector<Matrix>* SampleManager::GetFSamples()
 //*********************************************************************
 
 //Use this to get the only instance of SampleManager in the program.
+
 SampleManager& SampleManager::GetInstance()
 {
    if(_manager == NULL)
@@ -174,10 +205,10 @@ SampleManager& SampleManager::GetInstance()
       _manager = new SampleManager();
    }
    return *_manager;
-}
+}SampleManager* SampleManager::_manager;
 
 //Private Constructor.
-SampleManager::SampleManager(){}
+SampleManager::SampleManager():_oclptxOptions(oclptxOptions::getInstance()){}
 
 SampleManager::~SampleManager()
 {

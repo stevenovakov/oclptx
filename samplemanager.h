@@ -33,6 +33,7 @@
 #define  OCLPTX_SAMPLEMANAGER_H_
 
 #include "newimage/newimageall.h"
+#include "oclptxOptions.h"
 #include <iostream>
 #include <vector>
 #include <string>
@@ -42,14 +43,16 @@ using namespace NEWIMAGE;
 #define __CL_ENABLE_EXCEPTIONS
 // adds exception support from CL libraries
 // define before CL headers inclusion
+
  
 class SampleManager{
 	public:
       static SampleManager& GetInstance();
       ~SampleManager();
       
-      void LoadBedpostData(const string& aBasename);
-      //LoadBedpostData(const string& aBasename, const volume<float>& aMask);
+      void ParseCommandLine(int argc, char** argv);
+      void LoadBedpostData(const std::string& aBasename);
+      //LoadBedpostData(const std::string& aBasename, const volume<float>& aMask);
       
       //Getters
       const vector<Matrix>* GetThetaSamples();
@@ -59,10 +62,18 @@ class SampleManager{
 	private:
       SampleManager();
       
-      void LoadBedpostDataToMatrix(const string& aThetaSampleName, const string& aPhiSampleName, const string& afSampleName, const volume<float>& aMask = volume<float>());
-      string IntToString(const int& value);
+      void LoadBedpostDataToMatrix(
+        const std::string& aThetaSampleName,
+        const std::string& aPhiSampleName,
+        const std::string& afSampleName,
+        const volume<float>& aMask = volume<float>());
+        
+      std::string IntTostring(const int& value);
+      
       //Members
       static SampleManager* _manager;
+      
+      oclptxOptions& _oclptxOptions;
       vector<Matrix> _thetaSamples;
       vector<Matrix> _phiSamples;
       vector<Matrix> _fSamples; 
