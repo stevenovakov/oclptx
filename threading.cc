@@ -14,6 +14,8 @@ namespace threading
 bool CheckIn(char *kick)
 {
   // TODO(jeff): fix this hack.
+  // Note: Thread mustn't be killed until Watchdog thread notices that the
+  // *all* data is complete.
   if (2 == *kick)
     return true;
 
@@ -79,7 +81,7 @@ void Worker(struct global_fifos *fifos, Gpu *gpu, char *kick)
         gpu->ReadChunk(chunk);
 
         fifos->processed->PushOrDie(chunk);
-      } while (gpu->SpaceUsed());
+      } while (gpu->SpaceUsed());  // Keep copying until all data is off.
     } else {
       // No data available.
 
@@ -93,6 +95,17 @@ void Worker(struct global_fifos *fifos, Gpu *gpu, char *kick)
 // Reducer thread.
 int Reducer(struct global_fifos *fifos, char *kick)
 {
+  // What am I keeping track of..?
+
+
+
+
+
+
+
+
+
+  return 0;
 }
 
 // Watchdog thread.  Watches other threads for activity.
@@ -100,6 +113,7 @@ int Watchdog()
 {
   // time_t workers_last_kick[n_gpus];
   // time_t reducers_last_kick[n_reds];
+  return 0;
 }
 
 }  // namespace threading

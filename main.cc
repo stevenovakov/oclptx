@@ -42,6 +42,9 @@ int main(int argc, char **argv)
 
   worker.join();
 
+  // Expected values.
+  // 32 -> 16 -> 8  -> 4
+  // 17 -> 52 -> 26 -> 13
   return 0;
 
   // Set up my FIFOs:

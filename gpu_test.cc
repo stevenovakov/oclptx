@@ -39,6 +39,7 @@ int main(int argc, char **argv)
 
   // And check that the result is correct.
   // 32 -> 16 -> 8  -> 4
+  // 17 -> 52 -> 26 -> 13
   assert(4 == data2[0].value);
 
   return 0;
