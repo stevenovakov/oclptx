@@ -6,6 +6,7 @@
 //    current model does a decent amount of copying, maybe something else
 //    could work?
 
+#include <unistd.h>
 #include <thread>
 
 #include "oclptx/gpu.h"
@@ -36,6 +37,7 @@ int main(int argc, char **argv)
 
   std::thread worker(threading::Worker, &fifos, &gpu, &kick);
 
+  sleep(1); // Assumption: data will be complete by then.
   kick = 2;  // Kill the thread, which should start polling this when it's done.
 
   worker.join();
