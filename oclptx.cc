@@ -68,14 +68,18 @@ int main(int argc, char *argv[] )
   std::string compute_kernel;
   unsigned int n_particles;
   unsigned int n_max_steps;
-  
-  
+
+
   // Test Routine
   OclEnv environment("interptest");
+  //
+  // OclEnv should only ever be declared once (can rewrite as singleton
+  // class later). Recompile programs with ->SetOclRoutine(...)
+  //
   SimpleInterpolationTest(environment.GetContext(),
                           environment.GetCq(0),
                           environment.GetKernel(0));
-                          
+
   // Sample Manager
 
   SampleManager& s_manager = SampleManager::GetInstance();
@@ -118,11 +122,11 @@ int main(int argc, char *argv[] )
          //}
       //}
     //}
-    
+
     // somwhere in here, this should initialize, based on s_manager
     // actions:
     //
-    // OclEnv environment 
+    // OclEnv environment
   }
 
   std::cout<<"\n\nExiting...\n\n";

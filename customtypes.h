@@ -40,17 +40,17 @@
 #define OCLPTX_CUSTOMTYPES_H_
 
 
-struct float3{
-  float x, y, z;
-};
+//struct float3{
+  //float x, y, z;
+//};
 
 struct float4{
   float x, y, z, t;
 };
 
-struct int3{
-  float x, y, z;
-};
+//struct int3{
+  //float x, y, z;
+//};
 
 struct int4{
   float x, y, z, t;
@@ -86,5 +86,16 @@ struct BedpostXData
   unsigned int nx, ny, nz;  // discrete dimensions of mesh
   unsigned int ns;          //number of samples
 };
+//
+// Note on particle positions re:bedpostx mesh :
+// if a particle is at x,y,z, can find nearest "root" vertex:
+// (lowest x,y,z coordinate vertex), at X, Y, Z and find element #
+// thusly: 
+//
+// elem = nssample*(X*nz*ny + Y*nz + Z)
+//
+// Device side, where there may be multiple directions included, simply
+// multiply by the direction #, (from 0 to n-1)
+// 
 
 #endif

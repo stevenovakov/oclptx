@@ -123,6 +123,13 @@ void WriteSamplesToDevice( BedpostXData* f_data,
   unsigned int total_mem_size =
     single_direction_mem_size*num_directions;
 
+  this->samples_buffer_size = total_mem_size;
+  
+  this->sample_nx = f_data.nx;
+  this->sample_ny = f_data.ny;
+  this->sample_nz = f_data.nz;
+  this->sample_ns = f_data.ns;
+
   this->f_samples_buffer =
     cl::Buffer(
       *(this->ocl_context),
@@ -150,10 +157,12 @@ void WriteSamplesToDevice( BedpostXData* f_data,
       NULL
     );
 
+  // enqueue writes
+
   for (unsigned int d=0; d<num_directions; d++)
   {
     this->cq->enqueueWriteBuffer(
-        f_samples_buffer,
+        this->f_samples_buffer,
         CL_FALSE,
         d * single_direction_mem_size,
         single_direction_mem_size,
@@ -163,7 +172,7 @@ void WriteSamplesToDevice( BedpostXData* f_data,
     );
 
     this->cq->enqueueWriteBuffer(
-      theta_samples_buffer,
+      this->theta_samples_buffer,
       CL_FALSE,
       d * single_direction_mem_size,
       single_direction_mem_size,
@@ -173,7 +182,7 @@ void WriteSamplesToDevice( BedpostXData* f_data,
     );
 
     this->cq->enqueueWriteBuffer(
-      phi_samples_buffer,
+      this->phi_samples_buffer,
       CL_FALSE,
       d * single_direction_mem_size,
       single_direction_mem_size,
@@ -187,7 +196,86 @@ void WriteSamplesToDevice( BedpostXData* f_data,
   this->cq->finish();
 }
 
+void WriteInitialPosToDevice(float4* initial_positions,
+                              unsigned int nparticles,
+                              unsigned int maximum_steps,
+                              unsigned int ndevices,
+                              unsigned int device_num
+                            )
+{
+  unsigned int sec_size = nparticles/ndevices;
 
+  this->section_size = sec_size;
+  this->n_particles = nparticles;
+  this->max_steps = maximum_steps;
+
+  unsigned int path_mem_size = sec_size*maximum_steps*sizeof(float4);
+  unsigned int path_steps_size = sec_size*sizeof(unsigned int);
+
+  // if MT: wrap in mutex (to avoid race on initial_positions)
+  float4* start_pos_data = initial_positions + (sec_size*device_num);
+  // if MT: wrap in mutex (to avoid race on initial_positions)
+
+  std::vector<unsigned int> initial_steps(sec_size, 0);
+
+  // delete this at end of function always
+  float4* pos_container;
+  pos_container = new float4[sec_size * maximum_steps];
+
+  // the first entry in row i will be the particle start location
+  // the rest is garbage data (that's fine)
+  for ( unsigned int i = 0; i < sec_size; i++)
+  {
+    pos_container[maximum_steps*i] = *start_pos_data;
+    start_pos_data++;
+  }
+
+  this->particle_paths_buffer =
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_WRITE,
+      path_mem_size,
+      NULL,
+      NULL
+    );
+
+  this->particle_steps_taken_buffer =
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_WRITE,
+      path_steps_size,
+      NULL,
+      NULL
+    );
+
+  // enqueue writes
+
+  this->cq->enqueueWriteBuffer(
+    this->particle_paths_buffer,
+    CL_FALSE,
+    static_cast<unsigned int>(0),
+    path_mem_size,
+    pos_container,
+    NULL,
+    NULL
+  );
+
+  this->cq->enqueueWriteBuffer(
+    this->particle_steps_taken_buffer,
+    CL_FALSE,
+    static_cast<unsigned int>(0),
+    path_steps_size,
+    initial_steps.data(),
+    NULL,
+    NULL
+  );
+
+  // may not need to do this here, may want to wait to block until
+  // all "initialization" operations are finished.
+  this->cq->finish();
+
+  delete pos_container[];
+}
 
 //*********************************************************************
 //
@@ -195,9 +283,18 @@ void WriteSamplesToDevice( BedpostXData* f_data,
 //
 //*********************************************************************
 
+void OclPtxHandler::ReduceInit()
+{
+  
+  
+}
 
-
-
+void OclPtxHandler:Reduce()
+{
+  
+  
+  
+}
 
 //*********************************************************************
 //
@@ -205,7 +302,11 @@ void WriteSamplesToDevice( BedpostXData* f_data,
 //
 //*********************************************************************
 
-
+void OclPtxHandler::Interpolate()
+{
+  
+  
+}
 
 
 //*********************************************************************

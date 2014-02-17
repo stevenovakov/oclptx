@@ -81,7 +81,9 @@ class OclPtxHandler{
     // may want to compute offset beforehand in samplemanager,
     // can decide later.
 
-    void WriteInitialPosToDevice(float4* initial_positions,
+    void WriteInitialPosToDevice( float4* initial_positions,
+                                  unsigned int nparticles,
+                                  unsigned int max_steps,
                                   unsigned int ndevices,
                                   unsigned int device_num
                                 );
@@ -90,7 +92,8 @@ class OclPtxHandler{
     // Reduction
     //
 
-    void ReduceInit(std::string reduction_style); //ran once only.
+    void ReduceInit(  unsigned int particles_per,
+                      std::string reduction_style); //ran once only.
 
     void Reduce();
 
@@ -119,12 +122,15 @@ class OclPtxHandler{
     cl::Buffer theta_samples_buffer;
 
     unsigned int samples_buffer_size;
+    unsigned int sample_nx, sample_ny, sample_nz, sample_ns;
 
     //
     // Output Data
     //
 
     unsigned int n_particles;
+    unsigned int max_steps;
+    unsigned int section_size;
 
     cl::Buffer particle_paths_buffer;
     cl::Buffer particle_steps_taken_buffer;
