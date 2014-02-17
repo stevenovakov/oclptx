@@ -403,7 +403,7 @@ std::string OclEnv::OclErrorStrings(cl_int error)
     "CL_INVALID_MIP_LEVEL",
     "CL_INVALID_GLOBAL_WORK_SIZE"
   };
-  
+
   return cl_error_string[ -1*error];
 }
 

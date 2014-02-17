@@ -59,56 +59,56 @@ class OclPtxHandler{
     //
     // I/O
     //
-    
+
     std::vector<float4> GetParticlePaths();   // do at end
-    
+
     //
     // OCL Initialization
     //
-    
-    void     
-    
+
+    void
+
     void WriteSamplesToDevice( float4 * f_data,
                                 float4 * phi_data,
                                 float4 * theta_data,
                                 unsigned int offset
                               );
-    // may want to compute offset beforehand in samplemanager, 
+    // may want to compute offset beforehand in samplemanager,
     // can decide later.
-    
+
     //
     // Reduction
     //
-    
+
     void ReduceInit(std::string reduction_style); //ran once only.
-    
+
     void Reduce();
 
     //
     // Interpolation
     //
-    
+
     void Interpolate();
-  
+
 
   private:
     //
     // Constant Data
     //
-    
+
     cl::Buffer fsamples_buffer;
     cl::Buffer phisamples_buffer;
     cl::Buffer thetasamples_buffer;
-    
-    unsigned int samples_buffer_size;    
-    
+
+    unsigned int samples_buffer_size;
+
     //
     // Variable Data
     //
-    
-    cl::Buffer particle_paths_buffer;  
-    // size (Total Particles)/numDevices * (sizeof(float4))    
-    
+
+    cl::Buffer particle_paths_buffer;
+    // size (Total Particles)/numDevices * (sizeof(float4))
+
     //
     // These are the "double buffer" objects
     //
@@ -117,18 +117,18 @@ class OclPtxHandler{
     // may initiate a race condition.
     //
     std::vector<cl::Buffer> compute_indices;
-    
+
     // Vector of size   2x (N/2 ) , where n is the total number
     // of particles
     std::vector< std::vector<unsigned int> > particle_indeces;
 
     std::vector< std::vector<bool> > particle_complete;
-    
+
     // may want to just re-compute element # based off position
     // INSIDE KERNEL rather than store.
     //std::vector<cl::Buffer> compute_elements;
     //std::vector< std::vector<unsigned int> > particle_elements;
-    
+
     // NDRange of current pair of enqueueNDRangeKernel
     std::vector<unsigned int> compute_range;
 

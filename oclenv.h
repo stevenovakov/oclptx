@@ -66,9 +66,9 @@ class OclEnv{
     cl::Context * GetContext();
 
     cl::CommandQueue * GetCq(unsigned int device_num);
-    
+
     unsigned int HowManyDevices();
-    
+
     cl::Device * GetDevice(unsigned int device_num);
 
     cl::Kernel * GetKernel(unsigned int kernel_num);
@@ -89,7 +89,7 @@ class OclEnv{
     void NewCLCommandQueues();
 
     cl::Program CreateProgram();
-    
+
     std::string OclErrorStrings(cl_int error);
 
   private:
@@ -109,7 +109,7 @@ class OclEnv{
     //Every compiled kernel is stored here.
 
     std::string ocl_routine_name;
-    
+
     bool ocl_profiling;
 };
 
