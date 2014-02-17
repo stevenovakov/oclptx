@@ -53,7 +53,7 @@ class OclPtxHandler{
 
   public:
     OclPtxHandler(){};
-    
+
     OclPtxHandler(  cl::Context* cc,
                     cl::CommandQueue* cq,
                     cl::Kernel* ck);
@@ -136,19 +136,19 @@ class OclPtxHandler{
 
     unsigned int n_particles;
     unsigned int max_steps;
-    
+
     // TODO @STEVE:  Some of this stuff will be GPU memory limited
     // figure out which and how
-    
+
     unsigned int section_size;
     unsigned int step_size;
     unsigned int particles_size;
 
     cl::Buffer particle_paths_buffer;
     cl::Buffer particle_steps_taken_buffer;
-    
+
     cl::Buffer particle_done_buffer;
-    
+
     // size (Total Particles)/numDevices * (sizeof(float4))
 
     //
@@ -167,7 +167,7 @@ class OclPtxHandler{
     std::vector< std::vector<unsigned int> > particle_todo;
     // NDRange of current pair of enqueueNDRangeKernel
     std::vector<unsigned int> todo_range;
- 
+
 
     // may want to just re-compute element # based off position
     // INSIDE KERNEL rather than store.

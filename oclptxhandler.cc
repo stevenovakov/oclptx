@@ -108,7 +108,7 @@ OclPtxHandler::~OclPtxHandler()
 //
 // void Initialize()
 
-void OclPtxHandler::WriteSamplesToDevice( 
+void OclPtxHandler::WriteSamplesToDevice(
   BedpostXData* f_data,
   BedpostXData* phi_data,
   BedpostXData* theta_data,
@@ -308,9 +308,9 @@ void OclPtxHandler::DoubleBufferInit(
   this->step_size = step_interval_size;
 
   this->particles_size = particle_interval_size;
-  unsigned int interval_mem_size = 
+  unsigned int interval_mem_size =
     particle_interval_size*sizeof(unsigned int);
-    
+
   // first iteration is same size
   this->todo_range.push_back( step_interval_size );
   this->todo_range.push_back( step_interval_size );
@@ -347,7 +347,7 @@ void OclPtxHandler::DoubleBufferInit(
       NULL,
       NULL)
   );
-  
+
   // Copy over initial data to both buffers
   this->ocl_cq->enqueueWriteBuffer(
     this->compute_index_buffers.at(0),
