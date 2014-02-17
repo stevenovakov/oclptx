@@ -65,6 +65,11 @@
 //
 // Constructor(s)
 //
+OclPtxHandler::OclPtxHanlder()
+{
+  this->interpolation_complete = false;
+  this->target_section = 0;
+}
 
 
 //

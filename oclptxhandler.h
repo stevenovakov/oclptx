@@ -52,46 +52,88 @@
 class OclPtxHandler{
 
   public:
-    OclPtxHandler(){};
+    OclPtxHandler();
 
     ~OclPtxHandler();
 
-
     //
-    // Thread Management
+    // I/O
     //
-
-    void PTStart();
-
-    void ThreadController();
-
+    
+    std::vector<float4> GetParticlePaths();   // do at end
+    
+    //
+    // OCL Initialization
+    //
+    
+    void     
+    
+    void WriteSamplesToDevice( float4 * f_data,
+                                float4 * phi_data,
+                                float4 * theta_data,
+                                unsigned int offset
+                              );
+    // may want to compute offset beforehand in samplemanager, 
+    // can decide later.
+    
+    //
+    // Reduction
+    //
+    
+    void ReduceInit(std::string reduction_style); //ran once only.
+    
+    void Reduce();
 
     //
     // Interpolation
     //
-
-
+    
+    void Interpolate();
+  
 
   private:
     //
-    // Various
+    // Constant Data
     //
-
+    
+    cl::Buffer fsamples_buffer;
+    cl::Buffer phisamples_buffer;
+    cl::Buffer thetasamples_buffer;
+    
+    unsigned int samples_buffer_size;    
+    
+    //
+    // Variable Data
+    //
+    
+    cl::Buffer particle_paths_buffer;  
+    // size (Total Particles)/numDevices * (sizeof(float4))    
+    
+    //
+    // These are the "double buffer" objects
     //
     // Might have to rethink this within scope of mutexing, if
     // there is a common root/owner object, then access through that
     // may initiate a race condition.
     //
-
+    std::vector<cl::Buffer> compute_indices;
+    
     // Vector of size   2x (N/2 ) , where n is the total number
     // of particles
     std::vector< std::vector<unsigned int> > particle_indeces;
-    std::vector< std::vector<bool> > particle_complete;
 
+    std::vector< std::vector<bool> > particle_complete;
+    
+    // may want to just re-compute element # based off position
+    // INSIDE KERNEL rather than store.
+    //std::vector<cl::Buffer> compute_elements;
+    //std::vector< std::vector<unsigned int> > particle_elements;
+    
+    // NDRange of current pair of enqueueNDRangeKernel
     std::vector<unsigned int> compute_range;
 
     // which half of particle_indeces/particle_complete needs to be
-    // interpolated next.
+    // interpolated next (either 0, or 1)
     // TODO: Make sure there are no access conflicts within multithread
     // scheme (e.g.  go to interpolate second half, but reduction
     // method accidentally changed target_section to "0" again.
@@ -99,6 +141,7 @@ class OclPtxHandler{
     // this might need a mutex
 
     bool interpolation_complete;
+    // false until there are zero particle paths left to compute.
 };
 
 #endif
