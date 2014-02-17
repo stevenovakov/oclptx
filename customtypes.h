@@ -80,4 +80,11 @@ struct FloatVolume
     //MutexWrapper& operator=(MutexWrapper const&) { return *this; }
 //};
 
+struct BedpostXData
+{
+  std::vector<float*> data;
+  unsigned int nx, ny, nz;  // discrete dimensions of mesh
+  unsigned int ns;          //number of samples
+};
+
 #endif

@@ -65,10 +65,18 @@
 //
 // Constructor(s)
 //
-OclPtxHandler::OclPtxHanlder()
+OclPtxHandler::OclPtxHandler(
+    cl::Context* cc,
+    cl::CommandQueue* cq,
+    cl::Kernel* ck
+)
 {
   this->interpolation_complete = false;
   this->target_section = 0;
+
+  this->ocl_context = cc;
+  this->ocl_cq = cq;
+  this->ptx_kernel = ck;
 }
 
 
@@ -83,9 +91,101 @@ OclPtxHandler::~OclPtxHandler()
 
 //*********************************************************************
 //
-// OclPtxHandler Container Set/Get
+// OclPtxHandler  Set/Get
 //
 //*********************************************************************
+
+
+
+//*********************************************************************
+//
+// OclPtxHandler Container Initializations
+//
+//*********************************************************************
+
+// May want overarching initialize() that simply wraps everything
+// below to be called by std::thread
+//
+// void Initialize()
+
+void WriteSamplesToDevice( BedpostXData* f_data,
+                            BedpostXData* phi_data,
+                            BedpostXData* theta_data,
+                            unsigned int num_directions
+                          )
+{
+  unsigned int single_direction_size =
+    f_data->nx * f_data->ny * f_data->nz * f_data->ns;
+
+  unsigned int single_direction_mem_size =
+    single_direction_size*sizeof(float4);
+
+  unsigned int total_mem_size =
+    single_direction_mem_size*num_directions;
+
+  this->f_samples_buffer =
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_ONLY,
+      total_mem_size,
+      NULL,
+      NULL
+    );
+
+  this->theta_samples_buffer =
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_ONLY,
+      total_mem_size,
+      NULL,
+      NULL
+    );
+
+  this->phi_samples_buffer =
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_ONLY,
+      total_mem_size,
+      NULL,
+      NULL
+    );
+
+  for (unsigned int d=0; d<num_directions; d++)
+  {
+    this->cq->enqueueWriteBuffer(
+        f_samples_buffer,
+        CL_FALSE,
+        d * single_direction_mem_size,
+        single_direction_mem_size,
+        f_data->data.at(d),
+        NULL,
+        NULL
+    );
+
+    this->cq->enqueueWriteBuffer(
+      theta_samples_buffer,
+      CL_FALSE,
+      d * single_direction_mem_size,
+      single_direction_mem_size,
+      theta_data->data.at(d),
+      NULL,
+      NULL
+    );
+
+    this->cq->enqueueWriteBuffer(
+      phi_samples_buffer,
+      CL_FALSE,
+      d * single_direction_mem_size,
+      single_direction_mem_size,
+      phi_data->data.at(d),
+      NULL,
+      NULL
+    );
+  }
+  // may not need to do this here, may want to wait to block until
+  // all "initialization" operations are finished.
+  this->cq->finish();
+}
 
 
 

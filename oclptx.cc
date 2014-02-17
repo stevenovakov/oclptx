@@ -65,13 +65,18 @@ void SimpleInterpolationTest( cl::Context * ocl_context,
 
 int main(int argc, char *argv[] )
 {
-
-  //Test Routine
+  std::string compute_kernel;
+  unsigned int n_particles;
+  unsigned int n_max_steps;
+  
+  
+  // Test Routine
   OclEnv environment("interptest");
-
   SimpleInterpolationTest(environment.GetContext(),
                           environment.GetCq(0),
                           environment.GetKernel(0));
+                          
+  // Sample Manager
 
   SampleManager& s_manager = SampleManager::GetInstance();
   if(&s_manager == NULL)
@@ -113,6 +118,11 @@ int main(int argc, char *argv[] )
          //}
       //}
     //}
+    
+    // somwhere in here, this should initialize, based on s_manager
+    // actions:
+    //
+    // OclEnv environment 
   }
 
   std::cout<<"\n\nExiting...\n\n";

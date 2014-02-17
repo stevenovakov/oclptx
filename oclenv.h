@@ -64,13 +64,11 @@ class OclEnv{
     //
 
     cl::Context * GetContext();
-
-    cl::CommandQueue * GetCq(unsigned int device_num);
-
-    unsigned int HowManyDevices();
-
+    
     cl::Device * GetDevice(unsigned int device_num);
-
+    unsigned int HowManyDevices();
+    
+    cl::CommandQueue * GetCq(unsigned int device_num);
     cl::Kernel * GetKernel(unsigned int kernel_num);
     // TODO:
     // not sure if better to generate new cl::kernel  object for
@@ -101,7 +99,7 @@ class OclEnv{
     std::vector<cl::Platform> ocl_platforms;
 
     std::vector<cl::Device> ocl_devices;
-
+    
     std::vector<cl::CommandQueue> ocl_device_queues;
     //std::vector<MutexWrapper> ocl_device_queue_mutexs;
 

@@ -174,6 +174,11 @@ void OclEnv::OclDeviceInfo()
     std::cout<<"\n";
   }
 }
+
+unsigned int OclEnv::HowManyDevices()
+{
+  return this->ocl_devices.size();
+}
 //
 //
 //
@@ -305,26 +310,26 @@ cl::Program OclEnv::CreateProgram()
   //
   // Compile Kernels from Program
   //
-  if (this->ocl_routine_name == "oclptx" )
+  for( unsigned int k = 0; k < this->ocldevices.size(); k++)
   {
-    this->ocl_kernel_set.push_back(cl::Kernel(  ocl_program,
-                                                "InterpolateKernel",
-                                                NULL
-                                              ));
-  }
-  else if (this->ocl_routine_name == "oclptx" )
-  {
-    this->ocl_kernel_set.push_back(cl::Kernel(  ocl_program,
+    if (this->ocl_routine_name == "oclptx" )
+    {
+      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
+                                                "OclPtxKernel",
+                                                NULL ));
+    }
+    else if (this->ocl_routine_name == "prngtest" )
+    {
+      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
                                                 "PrngTestKernel",
-                                                NULL
-                                              ));
-  }
-  else if (this->ocl_routine_name == "interptest" )
-  {
-    this->ocl_kernel_set.push_back(cl::Kernel(  ocl_program,
+                                                NULL));
+    }
+    else if (this->ocl_routine_name == "interptest" )
+    {
+      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
                                                 "InterpolateTestKernel",
-                                                NULL
-                                              ));
+                                                NULL));
+    }
   }
 
   return ocl_program;

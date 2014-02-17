@@ -50,9 +50,7 @@
 //
 //*********************************************************************
 
-__kernel void InterpolateKernel(
-    __global float3* vertex_set
-    )
+__kernel void OclPtxKernel()
 {
   unsigned int glIDx = get_global_id(0);
   unsigned int glIDy = get_global_id(1);

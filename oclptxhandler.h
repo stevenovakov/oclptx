@@ -57,24 +57,34 @@ class OclPtxHandler{
     ~OclPtxHandler();
 
     //
-    // I/O
+    // Set/Get
     //
 
     std::vector<float4> GetParticlePaths();   // do at end
+
+    bool IsFinished(){ return this->interpolation_complete };
 
     //
     // OCL Initialization
     //
 
-    void
+    // May want overarching initialize() that simply wraps everything
+    // below to be called by std::thread
+    //
+    // void Initialize()
 
-    void WriteSamplesToDevice( float4 * f_data,
-                                float4 * phi_data,
-                                float4 * theta_data,
-                                unsigned int offset
+    void WriteSamplesToDevice( BedpostXData* f_data,
+                                BedpostXData* phi_data,
+                                BedpostXData* theta_data,
+                                unsigned int num_directions
                               );
     // may want to compute offset beforehand in samplemanager,
     // can decide later.
+
+    void WriteInitialPosToDevice(float4* initial_positions,
+                                  unsigned int ndevices,
+                                  unsigned int device_num
+                                );
 
     //
     // Reduction
@@ -93,20 +103,31 @@ class OclPtxHandler{
 
   private:
     //
-    // Constant Data
+    // OpenCL Interface
+    //
+    cl::Context* ocl_context;
+
+    cl::CommandQueue* ocl_cq;
+
+    cl::Kernel* ptx_kernel;
+    //
+    // BedpostX Data
     //
 
-    cl::Buffer fsamples_buffer;
-    cl::Buffer phisamples_buffer;
-    cl::Buffer thetasamples_buffer;
+    cl::Buffer f_samples_buffer;
+    cl::Buffer phi_samples_buffer;
+    cl::Buffer theta_samples_buffer;
 
     unsigned int samples_buffer_size;
 
     //
-    // Variable Data
+    // Output Data
     //
 
+    unsigned int n_particles;
+
     cl::Buffer particle_paths_buffer;
+    cl::Buffer particle_steps_taken_buffer;
     // size (Total Particles)/numDevices * (sizeof(float4))
 
     //
