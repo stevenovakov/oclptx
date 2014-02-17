@@ -108,11 +108,12 @@ OclPtxHandler::~OclPtxHandler()
 //
 // void Initialize()
 
-void WriteSamplesToDevice( BedpostXData* f_data,
-                            BedpostXData* phi_data,
-                            BedpostXData* theta_data,
-                            unsigned int num_directions
-                          )
+void OclPtxHandler::WriteSamplesToDevice( 
+  BedpostXData* f_data,
+  BedpostXData* phi_data,
+  BedpostXData* theta_data,
+  unsigned int num_directions
+)
 {
   unsigned int single_direction_size =
     f_data->nx * f_data->ny * f_data->nz * f_data->ns;
@@ -125,10 +126,10 @@ void WriteSamplesToDevice( BedpostXData* f_data,
 
   this->samples_buffer_size = total_mem_size;
 
-  this->sample_nx = f_data.nx;
-  this->sample_ny = f_data.ny;
-  this->sample_nz = f_data.nz;
-  this->sample_ns = f_data.ns;
+  this->sample_nx = f_data->nx;
+  this->sample_ny = f_data->ny;
+  this->sample_nz = f_data->nz;
+  this->sample_ns = f_data->ns;
 
   this->f_samples_buffer =
     cl::Buffer(
@@ -161,7 +162,7 @@ void WriteSamplesToDevice( BedpostXData* f_data,
 
   for (unsigned int d=0; d<num_directions; d++)
   {
-    this->cq->enqueueWriteBuffer(
+    this->ocl_cq->enqueueWriteBuffer(
         this->f_samples_buffer,
         CL_FALSE,
         d * single_direction_mem_size,
@@ -171,7 +172,7 @@ void WriteSamplesToDevice( BedpostXData* f_data,
         NULL
     );
 
-    this->cq->enqueueWriteBuffer(
+    this->ocl_cq->enqueueWriteBuffer(
       this->theta_samples_buffer,
       CL_FALSE,
       d * single_direction_mem_size,
@@ -181,7 +182,7 @@ void WriteSamplesToDevice( BedpostXData* f_data,
       NULL
     );
 
-    this->cq->enqueueWriteBuffer(
+    this->ocl_cq->enqueueWriteBuffer(
       this->phi_samples_buffer,
       CL_FALSE,
       d * single_direction_mem_size,
@@ -193,15 +194,16 @@ void WriteSamplesToDevice( BedpostXData* f_data,
   }
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
-  this->cq->finish();
+  this->ocl_cq->finish();
 }
 
-void WriteInitialPosToDevice(float4* initial_positions,
-                              unsigned int nparticles,
-                              unsigned int maximum_steps,
-                              unsigned int ndevices,
-                              unsigned int device_num
-                            )
+void OclPtxHandler::WriteInitialPosToDevice(
+  float4* initial_positions,
+  unsigned int nparticles,
+  unsigned int maximum_steps,
+  unsigned int ndevices,
+  unsigned int device_num
+)
 {
   unsigned int sec_size = nparticles/ndevices;
 
@@ -210,12 +212,13 @@ void WriteInitialPosToDevice(float4* initial_positions,
   this->max_steps = maximum_steps;
 
   unsigned int path_mem_size = sec_size*maximum_steps*sizeof(float4);
-  unsigned int path_steps_size = sec_size*sizeof(unsigned int);
+  unsigned int path_steps_mem_size = sec_size*sizeof(unsigned int);
 
   // if MT: wrap in mutex (to avoid race on initial_positions)
   float4* start_pos_data = initial_positions + (sec_size*device_num);
   // if MT: wrap in mutex (to avoid race on initial_positions)
 
+  // also doubles as the "is done" initial data
   std::vector<unsigned int> initial_steps(sec_size, 0);
 
   // delete this at end of function always
@@ -228,6 +231,8 @@ void WriteInitialPosToDevice(float4* initial_positions,
   {
     pos_container[maximum_steps*i] = *start_pos_data;
     start_pos_data++;
+    this->particle_indeces_left.push_back(i);
+    this->particle_complete.push_back(static_cast<unsigned int>(0));
   }
 
   this->particle_paths_buffer =
@@ -243,14 +248,22 @@ void WriteInitialPosToDevice(float4* initial_positions,
     cl::Buffer(
       *(this->ocl_context),
       CL_MEM_READ_WRITE,
-      path_steps_size,
+      path_steps_mem_size,
       NULL,
       NULL
     );
 
+  this->particle_done_buffer =
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_WRITE,
+      path_steps_mem_size,
+      NULL,
+      NULL
+    );
   // enqueue writes
 
-  this->cq->enqueueWriteBuffer(
+  this->ocl_cq->enqueueWriteBuffer(
     this->particle_paths_buffer,
     CL_FALSE,
     static_cast<unsigned int>(0),
@@ -260,11 +273,21 @@ void WriteInitialPosToDevice(float4* initial_positions,
     NULL
   );
 
-  this->cq->enqueueWriteBuffer(
+  this->ocl_cq->enqueueWriteBuffer(
     this->particle_steps_taken_buffer,
     CL_FALSE,
     static_cast<unsigned int>(0),
-    path_steps_size,
+    path_steps_mem_size,
+    initial_steps.data(),
+    NULL,
+    NULL
+  );
+
+  this->ocl_cq->enqueueWriteBuffer(
+    this->particle_done_buffer,
+    CL_FALSE,
+    static_cast<unsigned int>(0),
+    path_steps_mem_size,
     initial_steps.data(),
     NULL,
     NULL
@@ -272,14 +295,83 @@ void WriteInitialPosToDevice(float4* initial_positions,
 
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
-  this->cq->finish();
+  this->ocl_cq->finish();
 
-  delete pos_container[];
+  delete[] pos_container;
 }
 
-void OclPtxHandler::DoubleBufferInit()
+void OclPtxHandler::DoubleBufferInit(
+  unsigned int particle_interval_size,
+  unsigned int step_interval_size
+)
 {
+  this->step_size = step_interval_size;
 
+  this->particles_size = particle_interval_size;
+  unsigned int interval_mem_size = 
+    particle_interval_size*sizeof(unsigned int);
+    
+  // first iteration is same size
+  this->todo_range.push_back( step_interval_size );
+  this->todo_range.push_back( step_interval_size );
+
+  std::vector<unsigned int> temp;
+  this->particle_todo.push_back(temp);
+  this->particle_todo.push_back(temp);
+
+  for (unsigned int k=0; k<particle_interval_size; k++)
+  {
+    this->particle_todo.at(0).push_back(
+      this->particle_indeces_left.back());
+    this->particle_indeces_left.pop_back();
+    this->particle_todo.at(1).push_back(
+      this->particle_indeces_left.back());
+    this->particle_indeces_left.pop_back();
+  }
+
+  // Initialize both buffers
+
+  this->compute_index_buffers.push_back(
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_WRITE,
+      interval_mem_size,
+      NULL,
+      NULL)
+  );
+  this->compute_index_buffers.push_back(
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_WRITE,
+      interval_mem_size,
+      NULL,
+      NULL)
+  );
+  
+  // Copy over initial data to both buffers
+  this->ocl_cq->enqueueWriteBuffer(
+    this->compute_index_buffers.at(0),
+    CL_FALSE,
+    static_cast<unsigned int>(0),
+    interval_mem_size,
+    this->particle_todo.at(0).data(),
+    NULL,
+    NULL
+  );
+
+  this->ocl_cq->enqueueWriteBuffer(
+    this->compute_index_buffers.at(1),
+    CL_FALSE,
+    static_cast<unsigned int>(0),
+    interval_mem_size,
+    this->particle_todo.at(1).data(),
+    NULL,
+    NULL
+  );
+
+  // may not need to do this here, may want to wait to block until
+  // all "initialization" operations are finished.
+  this->ocl_cq->finish();
 
 }
 
@@ -289,17 +381,20 @@ void OclPtxHandler::DoubleBufferInit()
 //
 //*********************************************************************
 
-void OclPtxHandler::ReduceInit()
+void OclPtxHandler::ReduceInit(unsigned int particles_per,
+                                std::string reduction_style)
 {
-
+  // actually might not need this thanks to DoubleBufferInit
 
 }
 
-void OclPtxHandler:Reduce()
+void OclPtxHandler::Reduce()
 {
+  // may need to mutex
+  unsigned int t_sec = this->target_section;
+  // may need to mutex
 
-
-
+  this->target_section = this->target_section & 0x00000000;
 }
 
 //*********************************************************************

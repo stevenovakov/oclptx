@@ -40,17 +40,17 @@
 #define OCLPTX_CUSTOMTYPES_H_
 
 
-//struct float3{
-  //float x, y, z;
-//};
+struct float3{
+  float x, y, z;
+};
 
 struct float4{
   float x, y, z, t;
 };
 
-//struct int3{
-  //float x, y, z;
-//};
+struct int3{
+  float x, y, z;
+};
 
 struct int4{
   float x, y, z, t;

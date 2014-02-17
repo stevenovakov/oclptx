@@ -52,7 +52,11 @@
 class OclPtxHandler{
 
   public:
-    OclPtxHandler();
+    OclPtxHandler(){};
+    
+    OclPtxHandler(  cl::Context* cc,
+                    cl::CommandQueue* cq,
+                    cl::Kernel* ck);
 
     ~OclPtxHandler();
 
@@ -62,7 +66,7 @@ class OclPtxHandler{
 
     std::vector<float4> GetParticlePaths();   // do at end
 
-    bool IsFinished(){ return this->interpolation_complete };
+    bool IsFinished(){ return this->interpolation_complete; };
 
     //
     // OCL Initialization
@@ -88,7 +92,9 @@ class OclPtxHandler{
                                   unsigned int device_num
                                 );
 
-    void DoubleBufferInit();
+    void DoubleBufferInit(  unsigned int particle_interval_size,
+                            unsigned int step_interval_size
+                          );
     //
     // Reduction
     //
@@ -130,10 +136,19 @@ class OclPtxHandler{
 
     unsigned int n_particles;
     unsigned int max_steps;
+    
+    // TODO @STEVE:  Some of this stuff will be GPU memory limited
+    // figure out which and how
+    
     unsigned int section_size;
+    unsigned int step_size;
+    unsigned int particles_size;
 
     cl::Buffer particle_paths_buffer;
     cl::Buffer particle_steps_taken_buffer;
+    
+    cl::Buffer particle_done_buffer;
+    
     // size (Total Particles)/numDevices * (sizeof(float4))
 
     //
@@ -143,21 +158,23 @@ class OclPtxHandler{
     // there is a common root/owner object, then access through that
     // may initiate a race condition.
     //
-    std::vector<cl::Buffer> compute_indices;
+    std::vector<cl::Buffer> compute_index_buffers;
 
-    // Vector of size   2x (N/2 ) , where n is the total number
+    std::vector< unsigned int > particle_indeces_left;
+    std::vector< bool > particle_complete;
+    // Vector of max size (N/2 ) , where n is the total number
     // of particles
-    std::vector< std::vector<unsigned int> > particle_indeces;
-
-    std::vector< std::vector<bool> > particle_complete;
+    std::vector< std::vector<unsigned int> > particle_todo;
+    // NDRange of current pair of enqueueNDRangeKernel
+    std::vector<unsigned int> todo_range;
+ 
 
     // may want to just re-compute element # based off position
     // INSIDE KERNEL rather than store.
     //std::vector<cl::Buffer> compute_elements;
     //std::vector< std::vector<unsigned int> > particle_elements;
 
-    // NDRange of current pair of enqueueNDRangeKernel
-    std::vector<unsigned int> compute_range;
+
 
     // which half of particle_indeces/particle_complete needs to be
     // interpolated next (either 0, or 1)

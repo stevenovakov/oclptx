@@ -65,6 +65,7 @@ void SimpleInterpolationTest( cl::Context * ocl_context,
 
 int main(int argc, char *argv[] )
 {
+  // stuff set by s_manager and environment
   std::string compute_kernel;
   unsigned int n_particles;
   unsigned int n_max_steps;

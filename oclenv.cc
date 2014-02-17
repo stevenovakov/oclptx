@@ -105,7 +105,7 @@ cl::Kernel * OclEnv::GetKernel(unsigned int kernel_num)
 void OclEnv::SetOclRoutine(std::string new_routine)
 {
   this->ocl_routine_name = new_routine;
-  this->CreateProgram
+  this->CreateProgram();
 }
 
 
@@ -311,7 +311,7 @@ cl::Program OclEnv::CreateProgram()
   //
   // Compile Kernels from Program
   //
-  for( unsigned int k = 0; k < this->ocldevices.size(); k++)
+  for( unsigned int k = 0; k < this->ocl_devices.size(); k++)
   {
     if (this->ocl_routine_name == "oclptx" )
     {
