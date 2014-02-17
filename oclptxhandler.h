@@ -88,13 +88,13 @@ class OclPtxHandler{
                                   unsigned int device_num
                                 );
 
+    void DoubleBufferInit();
     //
     // Reduction
     //
 
     void ReduceInit(  unsigned int particles_per,
                       std::string reduction_style); //ran once only.
-
     void Reduce();
 
     //

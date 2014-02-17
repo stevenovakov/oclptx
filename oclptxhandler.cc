@@ -124,7 +124,7 @@ void WriteSamplesToDevice( BedpostXData* f_data,
     single_direction_mem_size*num_directions;
 
   this->samples_buffer_size = total_mem_size;
-  
+
   this->sample_nx = f_data.nx;
   this->sample_ny = f_data.ny;
   this->sample_nz = f_data.nz;
@@ -277,6 +277,12 @@ void WriteInitialPosToDevice(float4* initial_positions,
   delete pos_container[];
 }
 
+void OclPtxHandler::DoubleBufferInit()
+{
+
+
+}
+
 //*********************************************************************
 //
 // OclPtxHandler Reduction
@@ -285,15 +291,15 @@ void WriteInitialPosToDevice(float4* initial_positions,
 
 void OclPtxHandler::ReduceInit()
 {
-  
-  
+
+
 }
 
 void OclPtxHandler:Reduce()
 {
-  
-  
-  
+
+
+
 }
 
 //*********************************************************************
@@ -304,8 +310,8 @@ void OclPtxHandler:Reduce()
 
 void OclPtxHandler::Interpolate()
 {
-  
-  
+
+
 }
 
 
