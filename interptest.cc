@@ -38,6 +38,16 @@
 #include <vector>
 #include <cmath>
 
+#define __CL_ENABLE_EXCEPTIONS
+// adds exception support from CL libraries
+// define before CL headers inclusion
+
+#ifdef __APPLE__
+#include <OpenCL/opencl.hpp>
+#else
+#include <CL/cl.hpp>
+#endif
+
 #include "customtypes.h"
 
 //
@@ -56,6 +66,22 @@ std::vector<unsigned int> RandSeedElem(int n,
 void VolumeToFile(IntVolume ivol, FloatVolume fvol);
 void PathsToFile(std::vector<float4> path_vector,
   unsigned int n_seeds, unsigned int n_steps);
+
+std::vector<float4> InterpolationTestRoutine
+(
+  FloatVolume voxel_space,
+  FloatVolume flow_space,
+  std::vector<float4> seed_space,
+  std::vector<unsigned int> seed_elem,
+  unsigned int n_seeds,
+  unsigned int n_steps,
+  float dr,
+  float4 min_bounds,
+  float4 max_bounds,
+  cl::Context * ocl_context,
+  std::vector<cl::CommandQueue> * cq,
+  cl::Kernel * test_kernel
+);
 
 //
 // Floating point voxel space
@@ -157,16 +183,19 @@ std::vector<unsigned int> RandSeedElem(unsigned int n, float3 mins,
 
   unsigned int x, y, z;
 
-  srand(time(NULL));
+  unsigned int seed = time(NULL);
 
   for (unsigned int i = 0; i < n; i++)
   {
+    rand_r(&seed);
     x = static_cast<unsigned int>(
-      rand_r()%1000*(maxs.x - mins.x))/1000.0 + mins.x);
+      (seed%1000*(maxs.x - mins.x))/1000.0 + mins.x);
+    rand_r(&seed);
     y = static_cast<unsigned int>(
-      rand_r()%1000*(maxs.y - mins.y))/1000.0 + mins.y);
+      (seed%1000*(maxs.y - mins.y))/1000.0 + mins.y);
+    rand_r(&seed);
     z = static_cast<unsigned int>(
-      rand_r()%1000*(maxs.z - mins.z))/1000.0 + mins.z);
+      (seed%1000*(maxs.z - mins.z))/1000.0 + mins.z);
 
     temp_elem = z*(8*vvol.nx*vvol.ny) + y*8*vvol.nx + 8*x;
     // "elem #" is START of vertex list 0, 1, 2, ...., 6, 7
@@ -186,7 +215,7 @@ std::vector<float4> RandSeedPoints(int n,
 
   int maxx, minx, maxy, miny, maxz, minz;
 
-  srand(time(NULL));
+  unsigned int seed = time(NULL);
 
   for (unsigned int i = 0; i < seed_elem.size(); i++)
   {
@@ -199,9 +228,12 @@ std::vector<float4> RandSeedPoints(int n,
     minz = vvol.vol.at(seed_elem.at(i)).z;
     maxz = vvol.vol.at(seed_elem.at(i)+4).z;
 
-    temp_point.x = rand_r()%1000*(maxx - minx)/1000.0 + minx;
-    temp_point.y = rand_r()%1000*(maxy - miny)/1000.0 + miny;
-    temp_point.z = rand_r()%1000*(maxz - minz)/1000.0 + minz;
+    rand_r(&seed);
+    temp_point.x = seed%1000*(maxx - minx)/1000.0 + minx;
+    rand_r(&seed);
+    temp_point.y = seed%1000*(maxy - miny)/1000.0 + miny;
+    rand_r(&seed);
+    temp_point.z = seed%1000*(maxz - minz)/1000.0 + minz;
 
     seed_set.push_back(temp_point);
   }
@@ -221,7 +253,7 @@ void VolumeToFile(FloatVolume vvol, FloatVolume fvol)
   std::string flow_filename;
 
   time_t t = time(0);
-  struct tm * now = localtime_r(&t);
+  struct tm * now = localtime(&t);
 
   convert << "Test Data/"<< now->tm_yday << "-" <<
     static_cast<int>(now->tm_year) + 1900 << "_"<< now->tm_hour <<
@@ -290,7 +322,7 @@ void PathsToFile(std::vector<float4> path_vector,
   std::vector<float> temp_z;
 
   time_t t = time(0);
-  struct tm * now = localtime_r(&t);
+  struct tm * now = localtime(&t);
 
   convert << "Test Data/"<< now->tm_yday << "-" <<
     static_cast<int>(now->tm_year) + 1900 << "_"<< now->tm_hour <<
@@ -348,5 +380,182 @@ void PathsToFile(std::vector<float4> path_vector,
 
   path_file.close();
 }
+
+std::vector<float4> InterpolationTestRoutine
+    (
+      FloatVolume voxel_space,
+      FloatVolume flow_space,
+      std::vector<float4> seed_space,
+      std::vector<unsigned int> seed_elem,
+      unsigned int n_seeds,
+      unsigned int n_steps,
+      float dr,
+      float4 min_bounds,
+      float4 max_bounds,
+      cl::Context * ocl_context,
+      cl::CommandQueue * cq,
+      cl::Kernel * test_kernel
+    )
+{
+
+  std::vector<cl::Buffer> read_buffer_set;
+  std::vector<cl::Buffer> write_buffer_set;
+  std::vector<unsigned int> read_buffer_set_sizes;
+  std::vector<unsigned int> write_buffer_set_sizes;
+
+  bool blocking_write = false;
+
+  write_buffer_set_sizes.clear();
+  read_buffer_set_sizes.clear();
+
+  unsigned int vol_size = voxel_space.vol.size();
+  unsigned int vol_item_size = sizeof(voxel_space.vol.at(0));
+
+  unsigned int flow_size = flow_space.vol.size();
+  unsigned int flow_item_size = sizeof(flow_space.vol.at(0));
+
+  unsigned int seed_size = seed_space.size();
+  unsigned int seed_item_size = sizeof(seed_space.at(0));
+
+  unsigned int vol_mem_size = vol_size * vol_item_size;
+  unsigned int flow_mem_size = flow_size*flow_item_size;
+  unsigned int seed_mem_size = seed_size*seed_item_size;
+
+  read_buffer_set_sizes.push_back(vol_mem_size); //1
+  read_buffer_set_sizes.push_back(flow_mem_size); //2
+  read_buffer_set_sizes.push_back(seed_mem_size); //3
+
+  unsigned int result_num = n_seeds*n_steps;
+  unsigned int result_mem_size = result_num * flow_item_size;
+  unsigned int seed_elem_mem_size = n_seeds*sizeof(seed_elem.at(0));
+
+  write_buffer_set_sizes.push_back(result_mem_size); //1
+  write_buffer_set_sizes.push_back(seed_elem_mem_size); //2
+
+  cl::NDRange test_global_range(n_seeds);
+  cl::NDRange test_local_range(1);
+
+  // Instantiate Buffers
+
+  for( unsigned int i = 0;
+    i < read_buffer_set_sizes.size(); i++)
+  {
+    std::cout<<"RBUF: "<<read_buffer_set_sizes.at(i)<<"\n";
+    read_buffer_set.push_back(
+      cl::Buffer( *ocl_context,
+                  CL_MEM_READ_ONLY,
+                  read_buffer_set_sizes.at(i),
+                  NULL,
+                  NULL
+                )
+    );
+  }
+  for( unsigned int i = 0;
+    i < write_buffer_set_sizes.size(); i++)
+  {
+    std::cout<<"WBUF: "<<write_buffer_set_sizes.at(i)<<"\n";
+    write_buffer_set.push_back(
+      cl::Buffer( *ocl_context,
+                  CL_MEM_READ_WRITE,
+                  write_buffer_set_sizes.at(i),
+                  NULL,
+                  NULL
+                )
+    );
+  }
+
+  //write to buffers on device
+
+  //flow space
+  cq->enqueueWriteBuffer(
+        read_buffer_set.at(0),
+        blocking_write,
+        (unsigned int) 0,
+        read_buffer_set_sizes.at(0),
+        voxel_space.vol.data(),
+        NULL,
+        NULL
+  );
+  //flow space
+  cq->enqueueWriteBuffer(
+        read_buffer_set.at(1),
+        blocking_write,
+        (unsigned int) 0,
+        read_buffer_set_sizes.at(1),
+        flow_space.vol.data(),
+        NULL,
+        NULL
+  );
+  //seed initial pos
+  cq->enqueueWriteBuffer(
+        read_buffer_set.at(2),
+        blocking_write,
+        (unsigned int) 0,
+        read_buffer_set_sizes.at(2),
+        seed_space.data(),
+        NULL,
+        NULL
+  );
+  // seed elem
+  cq->enqueueWriteBuffer(
+        write_buffer_set.at(1),
+        blocking_write,
+        (unsigned int) 0,
+        write_buffer_set_sizes.at(1),
+        seed_elem.data(),
+        NULL,
+        NULL
+  );
+
+  // do NOT call delete on this.
+
+  test_kernel->setArg(0, read_buffer_set.at(0)); //voxels
+  test_kernel->setArg(1, read_buffer_set.at(1)); //flow
+  test_kernel->setArg(2, read_buffer_set.at(2)); //seed pts
+  test_kernel->setArg(3, write_buffer_set.at(1)); //seed elem
+  test_kernel->setArg(4, voxel_space.nx); //nx
+  test_kernel->setArg(5, voxel_space.ny); //ny
+  test_kernel->setArg(6, voxel_space.nz); //nz
+  test_kernel->setArg(7, min_bounds); //ny
+  test_kernel->setArg(8, max_bounds); //nz
+  test_kernel->setArg(9, n_steps); //n_steps
+  test_kernel->setArg(10, write_buffer_set.at(0));//path container
+
+  // OCL CQ BLOCK
+  cq->finish();
+
+  cq->enqueueNDRangeKernel(
+    *test_kernel,
+    cl::NullRange,
+    test_global_range,
+    test_local_range,
+    NULL,
+    NULL
+  );
+
+  // OCL CQ BLOCK
+  cq->finish();
+
+  //instantiate return container
+  std::vector<float4> return_container(result_num);
+
+  std::cout<<
+    return_container.size()*sizeof(return_container.at(result_num))<<
+      "\n";
+  std::cout<<n_seeds*n_steps*sizeof(float4)<<"\n";
+  std::cout<<result_mem_size<<"\n";
+
+  //fill return container
+  cq->enqueueReadBuffer(
+    write_buffer_set.at(0),
+    CL_TRUE, // blocking
+    0,
+    result_mem_size,
+    &return_container[0]
+  );
+
+  return return_container;
+}
+
 
 // EOF

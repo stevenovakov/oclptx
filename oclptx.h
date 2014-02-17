@@ -32,11 +32,11 @@
 #ifndef  OCLPTX_OCLPTX_H_
 #define  OCLPTX_OCLPTX_H_
 
+#include "oclenv.h"
 #include "oclptxhandler.h"
 #include "samplemanager.h"
 #include "customtypes.h"
 #include "interptest.cc"
-
 
 #endif
 

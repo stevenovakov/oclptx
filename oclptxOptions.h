@@ -174,7 +174,7 @@ class oclptxOptions {
 };
 
 
- inline oclptxOptions::oclptxOptions() :
+inline oclptxOptions::oclptxOptions():
    verbose(std::string("-V,--verbose"), 0,
      std::string("Verbose level, [0-2]"),
      false, requires_argument),
@@ -373,8 +373,6 @@ class oclptxOptions {
 
    options("oclptx","oclptx -s <basename> -m <maskname> -x <seedfile> -o <output> --targetmasks=<textfile>\n oclptx --help\n")
    {
-
-
      try {
        options.add(verbose);
        options.add(help);

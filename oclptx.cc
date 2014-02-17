@@ -31,6 +31,7 @@
 
 
 #include <iostream>
+#include <chrono>
 
 #define __CL_ENABLE_EXCEPTIONS
 // adds exception support from CL libraries
@@ -50,7 +51,10 @@
 //
 //*********************************************************************
 
-void SimpleInterpolationTest();
+void SimpleInterpolationTest( cl::Context * ocl_context,
+                              cl::CommandQueue * cq,
+                              cl::Kernel * test_kernel
+                            );
 
 
 //*********************************************************************
@@ -62,48 +66,54 @@ void SimpleInterpolationTest();
 int main(int argc, char *argv[] )
 {
 
+  //Test Routine
+  OclEnv environment("interptest");
+
+  SimpleInterpolationTest(environment.GetContext(),
+                          environment.GetCq(0),
+                          environment.GetKernel(0));
+
   SampleManager& s_manager = SampleManager::GetInstance();
   if(&s_manager == NULL)
   {
-     cout<<"\n Null value"<<std::endl;
+     std::cout<<"\n Null value"<<std::endl;
   }
   else
   {
-     s_manager.ParseCommandLine(argc, argv);
+    s_manager.ParseCommandLine(argc, argv);
 
-     //s_manager.LoadBedpostData("bedpostdata/merged");
-     //const vector<Matrix>* thetaSamples = s_manager.GetThetaSamples();
-     //const vector<Matrix>* phiSamples = s_manager.GetPhiSamples();
-     //const vector<Matrix>* fSamples = s_manager.GetFSamples();
-     //Matrix thetaMatrix = thetaSamples->at(0);
-     //Matrix phiMatrix = phiSamples->at(0);
-     //Matrix fMatrix = fSamples->at(0);
+    const vector<Matrix>* thetaSamples = s_manager.GetThetaSamples();
+    const vector<Matrix>* phiSamples = s_manager.GetPhiSamples();
+    const vector<Matrix>* fSamples = s_manager.GetFSamples();
+    Matrix thetaMatrix = thetaSamples->at(0);
+    Matrix phiMatrix = phiSamples->at(0);
+    Matrix fMatrix = fSamples->at(0);
 
-     //for (int row = 1; row < thetaMatrix.Nrows(); row++)
-     //{
-        //for (int col = 1; col < thetaMatrix.Ncols(); col++)
-        //{
-           //if(thetaMatrix(row,col) != 0)
-           //{
-              //float thetaTest=thetaMatrix(row,col);
-              //float phiTest = phiMatrix(row,col);
-              //float fTest = fMatrix(row,col);
-              //cout <<"\n Rows Theta:"<<row<<" Cols Theta:"<<
-              //  col<<" "<<thetaTest<<std::endl;
-              //cout <<"\n Rows Phi:"<<row<<" Cols Phi:"<<
-              //  col<<" "<<phiTest<<std::endl;
-              //cout <<"\n Rows f:"<<row<<" Cols f:"<<
-              //  col<<" "<<fTest<<std::endl;
-
-           //}
-        //}
-     //}
+    std::cout<<"thetaMatrix, Rows: " << thetaMatrix.Nrows()<<
+      " Cols: "<< thetaMatrix.Ncols() <<"\n";
+    std::cout<<"phiMatrix, Rows: " << phiMatrix.Nrows() <<
+      " Cols: "<< phiMatrix.Ncols() <<"\n";
+    std::cout<<"fMatrix, Rows: " << fMatrix.Nrows() <<
+      " Cols: "<< fMatrix.Ncols() <<"\n";
+    //for (int row = 1; row < thetaMatrix.Nrows(); row++)
+    //{
+      //for (int col = 1; col < thetaMatrix.Ncols(); col++)
+      //{
+         //if (thetaMatrix(row,col) != 0)
+         //{
+            //float thetaTest=thetaMatrix(row,col);
+            //float phiTest = phiMatrix(row,col);
+            //float fTest = fMatrix(row,col);
+            //std::cout <<"\n Rows Theta:"<<row<<" Cols Theta:"<<
+              //col<<" "<<thetaTest<<std::endl;
+            //std::cout <<"\n Rows Phi:"<<row<<" Cols Phi:"<<
+              //col<<" "<<phiTest<<std::endl;
+            //std::cout <<"\n Rows f:"<<row<<" Cols f:"<<
+              //col<<" "<<fTest<<std::endl;
+         //}
+      //}
+    //}
   }
-
-
-  //Test Routine
-  //SimpleInterpolationTest();
-
 
   std::cout<<"\n\nExiting...\n\n";
   return 0;
@@ -116,24 +126,24 @@ int main(int argc, char *argv[] )
 //*********************************************************************
 
 
-void SimpleInterpolationTest()
+void SimpleInterpolationTest( cl::Context* ocl_context,
+                              cl::CommandQueue* cq,
+                              cl::Kernel* test_kernel)
 {
-
-  OclPtxHandler * ptx_handler;
-
-  ptx_handler = new OclPtxHandler("interptest");
-
   //*******************************************************************
   //
   //  TEST ROUTINE
   //
   //*******************************************************************
 
+  auto t_end = std::chrono::high_resolution_clock::now();
+  auto t_start = std::chrono::high_resolution_clock::now();
+
   unsigned int XN = 20;
   unsigned int YN = 20;
   unsigned int ZN = 20;
 
-  unsigned int nseeds = 200;
+  unsigned int nseeds = 500;
   unsigned int nsteps = 200;
 
   std::cout<<"\n\nInterpolation Test\n"<<"\n";
@@ -187,20 +197,30 @@ void SimpleInterpolationTest()
 
   VolumeToFile(voxel_space, flow_space);
 
-  PathsToFile(  ptx_handler->InterpolationTestRoutine(  voxel_space,
-                                                        flow_space,
-                                                        seed_space,
-                                                        seed_elem,
-                                                        nseeds,
-                                                        nsteps,
-                                                        dr,
-                                                        min_bounds,
-                                                        max_bounds
-                                                      ),
+  t_start = std::chrono::high_resolution_clock::now();
+
+  std::vector<float4> path_vector =
+    InterpolationTestRoutine(   voxel_space,
+                                flow_space,
+                                seed_space,
+                                seed_elem,
+                                nseeds,
+                                nsteps,
+                                dr,
+                                min_bounds,
+                                max_bounds,
+                                ocl_context,
+                                cq,
+                                test_kernel
+  );
+
+  t_end = std::chrono::high_resolution_clock::now();
+  std::cout<< "Interpolation Test Time:" <<
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+        t_end-t_start).count() << std::endl;
+
+  PathsToFile(  path_vector,
                 nseeds,
                 nsteps
   );
-
-  delete ptx_handler;
-
 }

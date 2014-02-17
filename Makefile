@@ -25,7 +25,7 @@ USRLDFLAGS = -L${LIB_NEWMAT} -L${LIB_NEWRAN} -L${LIB_CPROB} -L${LIB_PROB} -L${LI
 DLIBS =	-lwarpfns -lbasisfield -lfslsurface	-lfslvtkio -lmeshclass -lnewimage -lutils -lmiscmaths -lnewmat -lnewran -lfslio -lgiftiio -lexpat -lfirst_lib -lniftiio -lznz -lcprob -lutils -lprob -lm -lz -lOpenCL
 
 OCLPTX=oclptx
-OCLPTXOBJ=oclptx.o oclptxhandler.o samplemanager.o oclptxOptions.o
+OCLPTXOBJ=oclptx.o oclenv.o oclptxhandler.o samplemanager.o oclptxOptions.o
 
 XFILES=${OCLPTX}
 

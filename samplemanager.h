@@ -52,7 +52,8 @@ class SampleManager{
 
       void ParseCommandLine(int argc, char** argv);
       void LoadBedpostData(const std::string& aBasename);
-      //LoadBedpostData(const std::string& aBasename, const volume<float>& aMask);
+      //LoadBedpostData(
+      //  const std::string& aBasename, const volume<float>& aMask);
 
       //Getters
       const vector<Matrix>* GetThetaSamples();

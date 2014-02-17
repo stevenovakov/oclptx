@@ -104,7 +104,8 @@ void SampleManager::LoadBedpostData(const std::string& aBasename)
       thetaSampleNames = aBasename+"_thsamples";
       phiSampleNames = aBasename+"_phisamples";
       fSampleNames = aBasename+"_fsamples";
-      LoadBedpostDataToMatrix(thetaSampleNames,phiSampleNames,fSampleNames);
+      LoadBedpostDataToMatrix(
+        thetaSampleNames,phiSampleNames,fSampleNames);
    }
    //Multiple Fiber Case.
    else
@@ -118,7 +119,8 @@ void SampleManager::LoadBedpostData(const std::string& aBasename)
          phiSampleNames = aBasename+"_ph"+fiberNumAsstring+"samples";
          fSampleNames = aBasename+"_f"+fiberNumAsstring+"samples";
 
-         LoadBedpostDataToMatrix(thetaSampleNames,phiSampleNames,fSampleNames);
+         LoadBedpostDataToMatrix(
+          thetaSampleNames,phiSampleNames,fSampleNames);
 
          fiberNum++;
          fiberNumAsstring = IntTostring(fiberNum);
@@ -127,7 +129,8 @@ void SampleManager::LoadBedpostData(const std::string& aBasename)
       }
       if(fiberNum == 1)
       {
-         std::cout<<"Could not find samples. Exiting Program..."<<std::endl;
+         std::cout<<
+          "Could not find samples. Exiting Program..."<<std::endl;
          exit(1);
       }
       std::cout<<"Finished Loading Samples from Bedpost"<<std::endl;
@@ -138,16 +141,19 @@ void SampleManager::ParseCommandLine(int argc, char** argv)
 {
    _oclptxOptions.parse_command_line(argc, argv);
 
-   if(_oclptxOptions.verbose.value()>0)
+   if (_oclptxOptions.verbose.value()>0)
    {
       _oclptxOptions.status();
    }
 
-   if(_oclptxOptions.simple.value())
+   if (_oclptxOptions.simple.value())
    {
-      if(_oclptxOptions.matrix1out.value() || _oclptxOptions.matrix3out.value())
+      if (_oclptxOptions.matrix1out.value() ||
+        _oclptxOptions.matrix3out.value())
       {
-         std::cout<<"Error: cannot use matrix1 and matrix3 in simple mode"<<std::endl;
+         std::cout<<
+          "Error: cannot use matrix1 and matrix3 in simple mode"<<
+            std::endl;
          exit(1);
       }
       std::cout<<"Running in simple mode"<<std::endl;
@@ -208,7 +214,8 @@ SampleManager& SampleManager::GetInstance()
 }SampleManager* SampleManager::_manager;
 
 //Private Constructor.
-SampleManager::SampleManager():_oclptxOptions(oclptxOptions::getInstance()){}
+SampleManager::SampleManager():_oclptxOptions(
+  oclptxOptions::getInstance()){}
 
 SampleManager::~SampleManager()
 {

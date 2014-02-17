@@ -49,22 +49,13 @@
 
 #include "customtypes.h"
 
-
 class OclPtxHandler{
 
   public:
-
     OclPtxHandler(){};
-
-    OclPtxHandler( std::string ocl_routine);
 
     ~OclPtxHandler();
 
-    //
-    // Container Set/Get
-    //
-
-    void SetOclRoutine(std::string new_routine);
 
     //
     // Thread Management
@@ -74,75 +65,40 @@ class OclPtxHandler{
 
     void ThreadController();
 
-    //
-    // OpenCL API Interface/Helper Functions
-    //
-
-    void OclInit();
-
-    void OclDeviceInfo();
-
-    void NewCLCommandQueues();
-
-    cl::Program CreateProgram();
-
-    void InstantiateBuffers();
 
     //
     // Interpolation
     //
 
-    std::vector<float4> InterpolationTestRoutine(
-      FloatVolume voxel_space,
-      FloatVolume flow_space,
-      std::vector<float4> seed_space,
-      std::vector<unsigned int> seed_elem,
-      unsigned int n_seeds,
-      unsigned int n_steps,
-      float dr,
-      float4 min_bounds,
-      float4 max_bounds
-    );
 
 
   private:
-
-    //
-    // Containers
-
-
-    //
-    // OpenCL Objects
-    //
-    cl::Context ocl_context;
-
-    std::vector<cl::Platform> ocl_platforms;
-
-    std::vector<cl::Device> ocl_devices;
-
-    std::vector<cl::CommandQueue> ocl_device_queues;
-    //std::vector<MutexWrapper> ocl_device_queue_mutexs;
-
-    std::vector<cl::Kernel> ocl_kernel_set;
-    //Every compiled kernel is stored here.
-
-
-    // read = CL_MEM_READ_ONLY
-    // write = CL_MEM_READ_WRITE, CL_MEM_WRITE_ONLY
-    std::vector<cl::Buffer> write_buffer_set;
-    std::vector<unsigned int> write_buffer_set_sizes;
-    std::vector<cl::Buffer> read_buffer_set;
-    std::vector<unsigned int> read_buffer_set_sizes;
-
-    bool ocl_profiling;
-
-    std::string ocl_routine_name;
     //
     // Various
     //
 
-    bool interpolation_complete;
+    //
+    // Might have to rethink this within scope of mutexing, if
+    // there is a common root/owner object, then access through that
+    // may initiate a race condition.
+    //
 
+    // Vector of size   2x (N/2 ) , where n is the total number
+    // of particles
+    std::vector< std::vector<unsigned int> > particle_indeces;
+    std::vector< std::vector<bool> > particle_complete;
+
+    std::vector<unsigned int> compute_range;
+
+    // which half of particle_indeces/particle_complete needs to be
+    // interpolated next.
+    // TODO: Make sure there are no access conflicts within multithread
+    // scheme (e.g.  go to interpolate second half, but reduction
+    // method accidentally changed target_section to "0" again.
+    unsigned int target_section;
+    // this might need a mutex
+
+    bool interpolation_complete;
 };
 
 #endif
