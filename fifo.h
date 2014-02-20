@@ -42,6 +42,8 @@
 #ifndef FIFO_H_
 #define FIFO_H_
 
+#include <unistd.h>
+
 #include <cstdlib>
 #include <mutex>
 
@@ -52,6 +54,7 @@ template<typename T> class Fifo
   ~Fifo();
   void PushOrDie(T *val);
   T *Pop();
+  T *PopOrBlock();
  private:
   int order_;
   int head_;  // front of queue---points to open slot
@@ -103,6 +106,18 @@ template<typename T> T *Fifo<T>::Pop()
 
   // lock_guard releases tail_mutex automatically
   return retval;
+}
+
+template<typename T> T *Fifo<T>::PopOrBlock()
+{
+  T *ret;
+  while (1)
+  {
+    ret = Pop();
+    if (ret)
+      return ret;
+    usleep(1000);  // TODO(jeff) don't poll
+  }
 }
 
 #endif  // FIFO_H_

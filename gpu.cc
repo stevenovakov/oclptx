@@ -1,59 +1,75 @@
 // Copyright 2014 Jeff Taylor
 
-#include "oclptx/gpu.h"
+#include <cassert>
+#include <cstring>
 
-Gpu::Gpu(int particles_per_chunk, int steps_per_kernel)
+#include "oclptx/gpu.h"
+#include "oclptx/structs.h"
+
+Gpu::Gpu(int particles_per_side, int steps_per_kernel):
+  particles_per_side_(particles_per_side),
+  steps_per_kernel_(steps_per_kernel),
+  kernel_(NULL)
 {
-  particles_per_chunk_ = particles_per_chunk;
-  steps_per_kernel_ = steps_per_kernel;
-  data_.v = new threading::collatz_data[1];
   data_.last = 0;
   data_.size = 1;
+  data_.v = new threading::collatz_data[1];
 }
 
 Gpu::~Gpu()
 {
   delete data_.v;
+  if (kernel_)
+    delete kernel_;
 }
 
-void Gpu::WriteChunk(struct threading::collatz_data_chunk *chunk)
+void Gpu::WriteParticles(struct threading::collatz_data_chunk *chunk)
 {
-  size_t space_remaining = data_.size - data_.last;
-
-  // TODO(jeff): Cleanup this copy to look like a proper mem copy.
-  // This actually reverses the data a la Towers of Hanoi, which I'd like to
-  // avoid.  It's not "incorrect" persay, but makes debugging way harder.
-  while ((data_.size != data_.last) && (0 != chunk->last))
+  size_t off;
+  for (int i = 0; i < chunk->last; i++)
   {
-    data_.v[data_.last] = chunk->v[chunk->last - 1];
-
-    chunk->last--;
-    data_.last++;
+    off = chunk->v[i].offset;
+    data_.v[off] = chunk->v[i];
   }
 }
 
-void Gpu::ReadChunk(struct threading::collatz_data_chunk *chunk)
+void Gpu::ReadParticles(struct threading::collatz_data_chunk *chunk,
+                        size_t offset,
+                        size_t count)
 {
-  size_t space_remaining = chunk->size - chunk->last;
+  assert(count <= chunk->size);
 
-  // TODO(jeff): See above comment.
-  while ((0 != data_.last) && (chunk->size != chunk->last))
-  {
-    chunk->v[chunk->last] = data_.v[data_.last - 1];
+  void *src = reinterpret_cast<void*>(data_.v + offset);
+  memcpy(reinterpret_cast<void*>(chunk->v),
+          src,
+          sizeof(threading::collatz_data) * count);
 
-    chunk->last++;
-    data_.last--;
-  }
+  chunk->last = count;
 }
 
-int Gpu::SpaceRemaining()
+void Gpu::RunKernelAsync(int side)
 {
-  return data_.size - data_.last;
+  assert(NULL == kernel_);
+
+  // kludge(jeff): Is there anyway to start the thread after the thread object
+  // is created?
+  kernel_ = new std::thread(&Gpu::RunKernel, this, side);
 }
 
-void Gpu::RunKernel()
+void Gpu::WaitForKernel()
 {
-  for (int i = 0; i < particles_per_chunk_; i++)
+  if (NULL == kernel_)
+    return;  // No kernel to wait for.
+
+  // TODO(jeff): Might be nice to have a timer run here.
+  kernel_->join();
+  delete kernel_;
+  kernel_ = NULL;
+}
+
+void Gpu::RunKernel(int side)
+{
+  for (int i = 0; i < particles_per_side_; i++)
   {
     for (int j = 0; j < steps_per_kernel_; j++)
     {
@@ -63,12 +79,9 @@ void Gpu::RunKernel()
       else
         data_.v[i].value = data_.v[i].value >> 1;
 
-      // TODO(jeff): Check for completion.
+      // End of the path?
+      if (1 == data_.v[i].value)
+        data_.v[i].complete = 1;
     }
   }
-}
-
-int Gpu::SpaceUsed()
-{
-  return data_.last;
 }

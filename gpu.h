@@ -9,20 +9,26 @@
 
 #include "structs.h"
 
+#include <thread>
+
 class Gpu
 {
  public:
-  Gpu(int particles_per_chunk, int steps_per_kernel);
+  Gpu(int particles_per_side, int steps_per_kernel);
   ~Gpu();
-  void WriteChunk(struct threading::collatz_data_chunk *chunk);
-  void ReadChunk(struct threading::collatz_data_chunk *chunk);
-  void RunKernel();
-  int SpaceRemaining();
-  int SpaceUsed();
+  void WriteParticles(struct threading::collatz_data_chunk *chunk);
+  void ReadParticles(struct threading::collatz_data_chunk *chunk,
+                     size_t offset,
+                     size_t count);
+  void RunKernel(int side);
+  void RunKernelAsync(int side);
+  void WaitForKernel();
+
+  int particles_per_side_;
+  int steps_per_kernel_;
  private:
+  std::thread *kernel_;
   struct threading::collatz_data_chunk data_;
-  int particles_per_chunk_ = 1;
-  int steps_per_kernel_ = 3;
 };
 
 #endif  // GPU_H_

@@ -14,56 +14,76 @@
 
 int main(int argc, char **argv)
 {
-  // Test routine for threading.
-  Gpu gpu(1, 3);
+  const int kParticlesPerSide = 1;
+  const int kStepsPerKernel = 3;
+  const int kNumReducers = 1;
+  const int kNumChunks = kNumReducers * 2;
+  const int kChunkSize = kParticlesPerSide/kNumReducers;  // verify this rounds up.
 
-  struct threading::collatz_data data[2] = {{17, 0}, {32, 0}};
-  struct threading::collatz_data_chunk chunk = {data, 2, 2};
+  uint64_t particle[] = {54, 72, 36, 12, 17, 42, 53, 16, 873, 14, 423};
+  const int kTotNumParticles = 11;
 
-  struct threading::collatz_data data2[2];
-  struct threading::collatz_data_chunk free_chunk = {data2, 0, 2};
+  // TODO(jeff) make these fifos the proper size
+  Fifo<threading::collatz_data_chunk> processed(5);
+  Fifo<threading::collatz_data_chunk> dirty(5);
+  Fifo<threading::collatz_data> particles(5);
 
-  Fifo<threading::collatz_data_chunk> to_process(2);  // 3 items
-  Fifo<threading::collatz_data_chunk> leftover(2);
-  Fifo<threading::collatz_data_chunk> processed(2);
-  Fifo<threading::collatz_data_chunk> free(2);
-
-  struct threading::global_fifos fifos = {&to_process, &processed, &leftover, &free};
+  struct threading::global_fifos fifos = {&processed, &dirty, &particles};
 
   char kick = 0;
 
-  to_process.PushOrDie(&chunk);
-  free.PushOrDie(&free_chunk);
+  // Test routine for threading.
+  Gpu gpu(kParticlesPerSide, kStepsPerKernel);
+
+  // Create nRed * 2 chunks, each one is particles_per_side / nRed in length
+  // TODO(jeff): This line is most likely going to cause cache issues.
+  struct threading::collatz_data_chunk chunks[kNumChunks];
+  struct threading::collatz_data *data;
+
+  // Give the GPU valid particles.
+  for (int i = 0; i < kNumChunks; ++i)
+  {
+    // TODO(jeff): handle when num particles small
+    //             handle when gpu size not divisible by particle count.
+    // Better way to do this is counting *down* remaining space on GPU and
+    // number of particles left.
+    data = new threading::collatz_data[kChunkSize];
+    for (int j = 0; j < kChunkSize; ++j)
+    {
+      *data = {particle[j], j % kParticlesPerSide, 0};  // value, offset, complete
+    }
+    chunks[i] = {data, 0, kChunkSize, kChunkSize};
+
+    // TODO: Bad Jeff.  Passing identical pointers onto a FIFO.  Major bad.
+    fifos.dirty->PushOrDie(&chunks[i]);
+  }
+
+  // Put the remainer of the particles in the particles fifo
+  for (int i = kNumChunks; i < kTotNumParticles; ++i)
+  {
+    data = new threading::collatz_data;
+    *data = {particle[i], 0, 0};
+    fifos.particles->PushOrDie(data);
+  }
 
   std::thread worker(threading::Worker, &fifos, &gpu, &kick);
+  std::thread *reducers[kNumReducers];
+  for (int i = 0; i < kNumReducers; ++i)
+  {
+    reducers[i] = new std::thread(threading::Reducer, &fifos, &kick);
+  }
 
   sleep(1); // Assumption: data will be complete by then.
   kick = 2;  // Kill the thread, which should start polling this when it's done.
 
   worker.join();
+  for (int i = 0; i < kNumReducers; ++i)
+  {
+    reducers[i]->join();
+  }
 
   // Expected values.
   // 32 -> 16 -> 8  -> 4
   // 17 -> 52 -> 26 -> 13
-  return 0;
-
-  // Set up my FIFOs:
-  //  - Reduced: Length >= max(2*nGPUs,2*nRedThreads)
-  //  - Leftover: Length >= nGPUs
-  //  - Processed: Length >= 2*nGPUs
-  //  - Free: >= Buffercount
-
-  // Create some sample data, load it into "reduced" fifo.  Needs to be split
-  // into 2*nGPUs chunks.  Keep track of how many seeds that *actually* is---
-  // that's going to change as we run.  Maybe we'll exponentially drop the
-  // number we queue onto the GPU?  Needs thought.
-  // And some empty buffers for us to use later.
-
-  // Kick off some threads.  nGPU worker threads and nRed reducers.
-
-  // This thread turns into a watchdog.  We need to kill the threads if they
-  // hang, after, say, 1 second.
-  threading::Watchdog();
-
   return 0;
 }

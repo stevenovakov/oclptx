@@ -6,6 +6,8 @@
 
 #include "oclptx/gpu.h"
 
+#define REDUCERS_PER_GPU 1  // Duplicate in main.cc
+
 namespace threading
 {
 
@@ -23,89 +25,84 @@ bool CheckIn(char *kick)
   return false;
 }
 
-// Worker thread.  Simulates the action of the GPU
+// Worker thread.  Controls the GPU.
 void Worker(struct global_fifos *fifos, Gpu *gpu, char *kick)
 {
-  struct collatz_data_chunk *chunk;
+  // Note, there are two "sides" of GPU memory.  At all times, a kernel must
+  // only access the one side.  We must only copy data to and from the
+  // non-running side.
+  int inactive_side = 0;
+  struct collatz_data_chunk *chunk[REDUCERS_PER_GPU];
 
   while (1)
   {
-    // TODO(jeff): How do I figure out whether we're done?  Maybe include a
-    // status tracker in kick_dog to keep a running count of how many paths
-    // have finished, and exit if we're done.
-    if (CheckIn(kick))
-      return;
-
-    // Is there data in "leftover"?
-    chunk = fifos->leftover->Pop();
-    if (NULL != chunk)
+    for (int i = 0; i < REDUCERS_PER_GPU; ++i)
     {
-      gpu->WriteChunk(chunk);
-
-      if (chunk->last)
-        fifos->leftover->PushOrDie(chunk);
-      else
-        fifos->free->PushOrDie(chunk);
+      chunk[i] = fifos->dirty->PopOrBlock();
+      gpu->WriteParticles(chunk[i]);
     }
 
-    while (gpu->SpaceRemaining())
+    gpu->WaitForKernel();
+
+    gpu->RunKernelAsync(inactive_side);
+
+    // Inactive side is now active
+    inactive_side = (0 == inactive_side)? 1: 0;
+
+    // Split the particles between threads evenly.
+    int leftover_particles = gpu->particles_per_side_ % REDUCERS_PER_GPU;
+    int offset = gpu->particles_per_side_ * inactive_side;
+    int count;
+    for (int i = 0; i < REDUCERS_PER_GPU; ++i)
     {
-      // Is there data in "reduced"?
-      chunk = fifos->reduced->Pop();
-
-      if (NULL == chunk)
-        break;
-
-      gpu->WriteChunk(chunk);
-
-      if (chunk->last)
-        fifos->leftover->PushOrDie(chunk);
-      else
-        fifos->free->PushOrDie(chunk);
-    }
-
-    if (gpu->SpaceUsed())
-    {
-      gpu->RunKernel();
-
-      do
+      count = gpu->particles_per_side_ / REDUCERS_PER_GPU;
+      if (leftover_particles)
       {
-        // Get Free chunk (or die)
-        chunk = fifos->free->Pop();
-        if (NULL == chunk)
-        {
-          puts("Error: Ran out of free buffers.");
-          abort();
-        }
-
-        gpu->ReadChunk(chunk);
-
-        fifos->processed->PushOrDie(chunk);
-      } while (gpu->SpaceUsed());  // Keep copying until all data is off.
-    } else {
-      // No data available.
-
-      // Maybe a "wakeup sleeping workers" would be nice.
-      // For now polling will have to do.
-      usleep(100*1000);
+        count++;
+        leftover_particles--;
+      }
+      gpu->ReadParticles(chunk[i], offset, count);
+      fifos->processed->PushOrDie(chunk[i]);
+      offset += count;
     }
   }
 }
 
 // Reducer thread.
-int Reducer(struct global_fifos *fifos, char *kick)
+void Reducer(struct global_fifos *fifos, char *kick)
 {
-  // What am I keeping track of..?
+  struct collatz_data_chunk *chunk;
+  struct collatz_data *particle;
 
+  int finished_particles = 0;
+  while (1)
+  {
+    chunk = fifos->processed->PopOrBlock();
 
+    int reduced_count = 0;
+    for (size_t i = 0; i < chunk->last; i++)
+    {
+      if (chunk->v[i].complete)
+      {
+        // Do something with the finished particle here, if we so desire.
+        // It's "chunk->v[i]"
+        ++finished_particles;
 
+        particle = fifos->particles->Pop();
+        if (!particle)
+          break;  // No particles left.
 
+        chunk->v[reduced_count] = *particle;
+        chunk->v[reduced_count].offset = chunk->offset + i;
+        ++reduced_count;
 
+        delete particle;
+      }
+    }
+    chunk->last = reduced_count;
 
-
-
-
-  return 0;
+    fifos->dirty->PushOrDie(chunk);
+  }
 }
 
 // Watchdog thread.  Watches other threads for activity.
