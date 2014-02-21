@@ -12,8 +12,8 @@ Gpu::Gpu(int particles_per_side, int steps_per_kernel):
   kernel_(NULL)
 {
   data_.last = 0;
-  data_.size = 1;
-  data_.v = new threading::collatz_data[1];
+  data_.size = 2 * particles_per_side;
+  data_.v = new threading::collatz_data[2 * particles_per_side];
 }
 
 Gpu::~Gpu()
@@ -71,17 +71,18 @@ void Gpu::RunKernel(int side)
 {
   for (int i = 0; i < particles_per_side_; i++)
   {
+    size_t off = i + particles_per_side_ * side;
     for (int j = 0; j < steps_per_kernel_; j++)
     {
       // Collatz conjecture.
-      if (data_.v[i].value & 1)
-        data_.v[i].value = data_.v[i].value * 3 + 1;
+      if (data_.v[off].value & 1)
+        data_.v[off].value = data_.v[off].value * 3 + 1;
       else
-        data_.v[i].value = data_.v[i].value >> 1;
+        data_.v[off].value = data_.v[off].value >> 1;
 
       // End of the path?
-      if (1 == data_.v[i].value)
-        data_.v[i].complete = 1;
+      if (1 == data_.v[off].value)
+        data_.v[off].complete = 1;
     }
   }
 }
