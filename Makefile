@@ -2,8 +2,8 @@ include $(FSLCONFDIR)/default.mk
 
 PROJNAME = fdt
 
-DBGFLAGS=-g
-USRCXXFLAGS=-std=c++0x
+DBGFLAGS=-g -O0
+USRCXXFLAGS=-std=c++0x -MMD -MP
 
 # TODO: Move LIB_OPENCL and INC_OPENCL into systemvars.mk
 LIB_OPENCL=/usr/lib64/nvidia
@@ -36,6 +36,7 @@ ${GPUTEST}: ${GPUTESTOBJ}
 ${FIFOTEST}: ${FIFOTESTOBJ}
 	${CXX} ${CXXFLAGS} ${LDFLAGS} -o $@ $^ ${DLIBS}
 
-
 lint: *.cc *.h *.cl
 	bash -c 'python cpplint.py --extensions=cc,h,cl --filter=-whitespace/braces $^ > lint 2>&1'
+
+-include $(OCLPTXOBJ:%.o=%.d)
