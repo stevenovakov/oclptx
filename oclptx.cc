@@ -91,39 +91,38 @@ int main(int argc, char *argv[] )
   }
   else
   {
+	  int countAll = 0;
+	  int countNonZero = 0;
+
     s_manager.ParseCommandLine(argc, argv);
 
-    const vector<Matrix>* thetaSamples = s_manager.GetThetaSamples();
-    const vector<Matrix>* phiSamples = s_manager.GetPhiSamples();
-    const vector<Matrix>* fSamples = s_manager.GetFSamples();
-    Matrix thetaMatrix = thetaSamples->at(0);
-    Matrix phiMatrix = phiSamples->at(0);
-    Matrix fMatrix = fSamples->at(0);
+    const BedpostXData* thetaData = s_manager.GetThetaDataPtr();
 
-    std::cout<<"thetaMatrix, Rows: " << thetaMatrix.Nrows()<<
-      " Cols: "<< thetaMatrix.Ncols() <<"\n";
-    std::cout<<"phiMatrix, Rows: " << phiMatrix.Nrows() <<
-      " Cols: "<< phiMatrix.Ncols() <<"\n";
-    std::cout<<"fMatrix, Rows: " << fMatrix.Nrows() <<
-      " Cols: "<< fMatrix.Ncols() <<"\n";
-    //for (int row = 1; row < thetaMatrix.Nrows(); row++)
-    //{
-      //for (int col = 1; col < thetaMatrix.Ncols(); col++)
-      //{
-         //if (thetaMatrix(row,col) != 0)
-         //{
-            //float thetaTest=thetaMatrix(row,col);
-            //float phiTest = phiMatrix(row,col);
-            //float fTest = fMatrix(row,col);
-            //std::cout <<"\n Rows Theta:"<<row<<" Cols Theta:"<<
-              //col<<" "<<thetaTest<<std::endl;
-            //std::cout <<"\n Rows Phi:"<<row<<" Cols Phi:"<<
-              //col<<" "<<phiTest<<std::endl;
-            //std::cout <<"\n Rows f:"<<row<<" Cols f:"<<
-              //col<<" "<<fTest<<std::endl;
-         //}
-      //}
-    //}
+    for(unsigned int t = 1; t < thetaData->ns; t++)
+    {
+      for (unsigned int x = 0; x<thetaData->nx; x++)
+      {
+        for (unsigned int y=0; y<thetaData->ny; y++)
+        {
+          for (unsigned int z=0; z<thetaData->nz; z++)
+          {
+            float data = s_manager.GetThetaData(0,t,x,y,z);
+            countAll++;
+            if(data != 0.0f)
+            countNonZero++;
+          }
+        }
+      }
+    }
+
+    // Access this array like so for a given x,y,z:
+    // seedMask[z*seedMaskVol.xsize()*seedMaskVol.ysize() +
+    //   y*seedMaskVol.zsize() + x]
+    const unsigned short int* seedMask =
+      s_manager.GetBrainMaskToArray();
+
+    cout<<"Count of All Data = "<<countAll<<endl;
+    cout<<"Count of Non Zero Data = "<<countNonZero<<endl;
 
     // somwhere in here, this should initialize, based on s_manager
     // actions:
@@ -145,6 +144,7 @@ int main(int argc, char *argv[] )
 
     //handler.ParticlePathsToFile());
 
+    delete[] seedMask;
   }
 
   std::cout<<"\n\nExiting...\n\n";
@@ -158,7 +158,7 @@ int main(int argc, char *argv[] )
 //*********************************************************************
 std::string DetermineKernel()
 {
-  return std::string("interptest");   
+  return std::string("interptest");
 }
 
 void SimpleInterpolationTest( cl::Context* ocl_context,

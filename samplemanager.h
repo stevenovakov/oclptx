@@ -32,53 +32,106 @@
 #ifndef  OCLPTX_SAMPLEMANAGER_H_
 #define  OCLPTX_SAMPLEMANAGER_H_
 
-#include "newimage/newimageall.h"
-#include "oclptxOptions.h"
 #include <iostream>
 #include <vector>
 #include <string>
-using namespace std;
-using namespace NEWIMAGE;
+//using namespace std;
+//using namespace NEWIMAGE;
 
-#define __CL_ENABLE_EXCEPTIONS
-// adds exception support from CL libraries
-// define before CL headers inclusion
+#include "newimage/newimageall.h"
+#include "miscmaths/miscmaths.h"
+#include "oclptxOptions.h"
+#include "customtypes.h"
 
-
-class SampleManager{
-	public:
+class SampleManager
+{
+  public:
       static SampleManager& GetInstance();
       ~SampleManager();
 
+      // CLI Example: ./oclptx -s bedpostXdata/merged --simple
+      //  --sampvox=2 -m bedpostXdata/nodif_brain_mask.nii.gz
+      //    -x bedpostXdata/seedFile
+      // 
+      // --simple = loading basic data form. Other types have not been
+      // implemented (MANDATORY)
+      // --sampvox = Sample random points within x mm sphere seed
+      // voxels (MANDATORY)
+      // -m = Brain Mask file (MANDATORY)
+      // -x = Seedmask file (OPTIONAL). If no seedmask file is
+      // specified, the program will seed using a single point:
+      // the midpoint of the brainmask data.
+      //
       void ParseCommandLine(int argc, char** argv);
-      void LoadBedpostData(const std::string& aBasename);
-      //LoadBedpostData(
-      //  const std::string& aBasename, const volume<float>& aMask);
 
-      //Getters
-      const vector<Matrix>* GetThetaSamples();
-      const vector<Matrix>* GetPhiSamples();
-      const vector<Matrix>* GetFSamples();
+      //Getters: Data
+      float const GetThetaData(int aFiberNum,
+        int aSamp, int aX, int aY, int aZ);
+      float const GetPhiData(int aFiberNum,
+        int aSamp, int aX, int aY, int aZ);
+      float const GetfData(int aFiberNum,
+        int aSamp, int aX, int aY, int aZ);
+      const NEWIMAGE::volume<short int>* GetBrainMask();
+      const unsigned short int* GetBrainMaskToArray();
 
-	private:
+      // Getters: 
+      // Counts (Particles Default = 5000, Steps Default = 2000)
+      int const GetNumParticles() {return _nParticles;}
+      int const GetNumMaxSteps() {return _nMaxSteps;}
+
+      // Getters: Randomly seeded particles (uses midpoint
+      //  of _brainMask if no seedfile is specified)
+      std::vector<float4> const GetSeedParticles()
+      {
+        return _seedParticles;
+      }
+
+      // WARNING: If you use these getters, you must access data from\
+      // the BedpostXData vector as follows:
+      // Ex Theta: thetaData.data.at(aFiberNum)[(aSamp)*(nx*ny*nz) +
+      // (aZ)*(nx*ny) + (aY)*nx + (aX)]
+      // Where aFiberNum = the Fiber (0 or 1), aSamp = SampleNumber,
+      //  nx ny nz = spacial dimensions stored in BedpostXData,
+      // and aY aX, aZ = inputed spacial coordinates.
+      // See definition of GetThetaData(...) above for example.
+      const BedpostXData* GetThetaDataPtr();
+      const BedpostXData* GetPhiDataPtr();
+      const BedpostXData* GetFDataPtr();
+
+  private:
       SampleManager();
-
-      void LoadBedpostDataToMatrix(
+      void LoadBedpostData(const std::string& aBasename);
+      void LoadBedpostDataHelper(
         const std::string& aThetaSampleName,
         const std::string& aPhiSampleName,
         const std::string& afSampleName,
-        const volume<float>& aMask = volume<float>());
-
+        const NEWIMAGE::volume<float>& aMask =
+          NEWIMAGE::volume<float>(),
+        const int aFiberNum = 0);
+      void PopulateMemberParameters(
+        const NEWIMAGE::volume4D<float> aLoadedData,
+        BedpostXData& aTargetContainer,
+        const NEWIMAGE::volume<float> aMaskParams,
+        const int aFiberNum);
+      void GenerateSeedParticles(float aSampleVoxel);
+      void GenerateSeedParticlesHelper(
+        float4 aSeed, float aSampleVoxel);
       std::string IntTostring(const int& value);
 
-      //Members
+      //Statics
       static SampleManager* _manager;
-
       oclptxOptions& _oclptxOptions;
-      vector<Matrix> _thetaSamples;
-      vector<Matrix> _phiSamples;
-      vector<Matrix> _fSamples;
-
+      //Particles
+      std::vector<float4> _seedParticles;
+      std::vector<int4> _rootVertices;
+      //BedpostData
+      BedpostXData _thetaData;
+      BedpostXData _phiData;
+      BedpostXData _fData;
+      NEWIMAGE::volume<short int> _brainMask;
+      //Input Constants
+      int _nParticles; //Default 5000
+      int _nMaxSteps; //Default 2000
 };
 
 #endif

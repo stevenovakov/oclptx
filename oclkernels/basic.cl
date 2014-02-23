@@ -159,11 +159,14 @@ __kernel void BasicInterpolate(
       d_vert_x = (i & 0x00000001);
       d_vert_y = ((i & 0x00000002) >> 1);
       d_vert_z = ((i & 0x00000004) >> 2);
+      
+      // because this is a coordinate space, no sample factor here
       box_vertices_index[i] =
         (current_root_vertex.s0 + d_vert_x)*
-          (sample_nz*sample_ny*sample_ns) + 
-            (current_root_vertex.s1 + d_vert_y)*(sample_nz*sample_ns) +
-              (current_root_vertex.s2 + d_vert_z)*(sample_ns);
+          (sample_nz*sample_ny) + 
+            (current_root_vertex.s1 + d_vert_y)*(sample_nz) +
+              (current_root_vertex.s2 + d_vert_z);
+              
       bounds_test = bounds_test * brain_mask[box_vertices_index[i]];
     }
     
