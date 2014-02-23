@@ -54,7 +54,7 @@ __kernel void BasicInterpolate(
   __global float4* f_samples, //R
   __global float4* phi_samples, //R
   __global float4* theta_samples, //R
-  __global unsigned int* brain_mask, //R
+  __global unsigned short int* brain_mask, //R
   unsigned int section_size, // dont think we need this...remove later
   unsigned int max_steps,
   unsigned int sample_nx,

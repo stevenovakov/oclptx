@@ -82,6 +82,10 @@ class SampleManager
     std::vector<float4> const GetSeedParticles()
     {
       return _seedParticles;
+    }    
+    std::vector<int4> const GetSeedElem()
+    {
+      return _rootVertices;
     }
 
     // If you use these getters, you must access data from\

@@ -67,13 +67,9 @@ std::string DetermineKernel(); //args undetermined yet
 int main(int argc, char *argv[] )
 {
   // stuff set by s_manager and environment
-  std::string compute_kernel;
-  unsigned int n_particles;
-  unsigned int n_max_steps;
-
 
   // Test Routine
-  OclEnv environment("interptest");
+  //OclEnv environment("interptest");
   //
   // OclEnv should only ever be declared once (can rewrite as singleton
   // class later). Recompile programs with ->SetOclRoutine(...)
@@ -96,9 +92,16 @@ int main(int argc, char *argv[] )
 
     s_manager.ParseCommandLine(argc, argv);
 
-    const BedpostXData* fdata = s_manager.GetFDataPtr();
-    const BedpostXData* thetaData = s_manager.GetThetaDataPtr();
-    const BedpostXData* phiData = s_manager.GetPhiDataPtr();
+    const BedpostXData* f_data = s_manager.GetFDataPtr();
+    const BedpostXData* theta_data = s_manager.GetThetaDataPtr();
+    const BedpostXData* phi_data = s_manager.GetPhiDataPtr();
+    
+    unsigned int n_particles = s_manager.GetNumParticles();
+    unsigned int max_steps = s_manager.GetNumMaxSteps();
+    
+    const float4* initial_positions =
+      s_manager.GetSeedParticles().data();
+    const int4* initial_elem = s_manager.GetSeedElem().data();
 
     //for(unsigned int t = 1; t < thetaData->ns; t++)
     //{
@@ -117,16 +120,10 @@ int main(int argc, char *argv[] )
       //}
     //}
 
-    unsigned int samples_nx, samples_ny, samples_nz, samples_ns;
-    
-    samples_nx = fdata->nx;
-    samples_ny = fdata->ny;
-    samples_nz = fdata->nz;
-    samples_ns = fdata->ns;    
     // Access this array like so for a given x,y,z:
     // seedMask[z*seedMaskVol.xsize()*seedMaskVol.ysize() +
     //   y*seedMaskVol.zsize() + x]
-    const unsigned short int* seedMask =
+    const unsigned short int* brain_mask =
       s_manager.GetBrainMaskToArray();
 
     //cout<<"Count of All Data = "<<countAll<<endl;
@@ -135,24 +132,37 @@ int main(int argc, char *argv[] )
     // somwhere in here, this should initialize, based on s_manager
     // actions:
     //
-    // OclEnv environment
-
+    OclEnv environment("basic");
+    unsigned int n_devices = environment.HowManyDevices();
     //
     // and then (this is a naive, "serial" implementation;
     //
 
-    ////OclPtxHandler handler( args );
-    //handler.WriteSamplesToDevice( args);
-    //handler.WriteInitialPosToDevice( args);
-    //handler.DoubleBufferInit( args);
+    OclPtxHandler handler(environment.GetContext(),
+                          environment.GetCq(0),
+                          environment.GetKernel(0));                          
+    
+      
+    handler.WriteSamplesToDevice( f_data,
+                                  phi_data,
+                                  theta_data,
+                                  static_cast<unsigned int>(1),
+                                  brain_mask);
+    handler.WriteInitialPosToDevice(  initial_positions,
+                                      initial_elem,
+                                      n_particles,
+                                      max_steps,
+                                      n_devices,
+                                      static_cast<unsigned int>(0));
+    handler.DoubleBufferInit( n_particles/2, max_steps);
 
-    //handler.Interpolate();
-    //handler.Reduce();
-    //handler.Interpolate();
+    handler.Interpolate();
+    handler.Reduce();
+    handler.Interpolate();
 
-    //handler.ParticlePathsToFile());
+    handler.ParticlePathsToFile();
 
-    delete[] seedMask;
+    delete[] brain_mask;
   }
 
   std::cout<<"\n\nExiting...\n\n";

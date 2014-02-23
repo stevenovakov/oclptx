@@ -78,17 +78,17 @@ class OclPtxHandler{
     //
     // void Initialize()
 
-    void WriteSamplesToDevice( BedpostXData* f_data,
-                                BedpostXData* phi_data,
-                                BedpostXData* theta_data,
+    void WriteSamplesToDevice( const BedpostXData* f_data,
+                                const BedpostXData* phi_data,
+                                const BedpostXData* theta_data,
                                 unsigned int num_directions,
-                                unsigned int * brain_mask
+                                const unsigned short int* brain_mask
                               );
     // may want to compute offset beforehand in samplemanager,
     // can decide later.
 
-    void WriteInitialPosToDevice( float4* initial_positions,
-                                  int4* initial_elem,
+    void WriteInitialPosToDevice( const float4* initial_positions,
+                                  const int4* initial_elem,
                                   unsigned int nparticles,
                                   unsigned int max_steps,
                                   unsigned int ndevices,
