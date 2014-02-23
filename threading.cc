@@ -13,11 +13,9 @@ namespace threading
 
 // Threads checking in.  Kicks watchdog and lets know if program is done.  This
 // function is really inefficient, so don't call it too often (cache)
+// Return true: we're all done.
 bool CheckIn(char *kick)
 {
-  // TODO(jeff): fix this hack.
-  // Note: Thread mustn't be killed until Watchdog thread notices that the
-  // *all* data is complete.
   if (2 == *kick)
     return true;
 
@@ -57,6 +55,9 @@ void Worker(struct global_fifos *fifos, Gpu *gpu, char *kick)
     inactive_side = (0 == inactive_side)? 1: 0;
 
     // Split the particles between threads evenly.
+    // This is a work-queue style of operation, which is relatively
+    // standard, but that's not obvious.  Making it more obvious would greatly
+    // improve readability.
     int leftover_particles = gpu->particles_per_side_ % REDUCERS_PER_GPU;
     int offset = gpu->particles_per_side_ * inactive_side;
     int count;
@@ -81,7 +82,6 @@ void Reducer(struct global_fifos *fifos, char *kick)
   struct collatz_data_chunk *chunk;
   struct collatz_data *particle;
 
-  int finished_particles = 0;
   while (1)
   {
     chunk = fifos->processed->Pop();
@@ -100,7 +100,6 @@ void Reducer(struct global_fifos *fifos, char *kick)
       {
         // Do something with the finished particle here, if we so desire.
         // It's "chunk->v[i]"
-        ++finished_particles;
 
         particle = fifos->particles->Pop();
         if (!particle)
@@ -117,14 +116,6 @@ void Reducer(struct global_fifos *fifos, char *kick)
 
     fifos->dirty->PushOrDie(chunk);
   }
-}
-
-// Watchdog thread.  Watches other threads for activity.
-int Watchdog()
-{
-  // time_t workers_last_kick[n_gpus];
-  // time_t reducers_last_kick[n_reds];
-  return 0;
 }
 
 }  // namespace threading
