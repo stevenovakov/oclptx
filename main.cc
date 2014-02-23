@@ -85,7 +85,7 @@ int main(int argc, char **argv)
   }
 
   // TODO(jeff): finish properly
-  // Hack: Assume everything will be done in a second, and kill the threads.
+  // Hack: Assume everything will be done in one second, and kill the threads.
   sleep(1);
   kick = 2;
 
