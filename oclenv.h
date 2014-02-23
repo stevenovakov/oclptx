@@ -1,4 +1,4 @@
-/*  Copyright (C) 2004
+/*  Copyright (C) 2014
  *    Afshin Haidari
  *    Steve Novakov
  *    Jeff Taylor

@@ -1,4 +1,4 @@
-/*  Copyright (C) 2004
+/*  Copyright (C) 2014
  *    Afshin Haidari
  *    Steve Novakov
  *    Jeff Taylor
@@ -453,7 +453,7 @@ void OclPtxHandler::DoubleBufferInit(
   unsigned int step_interval_size
 )
 {
-  this->step_size = step_interval_size;
+  this->num_steps = step_interval_size;
 
   this->particles_size = particle_interval_size;
   unsigned int interval_mem_size =
@@ -547,7 +547,7 @@ void OclPtxHandler::Reduce()
   std::vector<unsigned int>* left_vector =
     &(this->particle_indices_left);
 
-  unsigned int s_size = this->step_size;
+  unsigned int s_size = this->num_steps;
 
   unsigned int new_todo_range = 0;
 
@@ -615,7 +615,7 @@ void OclPtxHandler::Reduce()
 
 void OclPtxHandler::Interpolate()
 {
-  std::lock_guard<std::mutex> klock(this->kernel_mutex);
+  //std::lock_guard<std::mutex> klock(this->kernel_mutex);
 
   unsigned int t_sec = this->target_section;
 
@@ -627,7 +627,7 @@ void OclPtxHandler::Interpolate()
   //
 
   cl::NDRange global_range(this->todo_range.at(t_sec));
-  cl::NDRange test_local_range(1);
+  cl::NDRange local_range(1);
   
   // the indeces to compute, always first
   this->ptx_kernel->setArg(0, this->compute_index_buffers.at(t_sec));
@@ -642,9 +642,29 @@ void OclPtxHandler::Interpolate()
   this->ptx_kernel->setArg(5, this->f_samples_buffer);
   this->ptx_kernel->setArg(6, this->phi_samples_buffer);
   this->ptx_kernel->setArg(7, this->theta_samples_buffer);
-  this->ptx-kernel->setARg(8, this->brain_mask_buffer);
+  this->ptx_kernel->setArg(8, this->brain_mask_buffer);
   
+  this->ptx_kernel->setArg(9, this->section_size);
+  this->ptx_kernel->setArg(10, this->max_steps);
+  this->ptx_kernel->setArg(11, this->sample_nx);
+  this->ptx_kernel->setArg(12, this->sample_ny);
+  this->ptx_kernel->setArg(13, this->sample_nz);
+  this->ptx_kernel->setArg(14, this->sample_ns);
+  
+  this->ptx_kernel->setArg(15, this->num_steps);
   // Now I have to write a kernel!!! Yaaaay : )
+  
+  this->ocl_cq->enqueueNDRangeKernel(
+    *(this->ptx_kernel),
+    cl::NullRange,
+    global_range,
+    local_range,
+    NULL,
+    NULL
+  );
+
+  // OCL CQ BLOCK
+  this->ocl_cq->finish();
 }
 
 

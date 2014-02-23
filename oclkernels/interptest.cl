@@ -1,4 +1,4 @@
-/*  Copyright (C) 2004
+/*  Copyright (C) 2014
  *    Afshin Haidari
  *    Steve Novakov
  *    Jeff Taylor
@@ -101,7 +101,6 @@ __kernel void InterpolateTestKernel(
   int d_elem_x;
   int d_elem_y;
   int d_elem_z;
-  int bounds_test;
 
   float xmin, xmax, ymin, ymax, zmin, zmax;
 

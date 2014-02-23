@@ -1,4 +1,4 @@
-/*  Copyright (C) 2004
+/*  Copyright (C) 2014
  *    Afshin Haidari
  *    Steve Novakov
  *    Jeff Taylor
@@ -149,7 +149,7 @@ class OclPtxHandler{
     // are desireable.
 
     unsigned int section_size;
-    unsigned int step_size;
+    unsigned int num_steps;
     unsigned int particles_size;
 
     cl::Buffer particle_paths_buffer;

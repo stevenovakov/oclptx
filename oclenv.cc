@@ -1,4 +1,4 @@
-/*  Copyright (C) 2004
+/*  Copyright (C) 2014
  *    Afshin Haidari
  *    Steve Novakov
  *    Jeff Taylor
@@ -253,7 +253,10 @@ cl::Program OclEnv::CreateProgram()
     //source_list.push_back("prngmethods.cl");
     source_list.push_back(fold + slash + "interptest.cl");
   }
-
+  else if (this->ocl_routine_name == "basic")
+  {
+    source_list.push_back(fold + slash + "basic.cl");
+  }
   for (sit = source_list.begin(); sit != source_list.end(); ++sit)
   {
     line_str = *sit;
@@ -337,6 +340,12 @@ cl::Program OclEnv::CreateProgram()
     {
       this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
                                                 "InterpolateTestKernel",
+                                                NULL));
+    }
+    else if (this->ocl_routine_name == "basic" )
+    {
+      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
+                                                "BasicInterpolate",
                                                 NULL));
     }
   }
