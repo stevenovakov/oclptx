@@ -35,6 +35,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <mutex>
 //#include <mutex>
 //#include <thread>
 
@@ -95,7 +96,101 @@ OclPtxHandler::~OclPtxHandler()
 //
 //*********************************************************************
 
+void OclPtxHandler::ParticlePathsToFile()
+{
+  float4 * particle_paths;
+  particle_paths = new float4[this->n_particles*this->max_steps];
+  unsigned int * particle_steps;
+  particle_steps = new unsigned int[this->n_particles];
 
+  this->ocl_cq->enqueueReadBuffer(
+    this->particle_paths_buffer,
+    CL_FALSE, // blocking
+    0,
+    this->particles_mem_size,
+    particle_paths
+  );
+  this->ocl_cq->enqueueReadBuffer(
+    this->particle_steps_taken_buffer,
+    CL_FALSE, // blocking
+    0,
+    this->particle_uint_mem_size,
+    particle_steps
+  );
+  this->ocl_cq->finish();
+
+  // now dump to file
+
+  std::ostringstream convert(std::ostringstream::ate);
+
+  std::string path_filename;
+
+  std::vector<float> temp_x;
+  std::vector<float> temp_y;
+  std::vector<float> temp_z;
+
+  time_t t = time(0);
+  struct tm * now = localtime(&t);
+
+  convert << "OclPtx Results/"<< now->tm_yday << "-" <<
+    static_cast<int>(now->tm_year) + 1900 << "_"<< now->tm_hour <<
+      ":" << now->tm_min << ":" << now->tm_sec;
+
+  path_filename = convert.str() + "_PATHS.dat";
+  std::cout << "Writing to " << path_filename << "\n";
+
+  std::fstream path_file;
+  path_file.open(path_filename.c_str(), std::ios::app|std::ios::out);
+
+  for (unsigned int n = 0; n < this->n_particles; n ++)
+  {
+    unsigned int p_steps = particle_steps[n]
+    for (unsigned int s = 0; s < p_steps; s++)
+    {
+      temp_x.push_back(particle_paths[n*this->max_steps + s].x);
+      temp_y.push_back(particle_paths[n*this->max_steps + s].y);
+      temp_z.push_back(particle_paths[n*this->max_steps + s].z);
+    }
+
+    for (unsigned int i = 0; i < (unsigned int) p_steps; i++)
+    {
+      path_file << temp_x.at(i);
+
+      if (i < (unsigned int) n_steps - 1)
+        path_file << ",";
+      else
+        path_file << "\n";
+    }
+
+    for (unsigned int i = 0; i < (unsigned int) p_steps; i++)
+    {
+      path_file << temp_y.at(i);
+
+      if (i < (unsigned int) n_steps - 1)
+        path_file << ",";
+      else
+        path_file << "\n";
+    }
+
+    for (unsigned int i = 0; i < (unsigned int) p_steps; i++)
+    {
+      path_file << temp_z.at(i);
+
+      if (i < (unsigned int) n_steps - 1)
+        path_file << ",";
+      else
+        path_file << "\n";
+    }
+
+    temp_x.clear();
+    temp_y.clear();
+    temp_z.clear();
+  }
+
+  path_file.close();
+  delete[] particle_paths;
+  delete[] particle_steps;
+}
 
 //*********************************************************************
 //
@@ -199,6 +294,7 @@ void OclPtxHandler::WriteSamplesToDevice(
 
 void OclPtxHandler::WriteInitialPosToDevice(
   float4* initial_positions,
+  int4* initial_elem,
   unsigned int nparticles,
   unsigned int maximum_steps,
   unsigned int ndevices,
@@ -213,9 +309,15 @@ void OclPtxHandler::WriteInitialPosToDevice(
 
   unsigned int path_mem_size = sec_size*maximum_steps*sizeof(float4);
   unsigned int path_steps_mem_size = sec_size*sizeof(unsigned int);
+  this->particle_uint_mem_size = path_steps_mem_size;
+  this->particles_mem_size = path_mem_size;
+
+  unsigned int elem_size = sec_size;
+  unsigned int elem_mem_size = elem_size*sizeof(int4);
 
   // if MT: wrap in mutex (to avoid race on initial_positions)
   float4* start_pos_data = initial_positions + (sec_size*device_num);
+  int4* start_elem_data = initial_elem + (sec_size*device_num);
   // if MT: wrap in mutex (to avoid race on initial_positions)
 
   // also doubles as the "is done" initial data
@@ -253,6 +355,15 @@ void OclPtxHandler::WriteInitialPosToDevice(
       NULL
     );
 
+  this->particle_elem_buffer =
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_WRITE,
+      elem_mem_size,
+      NULL,
+      NULL
+    );
+
   this->particle_done_buffer =
     cl::Buffer(
       *(this->ocl_context),
@@ -261,7 +372,9 @@ void OclPtxHandler::WriteInitialPosToDevice(
       NULL,
       NULL
     );
+
   // enqueue writes
+  // both "steps taken" and "done" write the same array (all zeros)
 
   this->ocl_cq->enqueueWriteBuffer(
     this->particle_paths_buffer,
@@ -279,6 +392,16 @@ void OclPtxHandler::WriteInitialPosToDevice(
     static_cast<unsigned int>(0),
     path_steps_mem_size,
     initial_steps.data(),
+    NULL,
+    NULL
+  );
+
+  this->ocl_cq->enqueueWriteBuffer(
+    this->particle_elem_buffer,
+    CL_FALSE,
+    static_cast<unsigned int>(0),
+    elem_mem_size,
+    start_elem_data,
     NULL,
     NULL
   );
@@ -390,11 +513,63 @@ void OclPtxHandler::ReduceInit(unsigned int particles_per,
 
 void OclPtxHandler::Reduce()
 {
-  // may need to mutex
-  unsigned int t_sec = this->target_section;
-  // may need to mutex
+  unsigned int t_sec = this->target_section  & 0x00000000;
 
-  this->target_section = this->target_section & 0x00000000;
+  std::vector<unsigned int>* reduce_vector =
+    &(this->particle_todo.at(t_sec));
+  std::vector<unsigned int>* done_vector =
+    &(this->particle_complete);
+  std::vector<unsigned int>* left_vector =
+    &(this->particle_indices_left);
+
+  unsigned int s_size = this->step_size;
+
+  unsigned int new_todo_range = 0;
+
+  // first pop all of the finished indeces
+
+  // apparently in CL1.1 + ,
+  // all command queue CALLS are thread safe
+  // std::unique_lock<std::mutex> cqlock(this->cq_mutex);
+
+  this->ocl_cq->enqueueReadBuffer(
+    this->particle_done_buffer,
+    CL_TRUE, // blocking
+    0,
+    this->particle_uint_mem_size,
+    done_vector->data()
+  );
+
+  //cqlock.unlock();
+
+  for (unsigned int i = 0; i < reduce_vector->size(); i++)
+  {
+    if (done_vector->at(i) > 0)
+      reduce_vector->erase(reduce_vector->begin() + i);
+  }
+
+  unsigned int old_size_left = reduce_vector->size();
+  unsigned int particles_left = this->particle_indeces_left.size();
+  unsigned int gap_size = s_size - old_size_left;
+
+  if ( gap_size > particles_left )
+    gap_size = particles_left;
+
+  for (unsigned int i = 0; i < gap_size; i++)
+  {
+    reduce_vector->push_back(left_vector->back());
+    left_vector->pop_back();
+  }
+
+  if (left_vector->size == 0)
+    this->interpolation_complete = true;
+
+  new_todo_range = old_size_left + gap_size;
+
+  std::unique_lock<std::mutex> rdlock(this->reduce_mutex);
+  this->target_section = t_sec;
+  this->todo_range.at(t_sec) = new_todo_range;
+  rdlock.unlock();
 }
 
 //*********************************************************************
@@ -405,6 +580,15 @@ void OclPtxHandler::Reduce()
 
 void OclPtxHandler::Interpolate()
 {
+  std::lock_guard<std::mutex> klock(this->kernel_mutex);
+
+  unsigned int t_sec = this->target_section;
+
+  std::vector<unsigned int>* interpolate_vector =
+    &(this->particle_todo.at(t_sec));
+
+
+
 
 
 }

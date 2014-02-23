@@ -51,6 +51,12 @@
 
 #include "oclenv.h"
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+static const std::string slash="\\";
+#else
+static const std::string slash="/";
+#endif
+
 //*********************************************************************
 //
 // OclEnv Constructors/Destructors
@@ -229,21 +235,23 @@ cl::Program OclEnv::CreateProgram()
 
   std::vector<std::string> source_list;
   std::vector<std::string>::iterator sit;
+  
+  std::string fold = "oclkernels"
 
   if (this->ocl_routine_name == "oclptx")
   {
-    source_list.push_back("prngmethods.cl");
-    source_list.push_back("interpolate.cl");
+    source_list.push_back(fold + slash + "prngmethods.cl");
+    source_list.push_back(fold + slash + "interpolate.cl");
   }
   else if (this->ocl_routine_name == "prngtest")
   {
-    source_list.push_back("prngmethods.cl");
-    source_list.push_back("prngtest.cl");
+    source_list.push_back(fold + slash + "prngmethods.cl");
+    source_list.push_back(fold + slash + "prngtest.cl");
   }
   else if (this->ocl_routine_name == "interptest")
   {
     //source_list.push_back("prngmethods.cl");
-    source_list.push_back("interptest.cl");
+    source_list.push_back(fold + slash + "interptest.cl");
   }
 
   for (sit = source_list.begin(); sit != source_list.end(); ++sit)

@@ -34,6 +34,7 @@
 
 #include <iostream>
 #include <vector>
+#include <mutex>
 //#include <thread>
 //#include <mutex>
 
@@ -64,7 +65,7 @@ class OclPtxHandler{
     // Set/Get
     //
 
-    std::vector<float4> GetParticlePaths();   // do at end
+    void ParticlePathsToFile();   // do at end
 
     bool IsFinished(){ return this->interpolation_complete; };
 
@@ -86,6 +87,7 @@ class OclPtxHandler{
     // can decide later.
 
     void WriteInitialPosToDevice( float4* initial_positions,
+                                  int4* initial_elem,
                                   unsigned int nparticles,
                                   unsigned int max_steps,
                                   unsigned int ndevices,
@@ -139,6 +141,10 @@ class OclPtxHandler{
 
     // TODO @STEVE:  Some of this stuff will be GPU memory limited
     // figure out which and how
+    
+    // TODO @STEVE: May have to introduce additional "status" buffers
+    // for things like waypoint/stop mask ,etc to check which particles
+    // are desireable.
 
     unsigned int section_size;
     unsigned int step_size;
@@ -146,35 +152,34 @@ class OclPtxHandler{
 
     cl::Buffer particle_paths_buffer;
     cl::Buffer particle_steps_taken_buffer;
+    cl::Buffer particle_elem_buffer;
 
     cl::Buffer particle_done_buffer;
-
+    //cl:Buffer particle_waypoint_buffer;
+    
+    unsigned int particles_mem_size;
+    unsigned int particle_uint_mem_size;
     // size (Total Particles)/numDevices * (sizeof(float4))
 
     //
     // These are the "double buffer" objects
     //
-    // Might have to rethink this within scope of mutexing, if
-    // there is a common root/owner object, then access through that
-    // may initiate a race condition.
-    //
+
     std::vector<cl::Buffer> compute_index_buffers;
 
     std::vector< unsigned int > particle_indeces_left;
-    std::vector< bool > particle_complete;
+    std::vector< unsigned int > particle_complete;
     // Vector of max size (N/2 ) , where n is the total number
     // of particles
     std::vector< std::vector<unsigned int> > particle_todo;
     // NDRange of current pair of enqueueNDRangeKernel
     std::vector<unsigned int> todo_range;
 
-
-    // may want to just re-compute element # based off position
-    // INSIDE KERNEL rather than store.
-    //std::vector<cl::Buffer> compute_elements;
-    //std::vector< std::vector<unsigned int> > particle_elements;
-
-
+    // mutex for reduction/interpolation conflicts on local objects
+    std::mutex reduce_mutex;
+    // mutex for kernel 
+    std::mutex kernel_mutex;
+    // mutex for command queue access
 
     // which half of particle_indeces/particle_complete needs to be
     // interpolated next (either 0, or 1)
@@ -186,6 +191,7 @@ class OclPtxHandler{
 
     bool interpolation_complete;
     // false until there are zero particle paths left to compute.
+    // operations should finalize after NEXT interpolate call.
 };
 
 #endif

@@ -56,6 +56,7 @@ void SimpleInterpolationTest( cl::Context * ocl_context,
                               cl::Kernel * test_kernel
                             );
 
+std::string DetermineKernel(); //args undetermined yet
 
 //*********************************************************************
 //
@@ -128,6 +129,23 @@ int main(int argc, char *argv[] )
     // actions:
     //
     // OclEnv environment
+
+    //
+    // and then (this is a naive, "serial" implementation;
+    //
+
+    //OclPtxHandler handler( args );
+    handler.WriteSamplesToDevice( args);
+    handler.WriteInitialPosToDevice( args);
+    handler.DoubleBufferInit( args);
+
+    handler.Interpolate();
+    handler.Reduce();
+    handler.Interpolate();
+
+    // should rewrite to match actual ptx data format later
+    PathsToFile(handler.GetParticlePaths());
+
   }
 
   std::cout<<"\n\nExiting...\n\n";
@@ -139,7 +157,10 @@ int main(int argc, char *argv[] )
 // Assorted Functions
 //
 //*********************************************************************
-
+std::string DetermineKernel()
+{
+  return std::string("interptest");   
+}
 
 void SimpleInterpolationTest( cl::Context* ocl_context,
                               cl::CommandQueue* cq,
