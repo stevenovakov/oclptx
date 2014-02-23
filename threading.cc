@@ -38,7 +38,14 @@ void Worker(struct global_fifos *fifos, Gpu *gpu, char *kick)
   {
     for (int i = 0; i < REDUCERS_PER_GPU; ++i)
     {
-      chunk[i] = fifos->dirty->PopOrBlock();
+      chunk[i] = fifos->dirty->Pop();
+      while (!chunk[i])
+      {
+        usleep(1000);  // TODO(jeff) don't poll
+        if (CheckIn(kick))
+          return;
+        chunk[i] = fifos->dirty->Pop();
+      }
       gpu->WriteParticles(chunk[i]);
     }
 
@@ -77,7 +84,14 @@ void Reducer(struct global_fifos *fifos, char *kick)
   int finished_particles = 0;
   while (1)
   {
-    chunk = fifos->processed->PopOrBlock();
+    chunk = fifos->processed->Pop();
+    while (!chunk)
+    {
+      usleep(1000);  // TODO(jeff) don't poll
+      if (CheckIn(kick))
+        return;
+      chunk = fifos->processed->Pop();
+    }
 
     int reduced_count = 0;
     for (int i = 0; i < chunk->last; i++)
