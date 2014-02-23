@@ -19,7 +19,7 @@ namespace threading
 struct collatz_data
 {
   uint64_t value; // Dirty list
-  size_t offset; // Dirty list
+  int offset; // Dirty list
   int complete; // GPU mirror
 };
 
@@ -27,9 +27,9 @@ struct collatz_data
 struct collatz_data_chunk
 {
   struct collatz_data *v;
-  size_t offset;  // For GPU mirror
-  size_t last;  // For Both
-  size_t size;  // For Both.  Mainly a sanity check.
+  int offset;  // For GPU mirror
+  int last;  // For Both
+  int size;  // For Both.  Mainly a sanity check.
 };
 
 // Global FIFOs.  These are used in a number of places, and contain

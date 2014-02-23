@@ -28,7 +28,7 @@ Gpu::~Gpu()
 
 void Gpu::WriteParticles(struct threading::collatz_data_chunk *chunk)
 {
-  size_t off;
+  int off;
   for (int i = 0; i < chunk->last; i++)
   {
     off = chunk->v[i].offset;
@@ -37,8 +37,8 @@ void Gpu::WriteParticles(struct threading::collatz_data_chunk *chunk)
 }
 
 void Gpu::ReadParticles(struct threading::collatz_data_chunk *chunk,
-                        size_t offset,
-                        size_t count)
+                        int offset,
+                        int count)
 {
   assert(count <= chunk->size);
 
@@ -74,7 +74,7 @@ void Gpu::RunKernel(int side)
 {
   for (int i = 0; i < particles_per_side_; i++)
   {
-    size_t off = i + particles_per_side_ * side;
+    int off = i + particles_per_side_ * side;
     for (int j = 0; j < steps_per_kernel_; j++)
     {
       // Collatz conjecture.

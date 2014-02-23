@@ -80,7 +80,7 @@ void Reducer(struct global_fifos *fifos, char *kick)
     chunk = fifos->processed->PopOrBlock();
 
     int reduced_count = 0;
-    for (size_t i = 0; i < chunk->last; i++)
+    for (int i = 0; i < chunk->last; i++)
     {
       if (chunk->v[i].complete)
       {

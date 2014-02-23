@@ -18,8 +18,8 @@ class Gpu
   ~Gpu();
   void WriteParticles(struct threading::collatz_data_chunk *chunk);
   void ReadParticles(struct threading::collatz_data_chunk *chunk,
-                     size_t offset,
-                     size_t count);
+                     int offset,
+                     int count);
   void RunKernel(int side);
   void RunKernelAsync(int side);
   void WaitForKernel();
