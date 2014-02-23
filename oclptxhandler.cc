@@ -144,7 +144,8 @@ void OclPtxHandler::ParticlePathsToFile()
 
   for (unsigned int n = 0; n < this->n_particles; n ++)
   {
-    unsigned int p_steps = particle_steps[n]
+    unsigned int p_steps = particle_steps[n];
+    
     for (unsigned int s = 0; s < p_steps; s++)
     {
       temp_x.push_back(particle_paths[n*this->max_steps + s].x);
@@ -156,7 +157,7 @@ void OclPtxHandler::ParticlePathsToFile()
     {
       path_file << temp_x.at(i);
 
-      if (i < (unsigned int) n_steps - 1)
+      if (i < (unsigned int) p_steps - 1)
         path_file << ",";
       else
         path_file << "\n";
@@ -166,7 +167,7 @@ void OclPtxHandler::ParticlePathsToFile()
     {
       path_file << temp_y.at(i);
 
-      if (i < (unsigned int) n_steps - 1)
+      if (i < (unsigned int) p_steps - 1)
         path_file << ",";
       else
         path_file << "\n";
@@ -176,7 +177,7 @@ void OclPtxHandler::ParticlePathsToFile()
     {
       path_file << temp_z.at(i);
 
-      if (i < (unsigned int) n_steps - 1)
+      if (i < (unsigned int) p_steps - 1)
         path_file << ",";
       else
         path_file << "\n";
@@ -209,7 +210,7 @@ void OclPtxHandler::WriteSamplesToDevice(
   BedpostXData* phi_data,
   BedpostXData* theta_data,
   unsigned int num_directions,
-  unsigned int* brain_mask,
+  unsigned int* brain_mask
 )
 {
   unsigned int single_direction_size =
@@ -545,7 +546,7 @@ void OclPtxHandler::Reduce()
   std::vector<unsigned int>* done_vector =
     &(this->particle_complete);
   std::vector<unsigned int>* left_vector =
-    &(this->particle_indices_left);
+    &(this->particle_indeces_left);
 
   unsigned int s_size = this->num_steps;
 
@@ -586,7 +587,7 @@ void OclPtxHandler::Reduce()
     left_vector->pop_back();
   }
 
-  if (left_vector->size == 0)
+  if (left_vector->size() == 0)
     this->interpolation_complete = true;
 
   new_todo_range = old_size_left + gap_size;
@@ -618,9 +619,6 @@ void OclPtxHandler::Interpolate()
   //std::lock_guard<std::mutex> klock(this->kernel_mutex);
 
   unsigned int t_sec = this->target_section;
-
-  std::vector<unsigned int>* interpolate_vector =
-    &(this->particle_todo.at(t_sec));
   
   //
   // Currently Handles single voxel/mask + No other options ONLY
@@ -635,7 +633,7 @@ void OclPtxHandler::Interpolate()
   // particle status buffers
   this->ptx_kernel->setArg(1, this->particle_paths_buffer);
   this->ptx_kernel->setArg(2, this->particle_steps_taken_buffer);
-  this->ptx_kernel->setArg(3, this->partcle_elem_buffer);
+  this->ptx_kernel->setArg(3, this->particle_elem_buffer);
   this->ptx_kernel->setArg(4, this->particle_done_buffer);
   
   // sample data buffers

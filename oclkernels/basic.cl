@@ -36,7 +36,7 @@
  * before compiling kernel for runtime:
  *
  *      prngmethods.cl
- *      interptest.cl
+ *      basic.cl
  *
  */
 

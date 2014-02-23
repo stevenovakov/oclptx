@@ -236,7 +236,7 @@ cl::Program OclEnv::CreateProgram()
   std::vector<std::string> source_list;
   std::vector<std::string>::iterator sit;
   
-  std::string fold = "oclkernels"
+  std::string fold = "oclkernels";
 
   if (this->ocl_routine_name == "oclptx")
   {
