@@ -78,9 +78,9 @@ int main(int argc, char *argv[] )
   // OclEnv should only ever be declared once (can rewrite as singleton
   // class later). Recompile programs with ->SetOclRoutine(...)
   //
-  SimpleInterpolationTest(environment.GetContext(),
-                          environment.GetCq(0),
-                          environment.GetKernel(0));
+  //SimpleInterpolationTest(environment.GetContext(),
+                          //environment.GetCq(0),
+                          //environment.GetKernel(0));
 
   // Sample Manager
 
@@ -91,38 +91,46 @@ int main(int argc, char *argv[] )
   }
   else
   {
-	  int countAll = 0;
-	  int countNonZero = 0;
+	  //int countAll = 0;
+	  //int countNonZero = 0;
 
     s_manager.ParseCommandLine(argc, argv);
 
+    const BedpostXData* fdata = s_manager.GetFDataPtr();
     const BedpostXData* thetaData = s_manager.GetThetaDataPtr();
+    const BedpostXData* phiData = s_manager.GetPhiDataPtr();
 
-    for(unsigned int t = 1; t < thetaData->ns; t++)
-    {
-      for (unsigned int x = 0; x<thetaData->nx; x++)
-      {
-        for (unsigned int y=0; y<thetaData->ny; y++)
-        {
-          for (unsigned int z=0; z<thetaData->nz; z++)
-          {
-            float data = s_manager.GetThetaData(0,t,x,y,z);
-            countAll++;
-            if(data != 0.0f)
-            countNonZero++;
-          }
-        }
-      }
-    }
+    //for(unsigned int t = 1; t < thetaData->ns; t++)
+    //{
+      //for (unsigned int x = 0; x<thetaData->nx; x++)
+      //{
+        //for (unsigned int y=0; y<thetaData->ny; y++)
+        //{
+          //for (unsigned int z=0; z<thetaData->nz; z++)
+          //{
+            //float data = s_manager.GetThetaData(0,t,x,y,z);
+            //countAll++;
+            //if(data != 0.0f)
+            //countNonZero++;
+          //}
+        //}
+      //}
+    //}
 
+    unsigned int samples_nx, samples_ny, samples_nz, samples_ns;
+    
+    samples_nx = fdata->nx;
+    samples_ny = fdata->ny;
+    samples_nz = fdata->nz;
+    samples_ns = fdata->ns;    
     // Access this array like so for a given x,y,z:
     // seedMask[z*seedMaskVol.xsize()*seedMaskVol.ysize() +
     //   y*seedMaskVol.zsize() + x]
     const unsigned short int* seedMask =
       s_manager.GetBrainMaskToArray();
 
-    cout<<"Count of All Data = "<<countAll<<endl;
-    cout<<"Count of Non Zero Data = "<<countNonZero<<endl;
+    //cout<<"Count of All Data = "<<countAll<<endl;
+    //cout<<"Count of Non Zero Data = "<<countNonZero<<endl;
 
     // somwhere in here, this should initialize, based on s_manager
     // actions:

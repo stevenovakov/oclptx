@@ -84,7 +84,7 @@ class SampleManager
       return _seedParticles;
     }
 
-    // WARNING: If you use these getters, you must access data from\
+    // If you use these getters, you must access data from\
     // the BedpostXData vector as follows:
     // Ex Theta: thetaData.data.at(aFiberNum)[(aSamp)*(nx*ny*nz) +
     // (aZ)*(nx*ny) + (aY)*nx + (aX)]
