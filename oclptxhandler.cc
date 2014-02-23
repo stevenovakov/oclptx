@@ -663,7 +663,7 @@ void OclPtxHandler::Interpolate()
     NULL
   );
 
-  // OCL CQ BLOCK
+  // BLOCK
   this->ocl_cq->finish();
 }
 
