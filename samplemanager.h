@@ -35,8 +35,6 @@
 #include <iostream>
 #include <vector>
 #include <string>
-//using namespace std;
-//using namespace NEWIMAGE;
 
 #include "newimage/newimageall.h"
 #include "miscmaths/miscmaths.h"

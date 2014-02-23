@@ -33,10 +33,6 @@
 #include <fstream>
 #include <sstream>
 
-#define __CL_ENABLE_EXCEPTIONS
-// adds exception support from CL libraries
-// define before CL headers inclusion
-
 #include "samplemanager.h"
 #include "oclptxOptions.h"
 
