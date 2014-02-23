@@ -7,6 +7,7 @@
 //    could work?
 
 #include <unistd.h>
+#include <cassert>
 #include <thread>
 
 #include "oclptx/gpu.h"
@@ -40,26 +41,35 @@ int main(int argc, char **argv)
   struct threading::collatz_data_chunk chunks[kNumChunks];
   struct threading::collatz_data *data;
 
-  // Give the GPU valid particles.
-  for (int i = 0; i < kNumChunks; ++i)
+  // Fill the GPU with valid particles.
+  int current_particle = 0;
+  int current_chunk = 0;
+
+  while (current_particle < 2 * kParticlesPerSide)
   {
-    // TODO(jeff): handle when num particles small
-    //             handle when gpu size not divisible by particle count.
-    // Better way to do this is counting *down* remaining space on GPU and
-    // number of particles left.
+    assert(current_chunk < kNumChunks);
+
     data = new threading::collatz_data[kChunkSize];
+
+    int chunk_size = 0;
     for (int j = 0; j < kChunkSize; ++j)
     {
-      *data = {particle[j], j % kParticlesPerSide, 0};  // value, offset, complete
+      // Add a particle to the chunk
+      if (current_particle >= 2 * kParticlesPerSide)
+        break;
+      data[j] = {particle[current_particle], current_particle, 0};  // value, offset, complete
+      ++current_particle;
+      ++chunk_size;
     }
-    chunks[i] = {data, 0, kChunkSize, kChunkSize};
-
-    // TODO: Bad Jeff.  Passing identical pointers onto a FIFO.  Major bad.
-    fifos.dirty->PushOrDie(&chunks[i]);
+    chunks[current_chunk] = {data, 0, chunk_size, kChunkSize};
+    // The chunks are all adjacent to each other in memory, which means they
+    // likely share a cache line.  That might be bad.
+    fifos.dirty->PushOrDie(&chunks[current_chunk]);
+    ++current_chunk;
   }
 
   // Put the remainer of the particles in the particles fifo
-  for (int i = kNumChunks; i < kTotNumParticles; ++i)
+  for (int i = current_particle; i < kTotNumParticles; ++i)
   {
     data = new threading::collatz_data;
     *data = {particle[i], 0, 0};
