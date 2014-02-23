@@ -90,6 +90,7 @@ int main(int argc, char **argv)
   for (int i = 0; i < kNumReducers; ++i)
   {
     reducers[i]->join();
+    delete reducers[i];
   }
 
   // Expected values.
