@@ -101,6 +101,7 @@ void Reducer(struct global_fifos *fifos, char *kick)
         // Do something with the finished particle here, if we so desire.
         // It's "chunk->v[i]"
 
+        // New particle.
         particle = fifos->particles->Pop();
         if (!particle)
           break;  // No particles left.

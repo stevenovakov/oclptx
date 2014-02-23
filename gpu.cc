@@ -32,6 +32,8 @@ void Gpu::WriteParticles(struct threading::collatz_data_chunk *chunk)
   for (int i = 0; i < chunk->last; i++)
   {
     off = chunk->v[i].offset;
+    assert(off < 2 * particles_per_side_);
+
     data_.v[off] = chunk->v[i];
   }
 }
@@ -40,6 +42,7 @@ void Gpu::ReadParticles(struct threading::collatz_data_chunk *chunk,
                         int offset,
                         int count)
 {
+  assert(offset + count <= 2 * particles_per_side_);
   assert(count <= chunk->size);
 
   void *src = reinterpret_cast<void*>(data_.v + offset);
@@ -65,7 +68,6 @@ void Gpu::WaitForKernel()
   if (NULL == kernel_)
     return;  // No kernel to wait for.
 
-  // TODO(jeff): Might be nice to have a timer run here.
   kernel_->join();
   delete kernel_;
   kernel_ = NULL;

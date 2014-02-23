@@ -76,6 +76,7 @@ int main(int argc, char **argv)
     fifos.particles->PushOrDie(data);
   }
 
+  // Start our threads
   std::thread worker(threading::Worker, &fifos, &gpu, &kick);
   std::thread *reducers[kNumReducers];
   for (int i = 0; i < kNumReducers; ++i)
@@ -83,8 +84,10 @@ int main(int argc, char **argv)
     reducers[i] = new std::thread(threading::Reducer, &fifos, &kick);
   }
 
-  sleep(1); // Assumption: data will be complete by then.
-  kick = 2;  // Kill the thread, which should start polling this when it's done.
+  // TODO(jeff): finish properly
+  // Hack: Assume everything will be done in a second, and kill the threads.
+  sleep(1);
+  kick = 2;
 
   worker.join();
   for (int i = 0; i < kNumReducers; ++i)
@@ -93,8 +96,5 @@ int main(int argc, char **argv)
     delete reducers[i];
   }
 
-  // Expected values.
-  // 32 -> 16 -> 8  -> 4
-  // 17 -> 52 -> 26 -> 13
   return 0;
 }
