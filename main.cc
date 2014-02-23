@@ -18,7 +18,7 @@ int main(int argc, char **argv)
   const int kParticlesPerSide = 1;
   const int kStepsPerKernel = 3;
   const int kNumReducers = 1;
-  const int kNumChunks = kNumReducers * 2;
+  const int kNumChunks = kNumReducers;
   const int kChunkSize = kParticlesPerSide/kNumReducers;  // verify this rounds up.
 
   uint64_t particle[] = {54, 72, 36, 12, 17, 42, 53, 16, 873, 14, 423};
@@ -45,7 +45,7 @@ int main(int argc, char **argv)
   int current_particle = 0;
   int current_chunk = 0;
 
-  while (current_particle < 2 * kParticlesPerSide)
+  while (current_particle < kParticlesPerSide)
   {
     assert(current_chunk < kNumChunks);
 
@@ -55,7 +55,7 @@ int main(int argc, char **argv)
     for (int j = 0; j < kChunkSize; ++j)
     {
       // Add a particle to the chunk
-      if (current_particle >= 2 * kParticlesPerSide)
+      if (current_particle >= kParticlesPerSide)
         break;
       data[j] = {particle[current_particle], current_particle, 0};  // value, offset, complete
       ++current_particle;
