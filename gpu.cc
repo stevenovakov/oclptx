@@ -47,6 +47,7 @@ void Gpu::ReadParticles(struct threading::collatz_data_chunk *chunk,
           src,
           sizeof(threading::collatz_data) * count);
 
+  chunk->offset = offset;
   chunk->last = count;
 }
 
