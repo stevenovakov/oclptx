@@ -81,7 +81,8 @@ class OclPtxHandler{
     void WriteSamplesToDevice( BedpostXData* f_data,
                                 BedpostXData* phi_data,
                                 BedpostXData* theta_data,
-                                unsigned int num_directions
+                                unsigned int num_directions,
+                                unsigned int * brain_mask
                               );
     // may want to compute offset beforehand in samplemanager,
     // can decide later.
@@ -128,6 +129,7 @@ class OclPtxHandler{
     cl::Buffer f_samples_buffer;
     cl::Buffer phi_samples_buffer;
     cl::Buffer theta_samples_buffer;
+    cl::Buffer brain_mask_buffer;
 
     unsigned int samples_buffer_size;
     unsigned int sample_nx, sample_ny, sample_nz, sample_ns;

@@ -203,15 +203,20 @@ void OclPtxHandler::ParticlePathsToFile()
 //
 // void Initialize()
 
+// TODO @STEVE add brain mask support
 void OclPtxHandler::WriteSamplesToDevice(
   BedpostXData* f_data,
   BedpostXData* phi_data,
   BedpostXData* theta_data,
-  unsigned int num_directions
+  unsigned int num_directions,
+  unsigned int* brain_mask,
 )
 {
   unsigned int single_direction_size =
     f_data->nx * f_data->ny * f_data->nz * f_data->ns;
+    
+  unsigned int brain_mem_size =
+    single_direction_size * sizeof(unsigned int);
 
   unsigned int single_direction_mem_size =
     single_direction_size*sizeof(float4);
@@ -252,6 +257,15 @@ void OclPtxHandler::WriteSamplesToDevice(
       NULL,
       NULL
     );
+  
+  this->brain_mask_buffer =
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_ONLY,
+      brain_mem_size,
+      NULL,
+      NULL
+    );
 
   // enqueue writes
 
@@ -287,6 +301,17 @@ void OclPtxHandler::WriteSamplesToDevice(
       NULL
     );
   }
+
+  this->ocl_cq->enqueueWriteBuffer(
+    this->phi_samples_buffer,
+    CL_FALSE,
+    static_cast<unsigned int>(0),
+    brain_mem_size,
+    brain_mask,
+    NULL,
+    NULL
+  );
+  
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
   this->ocl_cq->finish();
@@ -565,6 +590,16 @@ void OclPtxHandler::Reduce()
     this->interpolation_complete = true;
 
   new_todo_range = old_size_left + gap_size;
+  
+  this->ocl_cq->enqueueWriteBuffer(
+    this->compute_index_buffers.at(t_sec),
+    CL_TRUE, //blocking
+    (unsigned int) 0,
+    new_todo_range*sizeof(unsigned int),
+    left_vector->data(),
+    NULL,
+    NULL
+  );
 
   std::unique_lock<std::mutex> rdlock(this->reduce_mutex);
   this->target_section = t_sec;
@@ -586,11 +621,30 @@ void OclPtxHandler::Interpolate()
 
   std::vector<unsigned int>* interpolate_vector =
     &(this->particle_todo.at(t_sec));
+  
+  //
+  // Currently Handles single voxel/mask + No other options ONLY
+  //
 
-
-
-
-
+  cl::NDRange global_range(this->todo_range.at(t_sec));
+  cl::NDRange test_local_range(1);
+  
+  // the indeces to compute, always first
+  this->ptx_kernel->setArg(0, this->compute_index_buffers.at(t_sec));
+  
+  // particle status buffers
+  this->ptx_kernel->setArg(1, this->particle_paths_buffer);
+  this->ptx_kernel->setArg(2, this->particle_steps_taken_buffer);
+  this->ptx_kernel->setArg(3, this->partcle_elem_buffer);
+  this->ptx_kernel->setArg(4, this->particle_done_buffer);
+  
+  // sample data buffers
+  this->ptx_kernel->setArg(5, this->f_samples_buffer);
+  this->ptx_kernel->setArg(6, this->phi_samples_buffer);
+  this->ptx_kernel->setArg(7, this->theta_samples_buffer);
+  this->ptx-kernel->setARg(8, this->brain_mask_buffer);
+  
+  // Now I have to write a kernel!!! Yaaaay : )
 }
 
 
