@@ -20,7 +20,10 @@ Gpu::~Gpu()
 {
   delete data_.v;
   if (kernel_)
+  {
+    kernel_->join();
     delete kernel_;
+  }
 }
 
 void Gpu::WriteParticles(struct threading::collatz_data_chunk *chunk)
