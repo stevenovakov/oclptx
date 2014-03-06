@@ -7,8 +7,6 @@
 
 #include "oclptx/gpu.h"
 
-#define REDUCERS_PER_GPU 1  // Duplicate in main.cc
-
 namespace threading
 {
 
@@ -25,17 +23,17 @@ bool CheckIn(char *kick)
 }
 
 // Worker thread.  Controls the GPU.
-void Worker(struct shared_data *p, Gpu *gpu, char *kick)
+void Worker(struct shared_data *p, Gpu *gpu, char *kick, int num_reducers)
 {
   // Note, there are two "sides" of GPU memory.  At all times, a kernel must
   // only access the one side.  We must only copy data to and from the
   // non-running side.
   int inactive_side = 0;
-  std::unique_lock<std::mutex> *lk[REDUCERS_PER_GPU];
+  std::unique_lock<std::mutex> *lk[num_reducers];
 
   while (1)
   {
-    for (int i = 0; i < REDUCERS_PER_GPU; ++i)
+    for (int i = 0; i < num_reducers; ++i)
     {
       lk[i] = new std::unique_lock<std::mutex>(p[i].data_lock);
       while (!p[i].reduction_complete)
@@ -61,13 +59,13 @@ void Worker(struct shared_data *p, Gpu *gpu, char *kick)
     // This is a work-queue style of operation, which is relatively
     // standard, but that's not obvious.  Making it more obvious would greatly
     // improve readability.
-    int leftover_particles = gpu->particles_per_side_ % REDUCERS_PER_GPU;
+    int leftover_particles = gpu->particles_per_side_ % num_reducers;
     int offset = gpu->particles_per_side_ * inactive_side;
     int count;
-    for (int i = 0; i < REDUCERS_PER_GPU; ++i)
+    for (int i = 0; i < num_reducers; ++i)
     {
       // We still have data lock i
-      count = gpu->particles_per_side_ / REDUCERS_PER_GPU;
+      count = gpu->particles_per_side_ / num_reducers;
       if (leftover_particles)
       {
         count++;

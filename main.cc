@@ -76,7 +76,7 @@ int main(int argc, char **argv)
   }
 
   // Start our threads
-  std::thread worker(threading::Worker, sdata, &gpu, &kick);
+  std::thread worker(threading::Worker, sdata, &gpu, &kick, kNumReducers);
   std::thread *reducers[kNumReducers];
   for (int i = 0; i < kNumReducers; ++i)
   {

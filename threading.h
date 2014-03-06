@@ -7,7 +7,7 @@
 
 namespace threading
 {
-void Worker(struct shared_data *p, Gpu *gpu, char *kick);
+void Worker(struct shared_data *p, Gpu *gpu, char *kick, int num_reducers);
 void Reducer(struct shared_data *p, Fifo<threading::collatz_data> *particles);
 }  // namespace threading
 
