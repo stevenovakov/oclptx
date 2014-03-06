@@ -3,3 +3,4 @@ depend.mk
 *.d
 oclptx
 lint
+*.swp
