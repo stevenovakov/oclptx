@@ -1,6 +1,7 @@
 // Copyright 2014 Jeff Taylor
 //
 // Various thread functions
+//
 
 #include <unistd.h>
 
@@ -24,27 +25,28 @@ bool CheckIn(char *kick)
 }
 
 // Worker thread.  Controls the GPU.
-void Worker(struct global_fifos *fifos, Gpu *gpu, char *kick)
+void Worker(struct shared_data *p, Gpu *gpu, char *kick)
 {
   // Note, there are two "sides" of GPU memory.  At all times, a kernel must
   // only access the one side.  We must only copy data to and from the
   // non-running side.
   int inactive_side = 0;
-  struct collatz_data_chunk *chunk[REDUCERS_PER_GPU];
+  std::unique_lock<std::mutex> *lk[REDUCERS_PER_GPU];
 
   while (1)
   {
     for (int i = 0; i < REDUCERS_PER_GPU; ++i)
     {
-      chunk[i] = fifos->dirty->Pop();
-      while (!chunk[i])
+      lk[i] = new std::unique_lock<std::mutex>(p[i].data_lock);
+      while (!p[i].reduction_complete)
       {
-        usleep(1000);  // TODO(jeff) don't poll
+        p[i].reduction_complete_cv.wait_for(*lk[i], std::chrono::milliseconds(100));
         if (CheckIn(kick))
           return;
-        chunk[i] = fifos->dirty->Pop();
       }
-      gpu->WriteParticles(chunk[i]);
+      p[i].reduction_complete = false;
+
+      gpu->WriteParticles(&p[i].chunk);
     }
 
     gpu->WaitForKernel();
@@ -63,59 +65,69 @@ void Worker(struct global_fifos *fifos, Gpu *gpu, char *kick)
     int count;
     for (int i = 0; i < REDUCERS_PER_GPU; ++i)
     {
+      // We still have data lock i
       count = gpu->particles_per_side_ / REDUCERS_PER_GPU;
       if (leftover_particles)
       {
         count++;
         leftover_particles--;
       }
-      gpu->ReadParticles(chunk[i], offset, count);
-      fifos->processed->PushOrDie(chunk[i]);
+      gpu->ReadParticles(&p[i].chunk, offset, count);
       offset += count;
+
+      p[i].data_ready = true;
+      p[i].data_ready_cv.notify_one();
+      delete lk[i];
     }
   }
 }
 
 // Reducer thread.
-void Reducer(struct global_fifos *fifos, char *kick)
+// TODO here: separate IN and OUT.  Having them shared is fairly ugly.  I'm
+// really close to having this fixed.
+void Reducer(struct shared_data *p, Fifo<threading::collatz_data> *particles)
 {
-  struct collatz_data_chunk *chunk;
   struct collatz_data *particle;
+  int reduced_count;
 
   while (1)
   {
-    chunk = fifos->processed->Pop();
-    while (!chunk)
+    // Wait for data to be ready.
+    std::unique_lock<std::mutex> lk(p->data_lock);
+    while (!p->data_ready)
     {
-      usleep(1000);  // TODO(jeff) don't poll
-      if (CheckIn(kick))
+      p->data_ready_cv.wait_for(lk, std::chrono::milliseconds(100));
+      if (CheckIn(p->kick))
         return;
-      chunk = fifos->processed->Pop();
     }
+    p->data_ready = false;
 
-    int reduced_count = 0;
-    for (int i = 0; i < chunk->last; i++)
+    // Do the actual reduction
+    reduced_count = 0;
+    for (int i = 0; i < p->chunk.last; i++)
     {
-      if (chunk->v[i].complete)
+      if (p->chunk.v[i].complete)
       {
         // Do something with the finished particle here, if we so desire.
-        // It's "chunk->v[i]"
+        // It's "chunk.v[i]"
 
         // New particle.
-        particle = fifos->particles->Pop();
+        particle = particles->Pop();
         if (!particle)
           break;  // No particles left.
 
-        chunk->v[reduced_count] = *particle;
-        chunk->v[reduced_count].offset = chunk->offset + i;
+        p->chunk.v[reduced_count] = *particle;
+        p->chunk.v[reduced_count].offset = p->chunk.offset + i;
         ++reduced_count;
 
         delete particle;
       }
     }
-    chunk->last = reduced_count;
+    p->chunk.last = reduced_count;
 
-    fifos->dirty->PushOrDie(chunk);
+    p->reduction_complete = true;
+    p->reduction_complete_cv.notify_one();
+    lk.unlock();
   }
 }
 

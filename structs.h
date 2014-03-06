@@ -4,6 +4,7 @@
 #define STRUCTS_H_
 
 #include <stdint.h>
+#include <condition_variable>
 #include "oclptx/fifo.h"
 
 namespace threading
@@ -32,21 +33,17 @@ struct collatz_data_chunk
   int size;  // For Both.  Mainly a sanity check.
 };
 
-// Global FIFOs.  These are used in a number of places, and contain
-// threadsafe methods.
-struct global_fifos
-{
-  class Fifo<struct collatz_data_chunk> *dirty;
-  class Fifo<struct collatz_data_chunk> *processed;
-  class Fifo<struct collatz_data> *particles;
-};
+struct shared_data {
+  struct collatz_data_chunk chunk; // TODO(jeff) split two directions
+  std::mutex data_lock;
 
-// The kicker is used to inform the watchdog that this thread is alive and
-// well, and hasn't hung.
-struct global_kicker
-{
-  bool *worker_kick;
-  bool *reducer_kick;
+  bool data_ready;
+  std::condition_variable data_ready_cv;
+
+  bool reduction_complete;
+  std::condition_variable reduction_complete_cv;
+
+  char *kick;
 };
 
 }  // namespace threading

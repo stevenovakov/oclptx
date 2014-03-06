@@ -18,28 +18,29 @@ int main(int argc, char **argv)
   const int kParticlesPerSide = 1;
   const int kStepsPerKernel = 3;
   const int kNumReducers = 1;
-  const int kNumChunks = kNumReducers;
   const int kChunkSize = kParticlesPerSide/kNumReducers;  // verify this rounds up.
 
   uint64_t particle[] = {54, 72, 36, 12, 17, 42, 53, 16, 873, 14, 423};
   const int kTotNumParticles = 11;
 
-  // TODO(jeff) make these fifos the proper size
-  Fifo<threading::collatz_data_chunk> processed(5);
-  Fifo<threading::collatz_data_chunk> dirty(5);
+  // TODO(jeff) make this fifo the proper size
   Fifo<threading::collatz_data> particles(5);
 
-  struct threading::global_fifos fifos = {&processed, &dirty, &particles};
-
+  // TODO(jeff) kick is still a hack
   char kick = 0;
 
-  // Test routine for threading.
   Gpu gpu(kParticlesPerSide, kStepsPerKernel);
 
-  // Create nRed * 2 chunks, each one is particles_per_side / nRed in length
-  // TODO(jeff): This line is most likely going to cause cache issues.
-  struct threading::collatz_data_chunk chunks[kNumChunks];
+  // Create nRed chunks, each one is particles_per_side / nRed in length
+  struct threading::shared_data sdata[kNumReducers];
   struct threading::collatz_data *data;
+
+  for (int i = 0; i < kNumReducers; ++i)
+  {
+    sdata[i].kick = &kick;
+    sdata[i].data_ready = false;
+    sdata[i].reduction_complete = false;
+  }
 
   // Fill the GPU with valid particles.
   int current_particle = 0;
@@ -47,7 +48,7 @@ int main(int argc, char **argv)
 
   while (current_particle < kParticlesPerSide)
   {
-    assert(current_chunk < kNumChunks);
+    assert(current_chunk < kNumReducers);
 
     data = new threading::collatz_data[kChunkSize];
 
@@ -61,10 +62,8 @@ int main(int argc, char **argv)
       ++current_particle;
       ++chunk_size;
     }
-    chunks[current_chunk] = {data, 0, chunk_size, kChunkSize};
-    // The chunks are all adjacent to each other in memory, which means they
-    // likely share a cache line.  That might be bad.
-    fifos.dirty->PushOrDie(&chunks[current_chunk]);
+    sdata[current_chunk].chunk = {data, 0, chunk_size, kChunkSize};
+    sdata[current_chunk].reduction_complete = true;
     ++current_chunk;
   }
 
@@ -73,15 +72,15 @@ int main(int argc, char **argv)
   {
     data = new threading::collatz_data;
     *data = {particle[i], 0, 0};
-    fifos.particles->PushOrDie(data);
+    particles.PushOrDie(data);
   }
 
   // Start our threads
-  std::thread worker(threading::Worker, &fifos, &gpu, &kick);
+  std::thread worker(threading::Worker, sdata, &gpu, &kick);
   std::thread *reducers[kNumReducers];
   for (int i = 0; i < kNumReducers; ++i)
   {
-    reducers[i] = new std::thread(threading::Reducer, &fifos, &kick);
+    reducers[i] = new std::thread(threading::Reducer, &sdata[i], &particles);
   }
 
   // TODO(jeff): finish properly

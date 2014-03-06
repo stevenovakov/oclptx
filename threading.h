@@ -7,9 +7,8 @@
 
 namespace threading
 {
-void Worker(struct global_fifos *fifos, Gpu *gpu, char *kick);
-int Reducer(struct global_fifos *fifos, char *kick);
-int Watchdog();
+void Worker(struct shared_data *p, Gpu *gpu, char *kick);
+void Reducer(struct shared_data *p, Fifo<threading::collatz_data> *particles);
 }  // namespace threading
 
 #endif  // THREADING_H_
