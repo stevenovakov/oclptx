@@ -40,7 +40,15 @@ void Worker(struct shared_data *p, Gpu *gpu, char *kick, int num_reducers)
         p[i].reduction_complete_cv.wait_for(*lk[i],
                                             std::chrono::milliseconds(100));
         if (CheckIn(kick))
+        {
+          // Free all the locks before we return.
+          do {
+            delete lk[i];
+            i--;
+          } while (i >= 0);
+
           return;
+        }
       }
       p[i].reduction_complete = false;
 
