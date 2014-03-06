@@ -2,3 +2,4 @@ depend.mk
 *.o
 *.d
 oclptx
+lint
