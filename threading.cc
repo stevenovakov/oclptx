@@ -16,8 +16,6 @@ bool CheckIn(char *kick)
 {
   if (2 == *kick)
     return true;
-
-  *kick = 1;
   return false;
 }
 
