@@ -9,7 +9,7 @@
 
 #include <thread>
 
-#include "oclptx/structs.h"
+#include "oclptx/threading.h"
 
 class Gpu
 {

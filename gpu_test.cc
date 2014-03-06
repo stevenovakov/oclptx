@@ -4,7 +4,7 @@
 
 #include <cassert>
 #include "oclptx/gpu.h"
-#include "oclptx/structs.h"
+#include "oclptx/threading.h"
 
 int main(int argc, char **argv)
 {

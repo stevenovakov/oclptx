@@ -4,7 +4,7 @@
 #include <cstring>
 
 #include "oclptx/gpu.h"
-#include "oclptx/structs.h"
+#include "oclptx/threading.h"
 
 Gpu::Gpu(int particles_per_side, int steps_per_kernel):
   particles_per_side_(particles_per_side),
