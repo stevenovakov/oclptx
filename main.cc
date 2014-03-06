@@ -15,9 +15,9 @@
 
 int main(int argc, char **argv)
 {
-  const int kParticlesPerSide = 1;
+  const int kParticlesPerSide = 2;
   const int kStepsPerKernel = 3;
-  const int kNumReducers = 1;
+  const int kNumReducers = 2;
 
   uint64_t particle[] = {54, 72, 36, 12, 17, 42, 53, 16, 873, 14, 423};
   const int kTotNumParticles = 11;
@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 
   // TODO(jeff): finish properly.  In the future I should be able to join() the
   // above threads.
-  sleep(1);
+  usleep(100 * 1000);
   kick = 2;
 
   gpu_manager.join();
