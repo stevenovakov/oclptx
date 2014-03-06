@@ -10,8 +10,7 @@
 namespace threading
 {
 
-// Threads checking in.  Kicks watchdog and lets know if program is done.  This
-// function is really inefficient, so don't call it too often (cache)
+// Threads checking in.  Kicks watchdog and lets know if program is done.
 // Return true: we're all done.
 bool CheckIn(char *kick)
 {
@@ -84,7 +83,7 @@ void Worker(struct shared_data *p, Gpu *gpu, char *kick, int num_reducers)
 // Reducer thread.
 // TODO(jeff) here: separate IN and OUT.  Having them shared is fairly ugly.
 // I'm really close to having this fixed.
-void Reducer(struct shared_data *p, Fifo<threading::collatz_data> *particles)
+void Reducer(struct shared_data *p, Fifo<collatz_data> *particles)
 {
   struct collatz_data *particle;
   int reduced_count;
@@ -127,6 +126,56 @@ void Reducer(struct shared_data *p, Fifo<threading::collatz_data> *particles)
     p->reduction_complete = true;
     p->reduction_complete_cv.notify_one();
     lk.unlock();
+  }
+}
+
+void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers, char *kick)
+{
+  // Push blank data with complete=1 to reducer.  It will fill it in with
+  // particles.
+  int leftover_particles = gpu->particles_per_side_ % num_reducers;
+  int chunk_size = gpu->particles_per_side_ / num_reducers + 1;
+
+  int offset = 0;
+  int count;
+  struct threading::shared_data sdata[num_reducers];
+  struct threading::collatz_data *data;
+  for (int i = 0; i < num_reducers; ++i)
+  {
+    data = new threading::collatz_data[chunk_size];
+    for (int j = 0; j < chunk_size; ++j)
+      data[j] = {0, 0, 1}; // No data, complete = 1
+
+    count = gpu->particles_per_side_ / num_reducers;
+    if (leftover_particles)
+    {
+      count++;
+      leftover_particles--;
+    }
+
+    sdata[i].kick = kick;
+    sdata[i].reduction_complete = false;
+    sdata[i].chunk = {data, offset, count, chunk_size};
+
+    sdata[i].data_ready = true;
+
+    offset += count;
+  }
+
+  // Start our threads
+  std::thread *reducers[num_reducers];
+  for (int i = 0; i < num_reducers; ++i)
+  {
+    reducers[i] = new std::thread(threading::Reducer, &sdata[i], particles);
+  }
+  Worker(sdata, gpu, kick, num_reducers);
+
+
+  for (int i = 0; i < num_reducers; ++i)
+  {
+    reducers[i]->join();
+    delete reducers[i];
+    delete sdata[i].chunk.v;
   }
 }
 

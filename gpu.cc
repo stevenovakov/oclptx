@@ -14,8 +14,6 @@ Gpu::Gpu(int particles_per_side, int steps_per_kernel):
   data_.last = 0;
   data_.size = 2 * particles_per_side;
   data_.v = new threading::collatz_data[2 * particles_per_side];
-  // On the real GPU, we can instead (CPU side) keep track of which particles
-  // are uninitialized, catch this, and pass it to the reducer.
   for (int i = 0; i < 2 * particles_per_side; ++i)
   {
     data_.v[i].complete = 1;

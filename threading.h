@@ -23,7 +23,7 @@ namespace threading
 struct collatz_data
 {
   uint64_t value;  // Dirty list
-  int offset;  // Dirty list
+  int offset;  // Dirty list: This parameter specifically can NOT exist on GPU.
   int complete;  // GPU mirror
 };
 
@@ -49,8 +49,7 @@ struct shared_data {
   char *kick;
 };
 
-void Worker(struct shared_data *p, Gpu *gpu, char *kick, int num_reducers);
-void Reducer(struct shared_data *p, Fifo<threading::collatz_data> *particles);
+void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers, char *kick);
 
 }  // namespace threading
 
