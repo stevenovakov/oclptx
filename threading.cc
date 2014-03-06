@@ -40,7 +40,8 @@ void Worker(struct shared_data *p, Gpu *gpu, char *kick)
       lk[i] = new std::unique_lock<std::mutex>(p[i].data_lock);
       while (!p[i].reduction_complete)
       {
-        p[i].reduction_complete_cv.wait_for(*lk[i], std::chrono::milliseconds(100));
+        p[i].reduction_complete_cv.wait_for(*lk[i],
+                                            std::chrono::milliseconds(100));
         if (CheckIn(kick))
           return;
       }
@@ -83,8 +84,8 @@ void Worker(struct shared_data *p, Gpu *gpu, char *kick)
 }
 
 // Reducer thread.
-// TODO here: separate IN and OUT.  Having them shared is fairly ugly.  I'm
-// really close to having this fixed.
+// TODO(jeff) here: separate IN and OUT.  Having them shared is fairly ugly.
+// I'm really close to having this fixed.
 void Reducer(struct shared_data *p, Fifo<threading::collatz_data> *particles)
 {
   struct collatz_data *particle;

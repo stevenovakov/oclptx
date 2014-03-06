@@ -18,7 +18,7 @@ int main(int argc, char **argv)
   const int kParticlesPerSide = 1;
   const int kStepsPerKernel = 3;
   const int kNumReducers = 1;
-  const int kChunkSize = kParticlesPerSide/kNumReducers;  // verify this rounds up.
+  const int kChunkSize = kParticlesPerSide/kNumReducers;  // verify rounds up.
 
   uint64_t particle[] = {54, 72, 36, 12, 17, 42, 53, 16, 873, 14, 423};
   const int kTotNumParticles = 11;
@@ -58,7 +58,7 @@ int main(int argc, char **argv)
       // Add a particle to the chunk
       if (current_particle >= kParticlesPerSide)
         break;
-      data[j] = {particle[current_particle], current_particle, 0};  // value, offset, complete
+      data[j] = {particle[current_particle], current_particle, 0};
       ++current_particle;
       ++chunk_size;
     }

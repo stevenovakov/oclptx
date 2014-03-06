@@ -19,9 +19,9 @@ namespace threading
 // Data contained in a single instance of the collatz problem
 struct collatz_data
 {
-  uint64_t value; // Dirty list
-  int offset; // Dirty list
-  int complete; // GPU mirror
+  uint64_t value;  // Dirty list
+  int offset;  // Dirty list
+  int complete;  // GPU mirror
 };
 
 // List of the above, with supplementary context
@@ -34,7 +34,7 @@ struct collatz_data_chunk
 };
 
 struct shared_data {
-  struct collatz_data_chunk chunk; // TODO(jeff) split two directions
+  struct collatz_data_chunk chunk;  // TODO(jeff) split two directions
   std::mutex data_lock;
 
   bool data_ready;

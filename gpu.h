@@ -7,9 +7,9 @@
 #ifndef GPU_H_
 #define GPU_H_
 
-#include "structs.h"
-
 #include <thread>
+
+#include "oclptx/structs.h"
 
 class Gpu
 {
