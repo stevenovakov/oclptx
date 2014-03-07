@@ -36,20 +36,7 @@ struct collatz_data_chunk
   int size;  // For Both.  Mainly a sanity check.
 };
 
-struct shared_data {
-  struct collatz_data_chunk chunk;  // TODO(jeff) split two directions
-  std::mutex data_lock;
-
-  bool data_ready;
-  std::condition_variable data_ready_cv;
-
-  bool reduction_complete;
-  std::condition_variable reduction_complete_cv;
-
-  char *kick;
-};
-
-void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers, char *kick);
+void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers);
 
 }  // namespace threading
 

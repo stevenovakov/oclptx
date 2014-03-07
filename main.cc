@@ -49,16 +49,9 @@ int main(int argc, char **argv)
   }
 
   Gpu gpu(kParticlesPerSide, kStepsPerKernel);
-  char kick = 0;
 
   // Start up the threads.
-  std::thread gpu_manager(threading::RunThreads, &gpu, &particles, kNumReducers, &kick);
-
-  // TODO(jeff): finish properly.  In the future I should be able to join() the
-  // above threads.
-  usleep(100 * 1000);
-  kick = 2;
-
+  std::thread gpu_manager(threading::RunThreads, &gpu, &particles, kNumReducers);
   gpu_manager.join();
 
   return 0;

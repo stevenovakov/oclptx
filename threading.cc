@@ -10,26 +10,47 @@
 namespace threading
 {
 
-// Threads checking in.  Kicks watchdog and lets know if program is done.
-// Return true: we're all done.
-bool CheckIn(char *kick)
-{
-  if (2 == *kick)
-    return true;
-  return false;
-}
+struct shared_data {
+  struct collatz_data_chunk chunk;  // TODO(jeff) split two directions
+  std::mutex data_lock;
+
+  bool data_ready;
+  std::condition_variable data_ready_cv;
+
+  bool reduction_complete;
+  std::condition_variable reduction_complete_cv;
+
+  bool done;
+  bool has_data;
+};
 
 // Worker thread.  Controls the GPU.
-void Worker(struct shared_data *p, Gpu *gpu, char *kick, int num_reducers)
+void Worker(struct shared_data *p, Gpu *gpu, int num_reducers)
 {
   // Note, there are two "sides" of GPU memory.  At all times, a kernel must
   // only access the one side.  We must only copy data to and from the
   // non-running side.
   int inactive_side = 0;
+  bool has_data_side[2] = {true,true};
   std::unique_lock<std::mutex> *lk[num_reducers];
 
   while (1)
   {
+    // If no data on either side, we're done!
+    if (!has_data_side[0] && !has_data_side[1])
+    {
+      for (int i = 0; i < num_reducers; ++i)
+      {
+        // Wake up reducers and have them exit.
+        std::unique_lock<std::mutex> lock(p[i].data_lock);
+        p[i].done = true;
+        p[i].data_ready_cv.notify_one();
+        lock.unlock();
+      }
+      return;
+    }
+
+    has_data_side[inactive_side] = false;
     for (int i = 0; i < num_reducers; ++i)
     {
       lk[i] = new std::unique_lock<std::mutex>(p[i].data_lock);
@@ -37,20 +58,14 @@ void Worker(struct shared_data *p, Gpu *gpu, char *kick, int num_reducers)
       {
         p[i].reduction_complete_cv.wait_for(*lk[i],
                                             std::chrono::milliseconds(100));
-        if (CheckIn(kick))
-        {
-          // Free all the locks before we return.
-          do {
-            delete lk[i];
-            i--;
-          } while (i >= 0);
-
-          return;
-        }
       }
       p[i].reduction_complete = false;
 
-      gpu->WriteParticles(&p[i].chunk);
+      if (p[i].has_data)
+      {
+        has_data_side[inactive_side] = true;
+        gpu->WriteParticles(&p[i].chunk);
+      }
     }
 
     gpu->WaitForKernel();
@@ -101,19 +116,20 @@ void Reducer(struct shared_data *p, Fifo<collatz_data> *particles)
     while (!p->data_ready)
     {
       p->data_ready_cv.wait_for(lk, std::chrono::milliseconds(100));
-      if (CheckIn(p->kick))
+      if (p->done)
         return;
     }
     p->data_ready = false;
 
     // Do the actual reduction
     reduced_count = 0;
+    p->has_data = false;
     for (int i = 0; i < p->chunk.last; i++)
     {
       if (p->chunk.v[i].complete)
       {
         // Do something with the finished particle here, if we so desire.
-        // It's "chunk.v[i]"
+        // It's "chunk.v[i]".
 
         // New particle.
         particle = particles->Pop();
@@ -123,9 +139,12 @@ void Reducer(struct shared_data *p, Fifo<collatz_data> *particles)
         p->chunk.v[reduced_count] = *particle;
         p->chunk.v[reduced_count].offset = p->chunk.offset + i;
         ++reduced_count;
+        p->has_data = true;
 
         delete particle;
       }
+      else
+        p->has_data = true;
     }
     p->chunk.last = reduced_count;
 
@@ -135,7 +154,7 @@ void Reducer(struct shared_data *p, Fifo<collatz_data> *particles)
   }
 }
 
-void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers, char *kick)
+void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers)
 {
   // Push blank data with complete=1 to reducer.  It will fill it in with
   // particles.
@@ -159,11 +178,12 @@ void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers, char 
       leftover_particles--;
     }
 
-    sdata[i].kick = kick;
-    sdata[i].reduction_complete = false;
     sdata[i].chunk = {data, offset, count, chunk_size};
-
     sdata[i].data_ready = true;
+
+    sdata[i].reduction_complete = false;
+    sdata[i].done = false;
+    sdata[i].has_data = true;
 
     offset += count;
   }
@@ -174,7 +194,7 @@ void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers, char 
   {
     reducers[i] = new std::thread(threading::Reducer, &sdata[i], particles);
   }
-  Worker(sdata, gpu, kick, num_reducers);
+  Worker(sdata, gpu, num_reducers);
 
 
   for (int i = 0; i < num_reducers; ++i)
