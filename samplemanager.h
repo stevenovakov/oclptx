@@ -79,13 +79,13 @@ class SampleManager
 
     // Getters: Randomly seeded particles (uses midpoint
     //  of _brainMask if no seedfile is specified)
-    std::vector<float4> const GetSeedParticles()
+    std::vector<float4> * const GetSeedParticles()
     {
-      return _seedParticles;
+      return &_seedParticles;
     }    
-    std::vector<int4> const GetSeedElem()
+    std::vector<int4> * const GetSeedElem()
     {
-      return _rootVertices;
+      return &_rootVertices;
     }
 
     // If you use these getters, you must access data from\

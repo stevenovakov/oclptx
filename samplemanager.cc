@@ -240,10 +240,10 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
    if (seeds.Nrows() == 0)
    {
       seed.t = 1.0;
-      seed.x = floor((_brainMask.xdim())/2.0);
-      seed.y = floor((_brainMask.ydim())/2.0);
-      seed.z = floor((_brainMask.zdim())/2.0);
-      cout << "Seeded at "<< "x = " << seed.x << " y= " <<
+      seed.x = floor((_brainMask.xsize())/2.0);
+      seed.y = floor((_brainMask.ysize())/2.0);
+      seed.z = floor((_brainMask.zsize())/2.0);
+      std::cout << "Seeded at "<< "x = " << seed.x << " y= " <<
         seed.y<< " z = "<< seed.z<<endl;
       GenerateSeedParticlesHelper(seed,aSampleVoxel);
    }
@@ -332,6 +332,12 @@ const unsigned short int* SampleManager::GetBrainMaskToArray()
     const int sizeX = _brainMask.xsize();
     const int sizeY = _brainMask.ysize();
     const int sizeZ = _brainMask.zsize();
+    std::cout << "BrainMask Size "<< "x = " << _brainMask.xsize()<< " y= " <<
+      _brainMask.ysize()<< " z = "<< _brainMask.zsize()<<endl;
+    std::cout << "BrainMask Min "<< "x = " << _brainMask.minx()<< " y= " <<
+      _brainMask.miny()<< " z = "<< _brainMask.minz()<<endl;
+    std::cout << "BrainMask Max "<< "x = " << _brainMask.maxx()<< " y= " <<
+      _brainMask.maxy()<< " z = "<< _brainMask.maxz()<<endl;    
 
     unsigned short int* target =
       new unsigned short int[sizeX * sizeY * sizeZ];

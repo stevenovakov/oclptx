@@ -51,9 +51,9 @@ __kernel void BasicInterpolate(
   __global unsigned int* particle_steps_taken, //RW
   __global int4* particle_elem, //RW
   __global unsigned int* particle_done, //RW
-  __global float4* f_samples, //R
-  __global float4* phi_samples, //R
-  __global float4* theta_samples, //R
+  __global float* f_samples, //R
+  __global float* phi_samples, //R
+  __global float* theta_samples, //R
   __global unsigned short int* brain_mask, //R
   unsigned int section_size, // dont think we need this...remove later
   unsigned int max_steps,
@@ -61,19 +61,22 @@ __kernel void BasicInterpolate(
   unsigned int sample_ny,
   unsigned int sample_nz,
   unsigned int sample_ns,
-  unsigned int num_steps
+  unsigned int interval_steps
 )
 {
   unsigned int glid = get_global_id(0);
   
   unsigned int particle_index = particle_indeces[glid];
+  unsigned int steps_taken = particle_steps_taken[particle_index];
   unsigned int current_path_index =
-    particle_index*max_steps + particle_steps_taken[particle_index];
+    particle_index*(max_steps + 1) + steps_taken;
+    
+  unsigned int interval_steps_taken;
   
   int4 current_root_vertex = particle_elem[particle_index];
   int4 next_root_vertex = current_root_vertex;
   
-  int diffusion_index;
+  unsigned int diffusion_index;
   unsigned int sample;
   
   // last location of particle
@@ -86,25 +89,26 @@ __kernel void BasicInterpolate(
   float xmin, xmax, ymin, ymax, zmin, zmax;
   float f, phi, theta;
   
-  unsigned int total_steps = num_steps;
-  unsigned int current_step = 0;
-  unsigned int steps_taken = particle_steps_taken[particle_index];
-  
-  uint8 box_vertices_index;
+  unsigned int box_vertices_index;
   
   int d_elem_x, d_elem_y, d_elem_z;
   unsigned int d_vert_x, d_vert_y, d_vert_z;
 
   unsigned int bounds_test;
   
-  while(current_step < total_steps)
+  for (interval_steps_taken = 0; interval_steps_taken < interval_steps;
+    interval_steps_taken++)
   {
     // calculate current index in diffusion space
-    diffusion_index = (int) (
-      current_root_vertex.s0*(sample_nz*sample_ny*sample_ns) +
-      current_root_vertex.s1*(sample_nz*sample_ns) +
-      current_root_vertex.s2*(sample_ns)
-    );
+    //diffusion_index = 
+      //current_root_vertex.s0*(sample_nz*sample_ny*sample_ns) +
+      //current_root_vertex.s1*(sample_nz*sample_ns) +
+      //current_root_vertex.s2*(sample_ns);
+    
+    diffusion_index = 
+      26*(sample_nz*sample_ny*sample_ns) +
+      33*(sample_nz*sample_ns) +
+      48*(sample_ns);
     
     // pick sample
     sample = 0; // fixed, for now
@@ -121,9 +125,9 @@ __kernel void BasicInterpolate(
     theta = theta_samples[diffusion_index + sample];
     phi = phi_samples[diffusion_index + sample];
     
-    xyz.s0 = f * cos( phi ) * sin( theta );
-    xyz.s1 = f * sin( phi ) * sin( theta );
-    xyz.s2 = f * cos( theta );
+    xyz.s0 = 0.25 * cos( phi ) * sin( theta );
+    xyz.s1 = 0.25 * sin( phi ) * sin( theta );
+    xyz.s2 = 0.25 * cos( theta );
 
     temp_pos = particle_pos + xyz;
     
@@ -150,9 +154,9 @@ __kernel void BasicInterpolate(
     current_root_vertex = current_root_vertex +
       (int4) ( d_elem_x, d_elem_y, d_elem_z, 0);
     
-    // are we outside of brain mask?
-    // check all elements, multiply, if zero just stop
-    bounds_test = 1;
+    //// are we outside of brain mask?
+    //// check all elements, multiply, if zero just stop
+    //bounds_test = 1;
     
     for (unsigned int i = 0; i < 8; i++)
     {
@@ -161,36 +165,39 @@ __kernel void BasicInterpolate(
       d_vert_z = ((i & 0x00000004) >> 2);
       
       // because this is a coordinate space, no sample factor here
-      box_vertices_index[i] =
-        (current_root_vertex.s0 + d_vert_x)*
-          (sample_nz*sample_ny) + 
+      box_vertices_index =
+        (current_root_vertex.s0 + d_vert_x)*(sample_nz*sample_ny) + 
             (current_root_vertex.s1 + d_vert_y)*(sample_nz) +
               (current_root_vertex.s2 + d_vert_z);
               
-      bounds_test = bounds_test * brain_mask[box_vertices_index[i]];
+      bounds_test = bounds_test * brain_mask[box_vertices_index];
     }
     
     // if element is not surrounded by ones, then we are "outside"
     // if so, write to particle done, and exit
-    if (bounds_test < 1)
-    {
-      particle_done[particle_index] = 1;
-      break;
-    }
+    //if (bounds_test == 0)
+    //{
+      //particle_done[particle_index] = 1;
+      //break;
+    //}
     
     // update current location
     particle_pos = temp_pos;
     // add to particle paths
     current_path_index = current_path_index + 1;
-    particle_paths[current_path_index] = particle_pos;
+    particle_paths[current_path_index] = (float4)(steps_taken); //particle_pos;
+    
     // update steps taken
     steps_taken = steps_taken + 1;
+    
     particle_steps_taken[particle_index] = steps_taken;
     // update elem
     particle_elem[particle_index] = current_root_vertex;
     
-    if (steps_taken == max_steps)
+    if (steps_taken == max_steps){
+      particle_done[particle_index] = 1;
       break;  
+    }
   }
 }
 

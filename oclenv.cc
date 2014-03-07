@@ -83,7 +83,7 @@ OclEnv::OclEnv(
 //
 OclEnv::~OclEnv()
 {
-  std::cout<<"~OclPtxHandler\n";
+  std::cout<<"~OclEnv\n";
   // no pointer data elements at the moment...
 }
 
@@ -256,7 +256,8 @@ cl::Program OclEnv::CreateProgram()
   else if (this->ocl_routine_name == "basic")
   {
     source_list.push_back(fold + slash + "basic.cl");
-  }
+  }  
+  
   for (sit = source_list.begin(); sit != source_list.end(); ++sit)
   {
     line_str = *sit;

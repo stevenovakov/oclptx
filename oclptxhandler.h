@@ -68,6 +68,8 @@ class OclPtxHandler{
     void ParticlePathsToFile();   // do at end
 
     bool IsFinished(){ return this->interpolation_complete; };
+    
+    unsigned int GpuMemUsed();
 
     //
     // OCL Initialization
@@ -94,7 +96,10 @@ class OclPtxHandler{
                                   unsigned int ndevices,
                                   unsigned int device_num
                                 );
-
+                                
+    void SingleBufferInit(  unsigned int particle_interval_size,
+                            unsigned int step_interval_size
+                          );
     void DoubleBufferInit(  unsigned int particle_interval_size,
                             unsigned int step_interval_size
                           );
@@ -122,6 +127,8 @@ class OclPtxHandler{
     cl::CommandQueue* ocl_cq;
 
     cl::Kernel* ptx_kernel;
+    
+    unsigned int total_gpu_mem_size;
     //
     // BedpostX Data
     //
@@ -140,6 +147,7 @@ class OclPtxHandler{
 
     unsigned int n_particles;
     unsigned int max_steps;
+    unsigned int particle_path_size;
 
     // TODO @STEVE:  Some of this stuff will be GPU memory limited
     // figure out which and how

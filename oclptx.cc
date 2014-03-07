@@ -96,29 +96,33 @@ int main(int argc, char *argv[] )
     const BedpostXData* theta_data = s_manager.GetThetaDataPtr();
     const BedpostXData* phi_data = s_manager.GetPhiDataPtr();
     
-    unsigned int n_particles = s_manager.GetNumParticles();
-    unsigned int max_steps = s_manager.GetNumMaxSteps();
+    unsigned int n_particles = 20; //s_manager.GetNumParticles();
+    unsigned int max_steps = 100; //s_manager.GetNumMaxSteps();
     
     const float4* initial_positions =
-      s_manager.GetSeedParticles().data();
-    const int4* initial_elem = s_manager.GetSeedElem().data();
+      s_manager.GetSeedParticles()->data();
+    const int4* initial_elem = s_manager.GetSeedElem()->data();
+    
 
-    //for(unsigned int t = 1; t < thetaData->ns; t++)
+    //for(unsigned int t = 1; t < theta_data->ns; t++)
     //{
-      //for (unsigned int x = 0; x<thetaData->nx; x++)
+      //for (unsigned int x = 0; x<theta_data->nx; x++)
       //{
-        //for (unsigned int y=0; y<thetaData->ny; y++)
+        //for (unsigned int y=0; y<theta_data->ny; y++)
         //{
-          //for (unsigned int z=0; z<thetaData->nz; z++)
+          //for (unsigned int z=0; z<theta_data->nz; z++)
           //{
-            //float data = s_manager.GetThetaData(0,t,x,y,z);
-            //countAll++;
-            //if(data != 0.0f)
-            //countNonZero++;
+            //float theta = s_manager.GetThetaData(0,t,x,y,z);
+            //float f = s_manager.GetfData(0, t, x, y, z);
+            //float phi = s_manager.GetPhiData(0, t, x, y, z);
+            //std::cout<< "(" << x << ","<<y <<","<<z<<") "<<
+              //"(" << f <<","<<phi <<","<<theta <<")\n";
           //}
         //}
       //}
     //}
+    
+    //std::cin.get();
 
     // Access this array like so for a given x,y,z:
     // seedMask[z*seedMaskVol.xsize()*seedMaskVol.ysize() +
@@ -137,28 +141,40 @@ int main(int argc, char *argv[] )
     //
     // and then (this is a naive, "serial" implementation;
     //
-
+    
     OclPtxHandler handler(environment.GetContext(),
                           environment.GetCq(0),
                           environment.GetKernel(0));                          
     
-      
+    std::cout<<"init done\n";
     handler.WriteSamplesToDevice( f_data,
                                   phi_data,
                                   theta_data,
                                   static_cast<unsigned int>(1),
                                   brain_mask);
+    std::cout<<"samples done\n";                                 
     handler.WriteInitialPosToDevice(  initial_positions,
                                       initial_elem,
                                       n_particles,
                                       max_steps,
                                       n_devices,
                                       static_cast<unsigned int>(0));
-    handler.DoubleBufferInit( n_particles/2, max_steps);
-
+    std::cout<<"pos done\n";
+    handler.SingleBufferInit(n_particles, max_steps);
+    //handler.DoubleBufferInit( n_particles/2, max_steps);
+    std::cout<<"dbuff done\n";
+    
+    std::cout<<"Total GPU Memory Allocated (MB): "<<
+      handler.GpuMemUsed()/1e6 << "\n";
+    std::cout<<"Press Any Button To Continue...\n";
+    std::cin.get();
+    
     handler.Interpolate();
-    handler.Reduce();
-    handler.Interpolate();
+    std::cout<<"interp done\n";
+    //handler.Reduce();
+    //std::cout<<"reduce done\n";
+    //handler.Interpolate();
+    //std::cout<<"interp done\n";
 
     handler.ParticlePathsToFile();
 
