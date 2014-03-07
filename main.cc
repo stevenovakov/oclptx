@@ -13,22 +13,38 @@
 #include "oclptx/gpu.h"
 #include "oclptx/threading.h"
 
+// Basic log base 2
+int lb(int x)
+{
+  int r = 0;
+  x>>=1;
+  while (x)
+  {
+    r++;
+    x>>=1;
+  }
+  return r;
+}
+
+// 54 72 36 12 17 42 53 16 873 14 423
 int main(int argc, char **argv)
 {
   const int kParticlesPerSide = 2;
   const int kStepsPerKernel = 3;
   const int kNumReducers = 2;
 
-  uint64_t particle[] = {54, 72, 36, 12, 17, 42, 53, 16, 873, 14, 423};
-  const int kTotNumParticles = 11;
+  if (argc < 2)
+  {
+    printf("Usage: %s <collatz numbers>.\n", argv[0]);
+    return -1;
+  }
 
-  // Put the particles in the particles fifo
-  Fifo<threading::collatz_data> particles(4);  // 2**4-1 = 15 > 11
+  Fifo<threading::collatz_data> particles(lb(argc-1)+1);
   struct threading::collatz_data *data;
-  for (int i = 0; i < kTotNumParticles; ++i)
+  for (int i = 1; i < argc; ++i)
   {
     data = new threading::collatz_data;
-    *data = {particle[i], 0, 0};
+    *data = {(uint64_t) atoi(argv[i]), 0, 0};
     particles.PushOrDie(data);
   }
 

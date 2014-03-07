@@ -84,8 +84,9 @@ void Gpu::RunKernel(int side)
     int off = i + particles_per_side_ * side;
     for (int j = 0; j < steps_per_kernel_; j++)
     {
-      if (data_.v[off].value)
+      if (data_.v[off].value && !data_.v[off].complete)
         fprintf(stdout, "%i:%li\n", off, data_.v[off].value);
+
       // Collatz conjecture.
       if (data_.v[off].value & 1)
         data_.v[off].value = data_.v[off].value * 3 + 1;
