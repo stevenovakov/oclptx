@@ -35,7 +35,7 @@ int main(int argc, char **argv)
 
   if (argc < 2)
   {
-    printf("Usage: %s <collatz numbers>.\n", argv[0]);
+    fprintf(stderr, "Usage: %s <collatz numbers>.\n", argv[0]);
     return -1;
   }
 

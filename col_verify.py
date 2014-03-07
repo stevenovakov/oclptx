@@ -2,10 +2,15 @@
 import subprocess
 import random
 
-#values = {54, 72, 36, 12, 17, 42, 53, 16, 873, 14, 423}
+random.seed(42)
+num_to_test = 1000
+
 values = set()
-for i in range(100000):
-    values.add(random.randint(1,1000))
+with open("./col_args",'w') as f:
+    for i in range(num_to_test):
+        r = random.randint(1,100000)
+        f.write(str(r) + '\n')
+        values.add(r)
 
 # First make call with particle list
 out = subprocess.check_output(["./oclptx"] + [str(v) for v in values])
@@ -23,13 +28,15 @@ for line in out.decode().split("\n"):
     s, result = [int(x) for x in line.split(":")]
     # New particle
     if s not in streams or 2 == streams[s]:
-        assert result in values, "New particle (new stream) started with invalid value"
+        assert result in values, "New particle started with invalid value"
         streams[s] = result
         values.remove(result)
     # Continued particle
     else:
         assert result == collatz(streams[s]), "Incorrect collatz"
         streams[s] = result
+
+assert 0 == len(values), "Some values left: %s" % repr(values)
 
 print("Success!")
 
