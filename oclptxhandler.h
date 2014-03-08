@@ -57,7 +57,9 @@ class OclPtxHandler{
 
     OclPtxHandler(  cl::Context* cc,
                     cl::CommandQueue* cq,
-                    cl::Kernel* ck);
+                    cl::Kernel* ck,
+                    float curv_thresh = 10.0
+                  );
 
     ~OclPtxHandler();
 
@@ -147,6 +149,12 @@ class OclPtxHandler{
     unsigned int n_particles;
     unsigned int max_steps;
     unsigned int particle_path_size;
+    
+    //
+    // Check Data
+    //
+
+    float curvature_threshold;
 
     // TODO @STEVE:  Some of this stuff will be GPU memory limited
     // figure out which and how

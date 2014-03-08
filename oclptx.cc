@@ -96,8 +96,8 @@ int main(int argc, char *argv[] )
     const BedpostXData* theta_data = s_manager.GetThetaDataPtr();
     const BedpostXData* phi_data = s_manager.GetPhiDataPtr();
 
-    unsigned int n_particles = s_manager.GetNumParticles();
-    unsigned int max_steps = s_manager.GetNumMaxSteps();
+    unsigned int n_particles = 2;//s_manager.GetNumParticles();
+    unsigned int max_steps = 100;//s_manager.GetNumMaxSteps();
 
     const float4* initial_positions =
       s_manager.GetSeedParticles()->data();
@@ -105,10 +105,18 @@ int main(int argc, char *argv[] )
     const unsigned short int* brain_mask =
       s_manager.GetBrainMaskToArray();
     
-    float4 test_point; 
-    test_point.s0 = 51.0;
-    test_point.s1 = 34.0;
-    test_point.s2 = 24.0;
+    //float4 * test_point = new float4[n_particles];
+    //for( unsigned int i = 0; i < n_particles; i++ )
+    //{
+      //test_point[i].x = 51.0;
+      //test_point[i].y = 35.0;
+      //test_point[i].z = 24.0;
+    //}
+    
+    //const float4* tp = test_point;
+    
+    // TODO get curv thresh from sample manager
+    float curvature_threshold = 0.2;
       
     //for(unsigned int t = 1; t < theta_data->ns; t++)
     //{
@@ -160,7 +168,8 @@ int main(int argc, char *argv[] )
 
     OclPtxHandler handler(environment.GetContext(),
                           environment.GetCq(0),
-                          environment.GetKernel(0));
+                          environment.GetKernel(0),
+                          curvature_threshold);
 
     std::cout<<"init done\n";
     handler.WriteSamplesToDevice( f_data,
@@ -194,6 +203,7 @@ int main(int argc, char *argv[] )
     handler.ParticlePathsToFile();
 
     delete[] brain_mask;
+    //delete[] test_point;
   }
 
   std::cout<<"\n\nExiting...\n\n";

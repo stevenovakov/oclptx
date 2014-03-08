@@ -300,6 +300,10 @@ cl::Program OclEnv::CreateProgram()
     // TODO
     //  dump all error logging to logfile
     //  maybe differentiate b/w regular errors and cl errors
+    
+    // Eliminate exception use
+    // return the cl::Error type
+    // loko at cl::Error:what() instead of OclErrorStrings
 
     if( this->OclErrorStrings(err.err()) != "CL_SUCCESS")
     {

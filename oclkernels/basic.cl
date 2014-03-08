@@ -60,7 +60,8 @@ __kernel void BasicInterpolate(
   unsigned int sample_ny,
   unsigned int sample_nz,
   unsigned int sample_ns,
-  unsigned int interval_steps
+  unsigned int interval_steps,
+  float curvature_threshold
 )
 {
   unsigned int glid = get_global_id(0);
@@ -82,8 +83,9 @@ __kernel void BasicInterpolate(
   particle_pos.s3 = 0.0;
 
   float4 temp_pos = (float4) (0.0f); //dx, dy, dz
-  float4 xyz= (float4) (0.0f);
-  float4 last_xyz = (float4) (0.0f);
+  float4 dxyz= (float4) (0.0f);
+  float4 dr = (float4) (0.0f);
+  float4 last_dr = (float4) (0.0f);
   
   float xmin, xmax, ymin, ymax, zmin, zmax;
   xmin = 0.0; ymin = 0.0; zmin = 0.0;
@@ -91,7 +93,7 @@ __kernel void BasicInterpolate(
   
   float f, phi, theta;
   float jump_dot;
-  
+    
   unsigned int brain_mask_index;
   //unsigned int termination_mask_index;
   unsigned short int bounds_test;
@@ -119,26 +121,33 @@ __kernel void BasicInterpolate(
     theta = theta_samples[diffusion_index];
     phi = phi_samples[diffusion_index];
     
-    xyz.s0 = 0.25 * cos( phi ) * sin( theta );
-    xyz.s1 = 0.25 * sin( phi ) * sin( theta );
-    xyz.s2 = 0.25 * cos( theta );
+    dr.s0 = cos( phi ) * sin( theta );
+    dr.s1 = sin( phi ) * sin( theta );
+    dr.s2 = cos( theta );
     
     //
     // jump (aligns direction to prevent zig-zagging)
     //
     
-    jump_dot = xyz.s0*last_xyz.s0 + xyz.s1*last_xyz.s1 + 
-      xyz.s2*last_xyz.s2;
+    jump_dot = dr.s0*last_dr.s0 + dr.s1*last_dr.s1 + 
+      dr.s2*last_dr.s2;
     
-    if (jump_dot < 0 )
-      xyz = xyz;//*-1.0;
+    // TODO @STEVE
+    // temporary, until we introduce initial direction  
+    if( steps_taken == 0 && glid%2 == 0)
+      dr = dr*-1;
+      
+    dxyz = dr*0.25;
 
-    temp_pos = particle_pos + xyz;
+    if (jump_dot < 0.0 )
+      dxyz = dxyz*-1.0;
+    
+    temp_pos = particle_pos + dxyz;
     
     //
     // Complete out of bounds test (just in case)
     //
-    if ( temp_pos.s0 > xmax || xmin > temp_pos.s0 ||
+    if (temp_pos.s0 > xmax || xmin > temp_pos.s0 ||
       temp_pos.s1 > ymax || ymin > temp_pos.s1 ||
         temp_pos.s2 > zmax || zmin > temp_pos.s2)
     {
@@ -159,11 +168,23 @@ __kernel void BasicInterpolate(
       particle_done[particle_index] = 1;
       break;
     }
+    
+    //
+    // Curvature Threshold
+    //
+    
+    if (steps_taken > 1 && jump_dot < curvature_threshold)
+    {
+      particle_done[particle_index] = 1;
+      temp_pos.s0 = jump_dot;
+      temp_pos.s1 = curvature_threshold;
+      //break;
+    }    
 
     // update current location
     particle_pos = temp_pos;
     // update last flow vector
-    last_xyz = xyz;
+    last_dr = dr;
     // add to particle paths
     current_path_index = current_path_index + 1;
     particle_paths[current_path_index] = particle_pos;

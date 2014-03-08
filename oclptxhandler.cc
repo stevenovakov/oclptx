@@ -69,7 +69,8 @@
 OclPtxHandler::OclPtxHandler(
     cl::Context* cc,
     cl::CommandQueue* cq,
-    cl::Kernel* ck
+    cl::Kernel* ck,
+    float curv_thresh
 )
 {
   this->interpolation_complete = false;
@@ -78,8 +79,10 @@ OclPtxHandler::OclPtxHandler(
   this->ocl_context = cc;
   this->ocl_cq = cq;
   this->ptx_kernel = ck;
+  
+  this->curvature_threshold = curv_thresh;
 
-  this->total_gpu_mem_size = 0;
+  this->total_gpu_mem_size = 0;  
 }
 
 
@@ -730,6 +733,7 @@ void OclPtxHandler::Interpolate()
   this->ptx_kernel->setArg(13, this->sample_ns);
 
   this->ptx_kernel->setArg(14, this->num_steps);
+  this->ptx_kernel->setArg(15, this->curvature_threshold);
   // Now I have to write a kernel!!! Yaaaay : )
 
   this->ocl_cq->enqueueNDRangeKernel(
