@@ -89,7 +89,7 @@ __kernel void BasicInterpolate(
   
   unsigned int brain_mask_index;
   //unsigned int termination_mask_index;
-  unsigned int bounds_test;
+  unsigned short int bounds_test;
   
   for (interval_steps_taken = 0; interval_steps_taken < interval_steps;
     interval_steps_taken++)
@@ -144,7 +144,7 @@ __kernel void BasicInterpolate(
     particle_pos = temp_pos;
     // add to particle paths
     current_path_index = current_path_index + 1;
-    particle_paths[current_path_index] = (float4)( 1.0*current_root_vertex.s0,
+    particle_paths[current_path_index] = (float4)( 1.0*bounds_test,
       1.0*current_root_vertex.s1, 1.0*current_root_vertex.s2, 0.0); //particle_pos;
     
     // update steps taken

@@ -101,23 +101,37 @@ int main(int argc, char *argv[] )
 
     const float4* initial_positions =
       s_manager.GetSeedParticles()->data();
-
+      
+    const unsigned short int* brain_mask =
+      s_manager.GetBrainMaskToArray();
+      
     //for(unsigned int t = 1; t < theta_data->ns; t++)
     //{
-      //for (unsigned int x = 0; x<theta_data->nx; x++)
+    unsigned int nx, ny, nz;
+    
+    nx = theta_data->nx;
+    ny = theta_data->ny;
+    nz = theta_data->nz;  
+    
+    //std::cout<<"Data, Mask Tests: \n";  
+    //for (unsigned int x = 0; x<nx; x++)
+    //{
+      //for (unsigned int y=0; y<ny; y++)
       //{
-        //for (unsigned int y=0; y<theta_data->ny; y++)
+        //for (unsigned int z=0; z<nz; z++)
         //{
-          //for (unsigned int z=0; z<theta_data->nz; z++)
-          //{
-            //float theta = s_manager.GetThetaData(0,t,x,y,z);
-            //float f = s_manager.GetfData(0, t, x, y, z);
-            //float phi = s_manager.GetPhiData(0, t, x, y, z);
-            //std::cout<< "(" << x << ","<<y <<","<<z<<") "<<
-              //"(" << f <<","<<phi <<","<<theta <<")\n";
-          //}
+          //unsigned short int bmask = 
+            //brain_mask[ x*(ny*nz) + y*nz + z];
+          
+          //std::cout<<"("<<x<<","<<y<<","<<z<<"): "<< bmask<<"\n";          
         //}
       //}
+    //}
+    
+    std::cout<<"BMaskTest: "<< s_manager.GetBrainMask( 51,51,30) <<"\n";
+    std::cout<<"FTest: "<< s_manager.GetfData(0, 0, 51,51,30) <<"\n";
+    std::cout<<"ThetaTest: "<< s_manager.GetThetaData(0, 0, 51,51,30) <<"\n";
+    std::cout<<"Phi: "<< s_manager.GetPhiData(0, 0, 51,51,30) <<"\n";
     //}
 
     //std::cin.get();
@@ -125,8 +139,7 @@ int main(int argc, char *argv[] )
     // Access this array like so for a given x,y,z:
     // seedMask[z*seedMaskVol.xsize()*seedMaskVol.ysize() +
     //   y*seedMaskVol.zsize() + x]
-    const unsigned short int* brain_mask =
-      s_manager.GetBrainMaskToArray();
+
 
     //cout<<"Count of All Data = "<<countAll<<endl;
     //cout<<"Count of Non Zero Data = "<<countNonZero<<endl;

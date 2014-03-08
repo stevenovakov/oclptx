@@ -114,7 +114,7 @@ void SampleManager::PopulateMemberParameters(
                   t <= aLoadedData.maxt(); t++)
                 {
                     aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
-                      z*nx*ny + y*nx + x] =
+                      x*nz*ny + y*nz + z] =
                         aLoadedData[t](x+xoff,y+yoff,z+zoff);
                 }
             }
@@ -274,6 +274,10 @@ void SampleManager::GenerateSeedParticlesHelper(
     {
       float dx,dy,dz;
       float radSq = aSampleVoxel*aSampleVoxel;
+      
+      // rand not seeded properly, on purpose(want the same data set)
+      // seed it with sys clock later.
+      
       while(true)
       {
         dx=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
@@ -324,7 +328,7 @@ const unsigned short int* SampleManager::GetBrainMaskToArray()
       {
         for (int x = minX; x <= maxX; x++)
         {
-              target[z*sizeX*sizeY + y*sizeX + x] = _brainMask(x,y,z);
+              target[x*sizeY*sizeZ + y*sizeZ + z] = _brainMask(x,y,z);
         }
       }
     }
@@ -340,7 +344,7 @@ float const SampleManager::GetThetaData(
     int ny = _thetaData.ny;
     int nz = _thetaData.nz;
     return _thetaData.data.at(aFiberNum)[(aSamp)*(nx*ny*nz) +
-      (aZ)*(nx*ny) + (aY)*nx + (aX)];
+      (aX)*(nz*ny) + (aY)*nz + (aZ)];
   }
   return 0.0f;
 }
@@ -354,7 +358,7 @@ float const SampleManager::GetPhiData(
     int ny = _phiData.ny;
     int nz = _phiData.nz;
     return _phiData.data.at(aFiberNum)[(aSamp)*(nx*ny*nz) +
-      (aZ)*(nx*ny) + (aY)*nx + (aX)];
+      (aX)*(nz*ny) + (aY)*nz + (aZ)];
   }
   return 0.0f;
 }
@@ -368,9 +372,15 @@ float const SampleManager::GetfData(int aFiberNum,
     int ny = _fData.ny;
     int nz = _fData.nz;
     return _fData.data.at(aFiberNum)[(aSamp)*(nx*ny*nz) +
-      (aZ)*(nx*ny) + (aY)*nx + (aX)];
+      (aX)*(nz*ny) + (aY)*nz + (aZ)];
   }
   return 0.0f;
+}
+
+unsigned short int const SampleManager::GetBrainMask(
+  int aX, int aY, int aZ)
+{
+  return _brainMask(aX, aY, aZ);
 }
 
 const BedpostXData* SampleManager::GetThetaDataPtr()

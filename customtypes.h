@@ -98,4 +98,10 @@ struct BedpostXData
 // multiply by the direction #, (from 0 to n-1)
 // 
 
+unsigned int index_3d(unsigned int x, unsigned int y
+  unsigned int z, unsigned int ny, unsigned int nz)
+{
+    return x*(ny*nz) + y*nz + nz;
+}
+
 #endif
