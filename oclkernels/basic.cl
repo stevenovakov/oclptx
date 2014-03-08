@@ -176,9 +176,7 @@ __kernel void BasicInterpolate(
     if (steps_taken > 1 && jump_dot < curvature_threshold)
     {
       particle_done[particle_index] = 1;
-      temp_pos.s0 = jump_dot;
-      temp_pos.s1 = curvature_threshold;
-      //break;
+      break;
     }    
 
     // update current location
