@@ -289,30 +289,6 @@ void SampleManager::GenerateSeedParticlesHelper(
       randomParticle.z += dz / _brainMask.zdim();
     }
     _seedParticles.push_back(randomParticle);
-
-    //Determining the root vertex
-    int4 rootVertex;
-    rootVertex.t = aSeed.t;
-    rootVertex.x = aSeed.x;
-    rootVertex.y = aSeed.y;
-    rootVertex.z = aSeed.z;
-    if(randomParticle.x < rootVertex.x)
-    {
-      rootVertex.x = floor(randomParticle.x);
-    }
-    if (randomParticle.y < rootVertex.y)
-    {
-      rootVertex.y = floor(randomParticle.y);
-    }
-    if (randomParticle.z < rootVertex.z)
-    {
-      rootVertex.z = floor(randomParticle.z);
-    }
-    _rootVertices.push_back(rootVertex);
-   // cout<< " t = "<<randomParticle.t<< " x= "<< randomParticle.x <<
-   //   " y= " << randomParticle.y << " z= " << randomParticle.z<< endl;
-   // cout<< " t = "<<rootVertex.t<< " x= "<< rootVertex.x << " y= " <<
-   //   rootVertex.y << " z= " << rootVertex.z<< endl;
    }
 }
 

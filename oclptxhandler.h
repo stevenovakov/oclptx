@@ -90,7 +90,6 @@ class OclPtxHandler{
     // can decide later.
 
     void WriteInitialPosToDevice( const float4* initial_positions,
-                                  const int4* initial_elem,
                                   unsigned int nparticles,
                                   unsigned int max_steps,
                                   unsigned int ndevices,
@@ -162,7 +161,6 @@ class OclPtxHandler{
 
     cl::Buffer particle_paths_buffer;
     cl::Buffer particle_steps_taken_buffer;
-    cl::Buffer particle_elem_buffer;
 
     cl::Buffer particle_done_buffer;
     //cl:Buffer particle_waypoint_buffer;

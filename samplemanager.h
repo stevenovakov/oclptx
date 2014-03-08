@@ -82,10 +82,6 @@ class SampleManager
     std::vector<float4> * const GetSeedParticles()
     {
       return &_seedParticles;
-    }    
-    std::vector<int4> * const GetSeedElem()
-    {
-      return &_rootVertices;
     }
 
     // If you use these getters, you must access data from\
@@ -123,9 +119,8 @@ class SampleManager
     //Statics
     static SampleManager* _manager;
     oclptxOptions& _oclptxOptions;
-    //Particles
+    //Seed Particles
     std::vector<float4> _seedParticles;
-    std::vector<int4> _rootVertices;
     //BedpostData
     BedpostXData _thetaData;
     BedpostXData _phiData;

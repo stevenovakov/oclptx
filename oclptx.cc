@@ -87,22 +87,20 @@ int main(int argc, char *argv[] )
   }
   else
   {
-	  //int countAll = 0;
-	  //int countNonZero = 0;
+    //int countAll = 0;
+    //int countNonZero = 0;
 
     s_manager.ParseCommandLine(argc, argv);
 
     const BedpostXData* f_data = s_manager.GetFDataPtr();
     const BedpostXData* theta_data = s_manager.GetThetaDataPtr();
     const BedpostXData* phi_data = s_manager.GetPhiDataPtr();
-    
+
     unsigned int n_particles = 20; //s_manager.GetNumParticles();
     unsigned int max_steps = 100; //s_manager.GetNumMaxSteps();
-    
+
     const float4* initial_positions =
       s_manager.GetSeedParticles()->data();
-    const int4* initial_elem = s_manager.GetSeedElem()->data();
-    
 
     //for(unsigned int t = 1; t < theta_data->ns; t++)
     //{
@@ -121,7 +119,7 @@ int main(int argc, char *argv[] )
         //}
       //}
     //}
-    
+
     //std::cin.get();
 
     // Access this array like so for a given x,y,z:
@@ -141,20 +139,19 @@ int main(int argc, char *argv[] )
     //
     // and then (this is a naive, "serial" implementation;
     //
-    
+
     OclPtxHandler handler(environment.GetContext(),
                           environment.GetCq(0),
-                          environment.GetKernel(0));                          
-    
+                          environment.GetKernel(0));
+
     std::cout<<"init done\n";
     handler.WriteSamplesToDevice( f_data,
                                   phi_data,
                                   theta_data,
                                   static_cast<unsigned int>(1),
                                   brain_mask);
-    std::cout<<"samples done\n";                                 
+    std::cout<<"samples done\n";
     handler.WriteInitialPosToDevice(  initial_positions,
-                                      initial_elem,
                                       n_particles,
                                       max_steps,
                                       n_devices,
@@ -163,12 +160,12 @@ int main(int argc, char *argv[] )
     handler.SingleBufferInit(n_particles, max_steps);
     //handler.DoubleBufferInit( n_particles/2, max_steps);
     std::cout<<"dbuff done\n";
-    
+
     std::cout<<"Total GPU Memory Allocated (MB): "<<
       handler.GpuMemUsed()/1e6 << "\n";
     std::cout<<"Press Any Button To Continue...\n";
     std::cin.get();
-    
+
     handler.Interpolate();
     std::cout<<"interp done\n";
     //handler.Reduce();

@@ -78,7 +78,7 @@ OclPtxHandler::OclPtxHandler(
   this->ocl_context = cc;
   this->ocl_cq = cq;
   this->ptx_kernel = ck;
-  
+
   this->total_gpu_mem_size = 0;
 }
 
@@ -108,19 +108,19 @@ void OclPtxHandler::ParticlePathsToFile()
 
   this->ocl_cq->enqueueReadBuffer(
     this->particle_paths_buffer,
-    CL_FALSE, 
+    CL_FALSE,
     0,
     this->particles_mem_size,
     particle_paths
   );
   this->ocl_cq->enqueueReadBuffer(
     this->particle_steps_taken_buffer,
-    CL_FALSE, 
+    CL_FALSE,
     0,
     this->particle_uint_mem_size,
     particle_steps
   );
-  
+
   // blocking
   this->ocl_cq->finish();
 
@@ -146,14 +146,16 @@ void OclPtxHandler::ParticlePathsToFile()
 
   std::fstream path_file;
   path_file.open(path_filename.c_str(), std::ios::app|std::ios::out);
-  
+
   for (unsigned int n = 0; n < this->n_particles; n++)
   {
-    unsigned int p_steps = particle_steps[n] + 1;
-    
+    unsigned int p_steps = particle_steps[n];
+
     //if (p_steps > 0)
     std::cout<<"Particle " << n << " Steps Taken: " << p_steps <<"\n";
     
+    p_steps += 1;
+
     for (unsigned int s = 0; s < p_steps; s++)
     {
       temp_x.push_back(particle_paths[n*this->particle_path_size+ s].x);
@@ -244,7 +246,7 @@ void OclPtxHandler::WriteSamplesToDevice(
   this->sample_ny = f_data->ny;
   this->sample_nz = f_data->nz;
   this->sample_ns = f_data->ns;
-  
+
   // diagnostics
   std::cout<<"Brain Mem Size: "<< brain_mem_size <<"\n";
   std::cout<<"Samples Size: "<< single_direction_mem_size << "\n";
@@ -289,12 +291,12 @@ void OclPtxHandler::WriteSamplesToDevice(
       NULL,
       NULL
     );
-  
+
   // enqueue writes
 
   for (unsigned int d=0; d<num_directions; d++)
   {
-    
+
     this->ocl_cq->enqueueWriteBuffer(
         this->f_samples_buffer,
         CL_FALSE,
@@ -337,7 +339,7 @@ void OclPtxHandler::WriteSamplesToDevice(
   );
 
   this->total_gpu_mem_size += 3*total_mem_size + brain_mem_size;
-   
+
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
   this->ocl_cq->finish();
@@ -345,7 +347,6 @@ void OclPtxHandler::WriteSamplesToDevice(
 
 void OclPtxHandler::WriteInitialPosToDevice(
   const float4* initial_positions,
-  const int4* initial_elem,
   unsigned int nparticles,
   unsigned int maximum_steps,
   unsigned int ndevices,
@@ -365,13 +366,9 @@ void OclPtxHandler::WriteInitialPosToDevice(
   this->particle_uint_mem_size = path_steps_mem_size;
   this->particles_mem_size = path_mem_size;
 
-  unsigned int elem_size = sec_size;
-  unsigned int elem_mem_size = elem_size*sizeof(int4);
-
   // if MT: wrap in mutex (to avoid race on initial_positions)
   const float4* start_pos_data =
     initial_positions + (sec_size*device_num);
-  const int4* start_elem_data = initial_elem + (sec_size*device_num);
   // if MT: wrap in mutex (to avoid race on initial_positions)
 
   // also doubles as the "is done" initial data
@@ -390,7 +387,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
     this->particle_indeces_left.push_back(i);
     this->particle_complete.push_back(static_cast<unsigned int>(0));
   }
-  
+
   std::cout<<"Sec Size: "<< this->section_size <<"\n";
   std::cout<<"N Particles: " << this->n_particles <<"\n";
   std::cout<<"Max Steps: " << this->max_steps <<"\n";
@@ -398,7 +395,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
     this->particle_uint_mem_size<<"\n";
   std::cout<<"Particle Paths Mem Size: " <<
     this->particles_mem_size<<"\n";
-  
+
 
   this->particle_paths_buffer =
     cl::Buffer(
@@ -414,15 +411,6 @@ void OclPtxHandler::WriteInitialPosToDevice(
       *(this->ocl_context),
       CL_MEM_READ_WRITE,
       path_steps_mem_size,
-      NULL,
-      NULL
-    );
-
-  this->particle_elem_buffer =
-    cl::Buffer(
-      *(this->ocl_context),
-      CL_MEM_READ_WRITE,
-      elem_mem_size,
       NULL,
       NULL
     );
@@ -460,16 +448,6 @@ void OclPtxHandler::WriteInitialPosToDevice(
   );
 
   this->ocl_cq->enqueueWriteBuffer(
-    this->particle_elem_buffer,
-    CL_FALSE,
-    static_cast<unsigned int>(0),
-    elem_mem_size,
-    start_elem_data,
-    NULL,
-    NULL
-  );
-
-  this->ocl_cq->enqueueWriteBuffer(
     this->particle_done_buffer,
     CL_FALSE,
     static_cast<unsigned int>(0),
@@ -479,8 +457,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
     NULL
   );
 
-  this->total_gpu_mem_size += path_mem_size + 2*path_steps_mem_size +
-    elem_mem_size;
+  this->total_gpu_mem_size += path_mem_size + 2*path_steps_mem_size;
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
   this->ocl_cq->finish();
@@ -512,7 +489,7 @@ void OclPtxHandler::SingleBufferInit(
       this->particle_indeces_left.back());
     this->particle_indeces_left.pop_back();
   }
-  
+
   // Initialize both buffers
 
   this->compute_index_buffers.push_back(
@@ -534,9 +511,9 @@ void OclPtxHandler::SingleBufferInit(
     NULL,
     NULL
   );
-  
+
   this->total_gpu_mem_size += interval_mem_size;
-  
+
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
   this->ocl_cq->finish();
@@ -615,9 +592,9 @@ void OclPtxHandler::DoubleBufferInit(
     NULL,
     NULL
   );
-  
+
   this->total_gpu_mem_size += 2*interval_mem_size;
-  
+
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
   this->ocl_cq->finish();
@@ -640,7 +617,7 @@ void OclPtxHandler::ReduceInit(unsigned int particles_per,
 void OclPtxHandler::Reduce()
 {
   unsigned int t_sec = this->target_section  & 0x00000000;
-  
+
   std::cout<<"t_sec : " << t_sec <<"\n";
 
   std::vector<unsigned int>* reduce_vector =
@@ -707,7 +684,7 @@ void OclPtxHandler::Reduce()
   std::unique_lock<std::mutex> rdlock(this->reduce_mutex);
   this->target_section = t_sec;
   this->todo_range.at(t_sec) = new_todo_range;
-  
+
   std::cout<<"new range: " << new_todo_range <<"\n";
   rdlock.unlock();
 }
@@ -737,23 +714,22 @@ void OclPtxHandler::Interpolate()
   // particle status buffers
   this->ptx_kernel->setArg(1, this->particle_paths_buffer);
   this->ptx_kernel->setArg(2, this->particle_steps_taken_buffer);
-  this->ptx_kernel->setArg(3, this->particle_elem_buffer);
-  this->ptx_kernel->setArg(4, this->particle_done_buffer);
+  this->ptx_kernel->setArg(3, this->particle_done_buffer);
 
   // sample data buffers
-  this->ptx_kernel->setArg(5, this->f_samples_buffer);
-  this->ptx_kernel->setArg(6, this->phi_samples_buffer);
-  this->ptx_kernel->setArg(7, this->theta_samples_buffer);
-  this->ptx_kernel->setArg(8, this->brain_mask_buffer);
+  this->ptx_kernel->setArg(4, this->f_samples_buffer);
+  this->ptx_kernel->setArg(5, this->phi_samples_buffer);
+  this->ptx_kernel->setArg(6, this->theta_samples_buffer);
+  this->ptx_kernel->setArg(7, this->brain_mask_buffer);
 
-  this->ptx_kernel->setArg(9, this->section_size);
-  this->ptx_kernel->setArg(10, this->max_steps);
-  this->ptx_kernel->setArg(11, this->sample_nx);
-  this->ptx_kernel->setArg(12, this->sample_ny);
-  this->ptx_kernel->setArg(13, this->sample_nz);
-  this->ptx_kernel->setArg(14, this->sample_ns);
+  this->ptx_kernel->setArg(8, this->section_size);
+  this->ptx_kernel->setArg(9, this->max_steps);
+  this->ptx_kernel->setArg(10, this->sample_nx);
+  this->ptx_kernel->setArg(11, this->sample_ny);
+  this->ptx_kernel->setArg(12, this->sample_nz);
+  this->ptx_kernel->setArg(13, this->sample_ns);
 
-  this->ptx_kernel->setArg(15, this->num_steps);
+  this->ptx_kernel->setArg(14, this->num_steps);
   // Now I have to write a kernel!!! Yaaaay : )
 
   this->ocl_cq->enqueueNDRangeKernel(
