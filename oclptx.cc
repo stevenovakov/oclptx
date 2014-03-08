@@ -96,8 +96,8 @@ int main(int argc, char *argv[] )
     const BedpostXData* theta_data = s_manager.GetThetaDataPtr();
     const BedpostXData* phi_data = s_manager.GetPhiDataPtr();
 
-    unsigned int n_particles = 2;//s_manager.GetNumParticles();
-    unsigned int max_steps = 100;//s_manager.GetNumMaxSteps();
+    unsigned int n_particles = s_manager.GetNumParticles();
+    unsigned int max_steps = s_manager.GetNumMaxSteps();
 
     const float4* initial_positions =
       s_manager.GetSeedParticles()->data();
