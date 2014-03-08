@@ -96,29 +96,34 @@ int main(int argc, char *argv[] )
     const BedpostXData* theta_data = s_manager.GetThetaDataPtr();
     const BedpostXData* phi_data = s_manager.GetPhiDataPtr();
 
-    unsigned int n_particles = 20; //s_manager.GetNumParticles();
-    unsigned int max_steps = 100; //s_manager.GetNumMaxSteps();
+    unsigned int n_particles = s_manager.GetNumParticles();
+    unsigned int max_steps = s_manager.GetNumMaxSteps();
 
     const float4* initial_positions =
       s_manager.GetSeedParticles()->data();
       
     const unsigned short int* brain_mask =
       s_manager.GetBrainMaskToArray();
+    
+    float4 test_point; 
+    test_point.s0 = 51.0;
+    test_point.s1 = 34.0;
+    test_point.s2 = 24.0;
       
     //for(unsigned int t = 1; t < theta_data->ns; t++)
     //{
-    unsigned int nx, ny, nz;
+    //unsigned int nx, ny, nz;
     
-    nx = theta_data->nx;
-    ny = theta_data->ny;
-    nz = theta_data->nz;  
+    //nx = theta_data->nx;
+    //ny = theta_data->ny;
+    //nz = theta_data->nz;  
     
     //std::cout<<"Data, Mask Tests: \n";  
-    //for (unsigned int x = 0; x<nx; x++)
+    //for (unsigned int x = 45; x<55; x++)
     //{
-      //for (unsigned int y=0; y<ny; y++)
+      //for (unsigned int y=45; y<55; y++)
       //{
-        //for (unsigned int z=0; z<nz; z++)
+        //for (unsigned int z=25; z<35; z++)
         //{
           //unsigned short int bmask = 
             //brain_mask[ x*(ny*nz) + y*nz + z];
@@ -128,10 +133,10 @@ int main(int argc, char *argv[] )
       //}
     //}
     
-    std::cout<<"BMaskTest: "<< s_manager.GetBrainMask( 51,51,30) <<"\n";
-    std::cout<<"FTest: "<< s_manager.GetfData(0, 0, 51,51,30) <<"\n";
-    std::cout<<"ThetaTest: "<< s_manager.GetThetaData(0, 0, 51,51,30) <<"\n";
-    std::cout<<"Phi: "<< s_manager.GetPhiData(0, 0, 51,51,30) <<"\n";
+    //std::cout<<"BMaskTest: "<< s_manager.GetBrainMask( 51,51,30) <<"\n";
+    //std::cout<<"FTest: "<< s_manager.GetfData(0, 0, 51,51,30) <<"\n";
+    //std::cout<<"ThetaTest: "<< s_manager.GetThetaData(0, 0, 51,51,30) <<"\n";
+    //std::cout<<"Phi: "<< s_manager.GetPhiData(0, 0, 51,51,30) <<"\n";
     //}
 
     //std::cin.get();

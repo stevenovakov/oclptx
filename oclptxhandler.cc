@@ -329,7 +329,7 @@ void OclPtxHandler::WriteSamplesToDevice(
   }
 
   this->ocl_cq->enqueueWriteBuffer(
-    this->phi_samples_buffer,
+    this->brain_mask_buffer,
     CL_FALSE,
     static_cast<unsigned int>(0),
     brain_mem_size,

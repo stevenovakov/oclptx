@@ -83,9 +83,14 @@ __kernel void BasicInterpolate(
 
   float4 temp_pos = (float4) (0.0f); //dx, dy, dz
   float4 xyz= (float4) (0.0f);
+  float4 last_xyz = (float4) (0.0f);
   
   float xmin, xmax, ymin, ymax, zmin, zmax;
+  xmin = 0.0; ymin = 0.0; zmin = 0.0;
+  xmax = sample_nx*1.0; ymax = sample_ny*1.0; zmax = sample_nz*1.0;
+  
   float f, phi, theta;
+  float jump_dot;
   
   unsigned int brain_mask_index;
   //unsigned int termination_mask_index;
@@ -99,53 +104,69 @@ __kernel void BasicInterpolate(
     current_root_vertex.s1 = floor(particle_pos.s1);
     current_root_vertex.s2 = floor(particle_pos.s2);
     
-    diffusion_index = 
-      current_root_vertex.s0*(sample_nz*sample_ny*sample_ns) +
-      current_root_vertex.s1*(sample_nz*sample_ns) +
-      current_root_vertex.s2*(sample_ns);
-    
     // pick sample
-    sample = 0; // fixed, for now
+    sample = 0; // fixed, for now 
     
-    xmin = (float) current_root_vertex.s0;
-    ymin = (float) current_root_vertex.s1;
-    zmin = (float) current_root_vertex.s2;
-    xmax = xmin + 1.0;
-    ymax = ymin + 1.0;
-    zmax = zmin + 1.0;
+    // pick flow vertex
+    diffusion_index = 
+      sample*(sample_nz*sample_ny*sample_nx)+
+      current_root_vertex.s0*(sample_nz*sample_ny) +
+      current_root_vertex.s1*(sample_nz) +
+      current_root_vertex.s2;
     
     // find next step location
-    f = f_samples[diffusion_index + sample];
-    theta = theta_samples[diffusion_index + sample];
-    phi = phi_samples[diffusion_index + sample];
+    f = f_samples[diffusion_index];
+    theta = theta_samples[diffusion_index];
+    phi = phi_samples[diffusion_index];
     
     xyz.s0 = 0.25 * cos( phi ) * sin( theta );
     xyz.s1 = 0.25 * sin( phi ) * sin( theta );
     xyz.s2 = 0.25 * cos( theta );
+    
+    //
+    // jump (aligns direction to prevent zig-zagging)
+    //
+    
+    jump_dot = xyz.s0*last_xyz.s0 + xyz.s1*last_xyz.s1 + 
+      xyz.s2*last_xyz.s2;
+    
+    if (jump_dot < 0 )
+      xyz = xyz;//*-1.0;
 
     temp_pos = particle_pos + xyz;
     
     //
+    // Complete out of bounds test (just in case)
+    //
+    if ( temp_pos.s0 > xmax || xmin > temp_pos.s0 ||
+      temp_pos.s1 > ymax || ymin > temp_pos.s1 ||
+        temp_pos.s2 > zmax || zmin > temp_pos.s2)
+    {
+      particle_done[particle_index] = 1;
+      break;
+    }
+    //
     // Brain Mask Test - Checks NEAREST vertex.
     //
     brain_mask_index = 
-      floor(temp_pos.s0)*(sample_nz*sample_ny) +
-        floor(temp_pos.s1)*(sample_ny) + floor(temp_pos.s2);
+      round(temp_pos.s0)*(sample_nz*sample_ny) +
+        round(temp_pos.s1)*(sample_nz) + round(temp_pos.s2);
 
     bounds_test = brain_mask[brain_mask_index];
 
     if (bounds_test == 0)
     {
       particle_done[particle_index] = 1;
-      //break;
+      break;
     }
 
     // update current location
     particle_pos = temp_pos;
+    // update last flow vector
+    last_xyz = xyz;
     // add to particle paths
     current_path_index = current_path_index + 1;
-    particle_paths[current_path_index] = (float4)( 1.0*bounds_test,
-      1.0*current_root_vertex.s1, 1.0*current_root_vertex.s2, 0.0); //particle_pos;
+    particle_paths[current_path_index] = particle_pos;
     
     // update steps taken
     steps_taken = steps_taken + 1;
