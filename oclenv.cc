@@ -304,7 +304,6 @@ cl::Program OclEnv::CreateProgram()
     {
       std::cout<<"ERROR: " << err.what() <<
         " ( " << this->OclErrorStrings(err.err()) << ")\n";
-      std::cin.get();
 
       for(std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
         dit != this->ocl_devices.end(); dit++)
