@@ -292,7 +292,7 @@ cl::Program OclEnv::CreateProgram()
 
   try
   {
-    ocl_program.build(this->ocl_devices);
+    ocl_program.build(this->ocl_devices, "-I ./oclkernels");
   }
   catch(cl::Error err){
 
