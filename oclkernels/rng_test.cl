@@ -4,7 +4,7 @@
  *    Jeff Taylor
  */
 
-#include "prng.cl"
+#include "rng.cl"
 
 __kernel void RngTest(
   __global rng_t *rng,        /* RW */
@@ -20,7 +20,7 @@ __kernel void RngTest(
   for (i = start; i < finish; ++i)
   {
     int index = glid*buf_size + i;
-    (rng_output)[index] = Rand(rng + glid);
+    rng_output[index] = Rand(rng + glid);
   }
 }
 
