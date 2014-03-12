@@ -27,13 +27,20 @@ DLIBS =	-lwarpfns -lbasisfield -lfslsurface	-lfslvtkio -lmeshclass -lnewimage -l
 OCLPTX=oclptx
 OCLPTXOBJ=oclptx.o oclenv.o oclptxhandler.o samplemanager.o oclptxOptions.o
 
+RNGTEST=rng_test
+RNGTESTOBJ=rng_test.o oclenv.o
+
 XFILES=${OCLPTX}
 
 all: ${OCLPTX}
 
 ${OCLPTX}: ${OCLPTXOBJ}
-				${CXX} ${CXXFLAGS} ${LDFLAGS} -o $@ $^ ${DLIBS}
+	${CXX} ${CXXFLAGS} ${LDFLAGS} -o $@ $^ ${DLIBS}
+
+${RNGTEST}: ${RNGTESTOBJ}
+	${CXX} ${CXXFLAGS} ${LDFLAGS} -o $@ $^ ${DLIBS}
+
 
 lint: *.cc *.h
-				bash -c 'python cpplint.py --extensions=cc,h --filter=-whitespace/braces $^ > lint 2>&1'
+	bash -c 'python cpplint.py --extensions=cc,h --filter=-whitespace/braces $^ > lint 2>&1'
 

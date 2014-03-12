@@ -243,10 +243,9 @@ cl::Program OclEnv::CreateProgram()
     source_list.push_back(fold + slash + "prngmethods.cl");
     source_list.push_back(fold + slash + "interpolate.cl");
   }
-  else if (this->ocl_routine_name == "prngtest")
+  else if (this->ocl_routine_name == "rng_test")
   {
-    source_list.push_back(fold + slash + "prngmethods.cl");
-    source_list.push_back(fold + slash + "prngtest.cl");
+    source_list.push_back(fold + slash + "rng_test.cl");
   }
   else if (this->ocl_routine_name == "interptest")
   {
@@ -256,8 +255,8 @@ cl::Program OclEnv::CreateProgram()
   else if (this->ocl_routine_name == "basic")
   {
     source_list.push_back(fold + slash + "basic.cl");
-  }  
-  
+  }
+
   for (sit = source_list.begin(); sit != source_list.end(); ++sit)
   {
     line_str = *sit;
@@ -293,23 +292,18 @@ cl::Program OclEnv::CreateProgram()
 
   try
   {
-    ocl_program.build(this->ocl_devices);
+    ocl_program.build(this->ocl_devices, "-I ./oclkernels");
   }
   catch(cl::Error err){
 
     // TODO
     //  dump all error logging to logfile
     //  maybe differentiate b/w regular errors and cl errors
-    
-    // Eliminate exception use
-    // return the cl::Error type
-    // loko at cl::Error:what() instead of OclErrorStrings
 
     if( this->OclErrorStrings(err.err()) != "CL_SUCCESS")
     {
       std::cout<<"ERROR: " << err.what() <<
         " ( " << this->OclErrorStrings(err.err()) << ")\n";
-      std::cin.get();
 
       for(std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
         dit != this->ocl_devices.end(); dit++)
@@ -335,10 +329,10 @@ cl::Program OclEnv::CreateProgram()
                                                 "OclPtxKernel",
                                                 NULL ));
     }
-    else if (this->ocl_routine_name == "prngtest" )
+    else if (this->ocl_routine_name == "rng_test")
     {
       this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
-                                                "PrngTestKernel",
+                                                "RngTest",
                                                 NULL));
     }
     else if (this->ocl_routine_name == "interptest" )
