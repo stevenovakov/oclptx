@@ -1,15 +1,10 @@
 import struct
 import pylab
-
-data = []
+import scipy
 
 s = 0
 with open("./rng_output",'rb') as f:
-    d = f.read(8)
-    while d:
-        s += 1
-        if 0 == s % 100000: print(s)
-        data.append(struct.unpack('Q',d))
-        d = f.read(8)
+    read_data = scipy.fromfile(file=f, dtype=scipy.uint64)
 
-pylab.hist(d)
+pylab.hist(read_data)
+pylab.show()
