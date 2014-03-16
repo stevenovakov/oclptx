@@ -176,7 +176,7 @@ int main(int argc, char *argv[] )
                                   static_cast<unsigned int>(1),
                                   brain_mask);
     std::cout<<"samples done\n";
-    handler.WriteInitialPosToDevice(  test_point, //initial_positions,
+    handler.WriteInitialPosToDevice(  initial_positions,
                                       n_particles,
                                       max_steps,
                                       n_devices,
