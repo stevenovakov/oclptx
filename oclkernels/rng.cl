@@ -6,10 +6,12 @@
 
 typedef ulong8 rng_t;
 
+//
 // 5-state 64 bit LFSR.  Parameters used are from the paper
 // P. L'Ecuyer, "Tables of Maximally Equidistributed Combined LFSR Generators",
 //  Mathematics of Computation, 68, 225 (1999), 261--269
 // http://www.ams.org/journals/mcom/1999-68-225/S0025-5718-99-01039-X/S0025-5718-99-01039-X.pdf
+//
 ulong Rand(__global rng_t *z)
 {
   ulong b;

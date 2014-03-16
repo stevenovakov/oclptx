@@ -55,30 +55,30 @@ void SampleManager::LoadBedpostDataHelper(
   const NEWIMAGE::volume<float>& aMask,
   const int aFiberNum  )
 {
-    NEWIMAGE::volume4D<float> loadedVolume4DTheta;
-    NEWIMAGE::volume4D<float> loadedVolume4DPhi;
-    NEWIMAGE::volume4D<float> loadedVolume4Df;
+  NEWIMAGE::volume4D<float> loadedVolume4DTheta;
+  NEWIMAGE::volume4D<float> loadedVolume4DPhi;
+  NEWIMAGE::volume4D<float> loadedVolume4Df;
 
-    //Load Theta/Phi/f samples
-    NEWIMAGE::read_volume4D(loadedVolume4DTheta, aThetaSampleName);
-    NEWIMAGE::read_volume4D(loadedVolume4DPhi, aPhiSampleName);
-    NEWIMAGE::read_volume4D(loadedVolume4Df, afSampleName);
+  //Load Theta/Phi/f samples
+  NEWIMAGE::read_volume4D(loadedVolume4DTheta, aThetaSampleName);
+  NEWIMAGE::read_volume4D(loadedVolume4DPhi, aPhiSampleName);
+  NEWIMAGE::read_volume4D(loadedVolume4Df, afSampleName);
 
-    if(aMask.xsize() > 0)
-    {
-        //_thetaSamples.push_back(loadedVolume4DTheta.matrix(aMask));
-        //_phiSamples.push_back(loadedVolume4DPhi.matrix(aMask));
-        //_fSamples.push_back(loadedVolume4Df.matrix(aMask));
-    }
-    else
-    {
-        PopulateMemberParameters(loadedVolume4DTheta,
-          _thetaData, loadedVolume4DTheta[0], aFiberNum);
-        PopulateMemberParameters(loadedVolume4DPhi,
-          _phiData, loadedVolume4DPhi[0], aFiberNum);
-        PopulateMemberParameters(loadedVolume4Df,
-          _fData, loadedVolume4Df[0], aFiberNum);
-    }
+  if(aMask.xsize() > 0)
+  {
+      //_thetaSamples.push_back(loadedVolume4DTheta.matrix(aMask));
+      //_phiSamples.push_back(loadedVolume4DPhi.matrix(aMask));
+      //_fSamples.push_back(loadedVolume4Df.matrix(aMask));
+  }
+  else
+  {
+      PopulateMemberParameters(loadedVolume4DTheta,
+        _thetaData, loadedVolume4DTheta[0], aFiberNum);
+      PopulateMemberParameters(loadedVolume4DPhi,
+        _phiData, loadedVolume4DPhi[0], aFiberNum);
+      PopulateMemberParameters(loadedVolume4Df,
+        _fData, loadedVolume4Df[0], aFiberNum);
+  }
 }
 
 void SampleManager::PopulateMemberParameters(
@@ -88,38 +88,37 @@ void SampleManager::PopulateMemberParameters(
   const int aFiberNum)
 {
 
-    const int ns = aLoadedData.tsize();
-    const int nx = aLoadedData.xsize();
-    const int ny = aLoadedData.ysize();
-    const int nz = aLoadedData.zsize();
+  const int ns = aLoadedData.tsize();
+  const int nx = aLoadedData.xsize();
+  const int ny = aLoadedData.ysize();
+  const int nz = aLoadedData.zsize();
 
-    aTargetContainer.data.push_back( new float[ns*nx*ny*nz] );
-    aTargetContainer.nx = nx;
-    aTargetContainer.ny = ny;
-    aTargetContainer.nz = nz;
-    aTargetContainer.ns = ns;
+  aTargetContainer.data.push_back( new float[ns*nx*ny*nz] );
+  aTargetContainer.nx = nx;
+  aTargetContainer.ny = ny;
+  aTargetContainer.nz = nz;
+  aTargetContainer.ns = ns;
 
-    int xoff = aLoadedData[0].minx() - aMaskParams.minx();
-    int yoff = aLoadedData[0].miny() - aMaskParams.miny();
-    int zoff = aLoadedData[0].minz() - aMaskParams.minz();
-    for (int z = aMaskParams.minz(); z <= aMaskParams.maxz(); z++)
+  int xoff = aLoadedData[0].minx() - aMaskParams.minx();
+  int yoff = aLoadedData[0].miny() - aMaskParams.miny();
+  int zoff = aLoadedData[0].minz() - aMaskParams.minz();
+
+  for (int z = aMaskParams.minz(); z <= aMaskParams.maxz(); z++)
+  {
+    for (int y = aMaskParams.miny(); y <= aMaskParams.maxy(); y++)
     {
-      for (int y = aMaskParams.miny(); y <= aMaskParams.maxy(); y++)
+      for (int x = aMaskParams.minx(); x <= aMaskParams.maxx(); x++)
       {
-        for (int x = aMaskParams.minx(); x <= aMaskParams.maxx(); x++)
+
+        for (int t = aLoadedData.mint();
+          t <= aLoadedData.maxt(); t++)
         {
-            if (aMaskParams(x,y,z) > 0)
-            {
-                for (int t = aLoadedData.mint();
-                  t <= aLoadedData.maxt(); t++)
-                {
-                    aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
-                      x*nz*ny + y*nz + z] =
-                        aLoadedData[t](x+xoff,y+yoff,z+zoff);
-                }
-            }
+            aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
+              x*nz*ny + y*nz + z] =
+                aLoadedData[t](x+xoff,y+yoff,z+zoff);
         }
       }
+    }
   }
 }
 
@@ -317,7 +316,7 @@ const unsigned short int* SampleManager::GetBrainMaskToArray()
     std::cout << "BrainMask Min "<< "x = " << _brainMask.minx()<< " y= " <<
       _brainMask.miny()<< " z = "<< _brainMask.minz()<<endl;
     std::cout << "BrainMask Max "<< "x = " << _brainMask.maxx()<< " y= " <<
-      _brainMask.maxy()<< " z = "<< _brainMask.maxz()<<endl;    
+      _brainMask.maxy()<< " z = "<< _brainMask.maxz()<<endl;
 
     unsigned short int* target =
       new unsigned short int[sizeX * sizeY * sizeZ];

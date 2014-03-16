@@ -36,6 +36,8 @@
 #include <sstream>
 #include <vector>
 #include <mutex>
+
+#include <stdio.h>
 //#include <mutex>
 //#include <thread>
 
@@ -82,7 +84,7 @@ OclPtxHandler::OclPtxHandler(
   
   this->curvature_threshold = curv_thresh;
 
-  this->total_gpu_mem_size = 0;  
+  this->total_gpu_mem_size = 0;
 }
 
 
@@ -150,6 +152,8 @@ void OclPtxHandler::ParticlePathsToFile()
   std::fstream path_file;
   path_file.open(path_filename.c_str(), std::ios::app|std::ios::out);
 
+  path_file << "[";
+
   for (unsigned int n = 0; n < this->n_particles; n++)
   {
     unsigned int p_steps = particle_steps[n];
@@ -158,6 +162,8 @@ void OclPtxHandler::ParticlePathsToFile()
     std::cout<<"Particle " << n << " Steps Taken: " << p_steps <<"\n";
     
     p_steps += 1;
+
+    path_file << "[";
 
     for (unsigned int s = 0; s < p_steps; s++)
     {
@@ -168,38 +174,24 @@ void OclPtxHandler::ParticlePathsToFile()
 
     for (unsigned int i = 0; i < (unsigned int) p_steps; i++)
     {
-      path_file << temp_x.at(i);
+      path_file << "[" << temp_x.at(i) << "," << temp_y.at(i) << "," <<
+        temp_z.at(i) << "]";
 
       if (i < (unsigned int) p_steps - 1)
         path_file << ",";
       else
-        path_file << "\n";
-    }
-
-    for (unsigned int i = 0; i < (unsigned int) p_steps; i++)
-    {
-      path_file << temp_y.at(i);
-
-      if (i < (unsigned int) p_steps - 1)
-        path_file << ",";
-      else
-        path_file << "\n";
-    }
-
-    for (unsigned int i = 0; i < (unsigned int) p_steps; i++)
-    {
-      path_file << temp_z.at(i);
-
-      if (i < (unsigned int) p_steps - 1)
-        path_file << ",";
-      else
-        path_file << "\n";
+        path_file << "]";
     }
 
     temp_x.clear();
     temp_y.clear();
     temp_z.clear();
+
+    if (n < this->n_particles -1)
+      path_file << ",\n";
   }
+
+  path_file <<"]";
 
   path_file.close();
   delete[] particle_paths;

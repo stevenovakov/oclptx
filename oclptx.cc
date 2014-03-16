@@ -105,15 +105,13 @@ int main(int argc, char *argv[] )
     const unsigned short int* brain_mask =
       s_manager.GetBrainMaskToArray();
     
-    //float4 * test_point = new float4[n_particles];
-    //for( unsigned int i = 0; i < n_particles; i++ )
-    //{
-      //test_point[i].x = 51.0;
-      //test_point[i].y = 35.0;
-      //test_point[i].z = 24.0;
-    //}
-    
-    //const float4* tp = test_point;
+    // float4 * test_point = new float4[n_particles];
+    // for( unsigned int i = 0; i < n_particles; i++ )
+    // {
+    //   test_point[i].x = 51.0;
+    //   test_point[i].y = 51.0;
+    //   test_point[i].z = 30.0;
+    // }
     
     // TODO get curv thresh from sample manager
     float curvature_threshold = 0.2;
@@ -124,27 +122,27 @@ int main(int argc, char *argv[] )
     
     //nx = theta_data->nx;
     //ny = theta_data->ny;
-    //nz = theta_data->nz;  
+    //nz = theta_data->nz;
     
-    //std::cout<<"Data, Mask Tests: \n";  
+    //std::cout<<"Data, Mask Tests: \n";
     //for (unsigned int x = 45; x<55; x++)
     //{
       //for (unsigned int y=45; y<55; y++)
       //{
         //for (unsigned int z=25; z<35; z++)
         //{
-          //unsigned short int bmask = 
+          //unsigned short int bmask =
             //brain_mask[ x*(ny*nz) + y*nz + z];
           
-          //std::cout<<"("<<x<<","<<y<<","<<z<<"): "<< bmask<<"\n";          
+          //std::cout<<"("<<x<<","<<y<<","<<z<<"): "<< bmask<<"\n";
         //}
       //}
     //}
     
     //std::cout<<"BMaskTest: "<< s_manager.GetBrainMask( 51,51,30) <<"\n";
     //std::cout<<"FTest: "<< s_manager.GetfData(0, 0, 51,51,30) <<"\n";
-    //std::cout<<"ThetaTest: "<< s_manager.GetThetaData(0, 0, 51,51,30) <<"\n";
-    //std::cout<<"Phi: "<< s_manager.GetPhiData(0, 0, 51,51,30) <<"\n";
+    //std::cout<<"ThetaTest: "<< s_manager.GetThetaData(0, 0, 51,51,29) <<"\n";
+    //std::cout<<"PhiTest: "<< s_manager.GetPhiData(0, 0, 51,51,29) <<"\n";
     //}
 
     //std::cin.get();

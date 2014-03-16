@@ -29,19 +29,6 @@
  *
  */
 
-/*
- * OCL KERNEL COMPILATION - APPEND ORDER
- * 
- * Append parsed files in this order in one container
- * before compiling kernel for runtime:
- * 
- *      prngmethods.cl
- *      interpolate.cl
- *
- */
-
-
-
 
 
 //*********************************************************************

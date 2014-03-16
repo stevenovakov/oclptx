@@ -29,16 +29,6 @@
  *
  */
 
-/*
- * OCL KERNEL COMPILATION - APPEND ORDER
- *
- * Append parsed files in this order in one container
- * before compiling kernel for runtime:
- *
- *      prngmethods.cl
- *      basic.cl
- *
- */
 
 // sample data
 // Access x, y, z vertex:
@@ -73,7 +63,7 @@ __kernel void BasicInterpolate(
     
   unsigned int interval_steps_taken;
   
-  int3 current_root_vertex;
+  uint3 current_root_vertex;
   
   unsigned int diffusion_index;
   unsigned int sample;
@@ -83,7 +73,6 @@ __kernel void BasicInterpolate(
   particle_pos.s3 = 0.0;
 
   float4 temp_pos = (float4) (0.0f); //dx, dy, dz
-  float4 dxyz= (float4) (0.0f);
   float4 dr = (float4) (0.0f);
   float4 last_dr = (float4) (0.0f);
   
@@ -94,7 +83,7 @@ __kernel void BasicInterpolate(
   float f, phi, theta;
   float jump_dot;
     
-  unsigned int brain_mask_index;
+  unsigned int mask_index;
   //unsigned int termination_mask_index;
   unsigned short int bounds_test;
   
@@ -107,10 +96,10 @@ __kernel void BasicInterpolate(
     current_root_vertex.s2 = floor(particle_pos.s2);
     
     // pick sample
-    sample = 0; // fixed, for now 
+    sample = 0; // fixed, for now
     
     // pick flow vertex
-    diffusion_index = 
+    diffusion_index =
       sample*(sample_nz*sample_ny*sample_nx)+
       current_root_vertex.s0*(sample_nz*sample_ny) +
       current_root_vertex.s1*(sample_nz) +
@@ -125,24 +114,43 @@ __kernel void BasicInterpolate(
     dr.s1 = sin( phi ) * sin( theta );
     dr.s2 = cos( theta );
     
+    // TODO @STEVE
+    // temporary, until we introduce initial direction
+    if( steps_taken == 0 && glid%2 == 0)
+      dr = dr*-1.0;
+
     //
     // jump (aligns direction to prevent zig-zagging)
     //
     
-    jump_dot = dr.s0*last_dr.s0 + dr.s1*last_dr.s1 + 
+    jump_dot = dr.s0*last_dr.s0 + dr.s1*last_dr.s1 +
       dr.s2*last_dr.s2;
-    
-    // TODO @STEVE
-    // temporary, until we introduce initial direction  
-    if( steps_taken == 0 && glid%2 == 0)
-      dr = dr*-1;
-      
-    dxyz = dr*0.25;
 
     if (jump_dot < 0.0 )
-      dxyz = dxyz*-1.0;
+    {
+      dr = dr*-1.0;
+
+      jump_dot = dr.s0*last_dr.s0 + dr.s1*last_dr.s1 +
+      dr.s2*last_dr.s2;
+    }
     
-    temp_pos = particle_pos + dxyz;
+    //
+    // Curvature Threshold
+    //
+    
+    if (steps_taken > 1 && jump_dot < curvature_threshold)
+    {
+      particle_done[particle_index] = 1;
+      break;
+    }
+
+    // update last flow vector
+    last_dr = dr;
+
+    dr = dr*0.25; // implement actual step length argument later
+
+    // update particle position
+    temp_pos = particle_pos + dr;
     
     //
     // Complete out of bounds test (just in case)
@@ -157,44 +165,33 @@ __kernel void BasicInterpolate(
     //
     // Brain Mask Test - Checks NEAREST vertex.
     //
-    brain_mask_index = 
+    mask_index =
       round(temp_pos.s0)*(sample_nz*sample_ny) +
         round(temp_pos.s1)*(sample_nz) + round(temp_pos.s2);
 
-    bounds_test = brain_mask[brain_mask_index];
+    bounds_test = brain_mask[mask_index];
 
     if (bounds_test == 0)
     {
       particle_done[particle_index] = 1;
       break;
     }
-    
-    //
-    // Curvature Threshold
-    //
-    
-    if (steps_taken > 1 && jump_dot < curvature_threshold)
-    {
-      particle_done[particle_index] = 1;
-      break;
-    }    
 
     // update current location
     particle_pos = temp_pos;
-    // update last flow vector
-    last_dr = dr;
+
     // add to particle paths
     current_path_index = current_path_index + 1;
     particle_paths[current_path_index] = particle_pos;
-    
+  
     // update steps taken
     steps_taken = steps_taken + 1;
     // update step location
     particle_steps_taken[particle_index] = steps_taken;
     
-    if (steps_taken == max_steps){
+    if (steps_taken >= max_steps){
       particle_done[particle_index] = 1;
-      break;  
+      break;
     }
   }
 }
