@@ -1,0 +1,6 @@
+depend.mk
+*.o
+*.d
+oclptx
+lint
+*.swp

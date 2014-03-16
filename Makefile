@@ -9,7 +9,8 @@ include $(FSLCONFDIR)/default.mk
 
 PROJNAME =fdt
 
-DBGFLAGS=-g
+DBGFLAGS=-g -O0
+USRCXXFLAGS=-std=c++0x -MMD -MP
 
 # TODO: Move LIB_OPENCL and INC_OPENCL into systemvars.mk
 # test b/w AMD/Nvidia hardware?
@@ -17,9 +18,7 @@ DBGFLAGS=-g
 LIB_OPENCL=/opt/AMD-APP-SDK-v2.8-RC-lnx64/lib/x86_64
 #INC_OPENCL=/usr/local/cuda-5.5/include
 INC_OPENCL=/opt/AMD-APP-SDK-v2.8-RC-lnx64/include
-CPP11 = -std=c++0x
 
-USRINCFLAGS = -I${INC_NEWMAT} -I${INC_NEWRAN} -I${INC_CPROB} -I${INC_PROB} -I${INC_BOOST} -I${INC_ZLIB} -I${INC_OPENCL} ${CPP11}
 USRLDFLAGS = -L${LIB_NEWMAT} -L${LIB_NEWRAN} -L${LIB_CPROB} -L${LIB_PROB} -L${LIB_ZLIB} -L${LIB_OPENCL}
 
 DLIBS =	-lwarpfns -lbasisfield -lfslsurface	-lfslvtkio -lmeshclass -lnewimage -lutils -lmiscmaths -lnewmat -lnewran -lfslio -lgiftiio -lexpat -lfirst_lib -lniftiio -lznz -lcprob -lutils -lprob -lm -lz -lOpenCL
@@ -29,6 +28,9 @@ OCLPTXOBJ=oclptx.o oclenv.o oclptxhandler.o samplemanager.o oclptxOptions.o
 
 RNGTEST=rng_test
 RNGTESTOBJ=rng_test.o oclenv.o
+
+FIFOTEST=fifo_test
+FIFOTESTOBJ=fifo_test.o
 
 XFILES=${OCLPTX}
 
@@ -40,7 +42,10 @@ ${OCLPTX}: ${OCLPTXOBJ}
 ${RNGTEST}: ${RNGTESTOBJ}
 	${CXX} ${CXXFLAGS} ${LDFLAGS} -o $@ $^ ${DLIBS}
 
+${FIFOTEST}: ${FIFOTESTOBJ}
+	${CXX} ${CXXFLAGS} ${LDFLAGS} -o $@ $^ ${DLIBS}
 
-lint: *.cc *.h
-	bash -c 'python cpplint.py --extensions=cc,h --filter=-whitespace/braces $^ > lint 2>&1'
+lint: *.cc *.h *.cl
+	bash -c 'python cpplint.py --extensions=cc,h,cl --filter=-whitespace/braces $^ > lint 2>&1'
 
+-include $(OCLPTXOBJ:%.o=%.d)
