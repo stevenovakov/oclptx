@@ -114,8 +114,7 @@ __kernel void BasicInterpolate(
     dr.s1 = sin( phi ) * sin( theta );
     dr.s2 = cos( theta );
     
-    // TODO @STEVE
-    // temporary, until we introduce initial direction
+    // alternates initial direction of particle set
     if( steps_taken == 0 && glid%2 == 0)
       dr = dr*-1.0;
 
@@ -189,7 +188,7 @@ __kernel void BasicInterpolate(
     // update step location
     particle_steps_taken[particle_index] = steps_taken;
     
-    if (steps_taken >= max_steps){
+    if (steps_taken == max_steps){
       particle_done[particle_index] = 1;
       break;
     }

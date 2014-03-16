@@ -98,12 +98,7 @@ class OclPtxHandler{
                                   unsigned int device_num
                                 );
                                 
-    void SingleBufferInit(  unsigned int particle_interval_size,
-                            unsigned int step_interval_size
-                          );
-    void DoubleBufferInit(  unsigned int particle_interval_size,
-                            unsigned int step_interval_size
-                          );
+    void SingleBufferInit();
     //
     // Reduction
     //
@@ -164,8 +159,6 @@ class OclPtxHandler{
     // are desireable.
 
     unsigned int section_size;
-    unsigned int num_steps;
-    unsigned int particles_size;
 
     cl::Buffer particle_paths_buffer;
     cl::Buffer particle_steps_taken_buffer;
@@ -193,7 +186,7 @@ class OclPtxHandler{
 
     // mutex for reduction/interpolation conflicts on local objects
     std::mutex reduce_mutex;
-    // mutex for kernel 
+    // mutex for kernel
     std::mutex kernel_mutex;
     // mutex for command queue access
 

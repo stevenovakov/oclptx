@@ -108,9 +108,9 @@ int main(int argc, char *argv[] )
     // float4 * test_point = new float4[n_particles];
     // for( unsigned int i = 0; i < n_particles; i++ )
     // {
-    //   test_point[i].x = 51.0;
-    //   test_point[i].y = 51.0;
-    //   test_point[i].z = 30.0;
+    //   test_point[i].x = 52.0;
+    //   test_point[i].y = 52.0;
+    //   test_point[i].z = 34.0;
     // }
     
     // TODO get curv thresh from sample manager
@@ -176,13 +176,13 @@ int main(int argc, char *argv[] )
                                   static_cast<unsigned int>(1),
                                   brain_mask);
     std::cout<<"samples done\n";
-    handler.WriteInitialPosToDevice(  initial_positions,
+    handler.WriteInitialPosToDevice(  test_point, //initial_positions,
                                       n_particles,
                                       max_steps,
                                       n_devices,
                                       static_cast<unsigned int>(0));
     std::cout<<"pos done\n";
-    handler.SingleBufferInit(n_particles, max_steps);
+    handler.SingleBufferInit();
     //handler.DoubleBufferInit( n_particles/2, max_steps);
     std::cout<<"dbuff done\n";
 

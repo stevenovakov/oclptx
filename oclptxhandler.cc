@@ -107,9 +107,9 @@ void OclPtxHandler::ParticlePathsToFile()
 {
   float4 * particle_paths;
   particle_paths =
-    new float4[this->n_particles*this->particle_path_size];
+    new float4[this->section_size*this->particle_path_size];
   unsigned int * particle_steps;
-  particle_steps = new unsigned int[this->n_particles];
+  particle_steps = new unsigned int[this->section_size];
 
   this->ocl_cq->enqueueReadBuffer(
     this->particle_paths_buffer,
@@ -131,8 +131,9 @@ void OclPtxHandler::ParticlePathsToFile()
 
   // now dump to file
 
-  std::ostringstream convert(std::ostringstream::ate);
+  FILE * path_file;
 
+  std::ostringstream convert(std::ostringstream::ate);
   std::string path_filename;
 
   std::vector<float> temp_x;
@@ -149,12 +150,11 @@ void OclPtxHandler::ParticlePathsToFile()
   path_filename = convert.str() + "_PATHS.dat";
   std::cout << "Writing to " << path_filename << "\n";
 
-  std::fstream path_file;
-  path_file.open(path_filename.c_str(), std::ios::app|std::ios::out);
+  path_file = fopen(path_filename.c_str(), "wb");
 
-  path_file << "[";
+  fprintf(path_file, "[");
 
-  for (unsigned int n = 0; n < this->n_particles; n++)
+  for (unsigned int n = 0; n < this->section_size; n++)
   {
     unsigned int p_steps = particle_steps[n];
 
@@ -163,7 +163,7 @@ void OclPtxHandler::ParticlePathsToFile()
     
     p_steps += 1;
 
-    path_file << "[";
+    fprintf(path_file, "[");
 
     for (unsigned int s = 0; s < p_steps; s++)
     {
@@ -174,13 +174,13 @@ void OclPtxHandler::ParticlePathsToFile()
 
     for (unsigned int i = 0; i < (unsigned int) p_steps; i++)
     {
-      path_file << "[" << temp_x.at(i) << "," << temp_y.at(i) << "," <<
-        temp_z.at(i) << "]";
+      fprintf(path_file, "[%.6f,%.6f,%.6f]", temp_x.at(i), temp_y.at(i),
+        temp_z.at(i));
 
       if (i < (unsigned int) p_steps - 1)
-        path_file << ",";
+        fprintf(path_file, ",");
       else
-        path_file << "]";
+        fprintf(path_file, "]");
     }
 
     temp_x.clear();
@@ -188,12 +188,12 @@ void OclPtxHandler::ParticlePathsToFile()
     temp_z.clear();
 
     if (n < this->n_particles -1)
-      path_file << ",\n";
+      fprintf(path_file, ",\n");
   }
 
-  path_file <<"]";
+  fprintf(path_file, "]");
 
-  path_file.close();
+  fclose(path_file);
   delete[] particle_paths;
   delete[] particle_steps;
 }
@@ -350,36 +350,39 @@ void OclPtxHandler::WriteInitialPosToDevice(
 {
   unsigned int sec_size = nparticles/ndevices;
 
-  this->section_size = sec_size;
-  this->n_particles = nparticles;
+  this->section_size = 2*sec_size;
+  this->n_particles = 2*nparticles;
   this->max_steps = maximum_steps;
   this->particle_path_size = maximum_steps + 1;
 
   unsigned int path_mem_size =
-    sec_size*particle_path_size*sizeof(float4);
-  unsigned int path_steps_mem_size = sec_size*sizeof(unsigned int);
+    this->section_size*this->particle_path_size*sizeof(float4);
+  unsigned int path_steps_mem_size = this->section_size*sizeof(unsigned int);
   this->particle_uint_mem_size = path_steps_mem_size;
   this->particles_mem_size = path_mem_size;
 
   // if MT: wrap in mutex (to avoid race on initial_positions)
   const float4* start_pos_data =
-    initial_positions + (sec_size*device_num);
+    initial_positions + (this->section_size*device_num);
   // if MT: wrap in mutex (to avoid race on initial_positions)
 
   // also doubles as the "is done" initial data
-  std::vector<unsigned int> initial_steps(sec_size, 0);
+  std::vector<unsigned int> initial_steps(this->section_size, 0);
 
   // delete this at end of function always
   float4* pos_container;
-  pos_container = new float4[sec_size * particle_path_size];
+  pos_container = new float4[this->section_size * this->particle_path_size];
 
   // the first entry in row i will be the particle start location
   // the rest is garbage data (that's fine)
   for (unsigned int i = 0; i < sec_size; i++)
   {
-    pos_container[particle_path_size*i] = *start_pos_data;
+    pos_container[this->particle_path_size*(2*i)] = *start_pos_data;
+    pos_container[this->particle_path_size*(2*i + 1)] = *start_pos_data;
     start_pos_data++;
-    this->particle_indeces_left.push_back(i);
+    this->particle_indeces_left.push_back(2*i);
+    this->particle_indeces_left.push_back(2*i + 1);
+    this->particle_complete.push_back(static_cast<unsigned int>(0));
     this->particle_complete.push_back(static_cast<unsigned int>(0));
   }
 
@@ -390,7 +393,6 @@ void OclPtxHandler::WriteInitialPosToDevice(
     this->particle_uint_mem_size<<"\n";
   std::cout<<"Particle Paths Mem Size: " <<
     this->particles_mem_size<<"\n";
-
 
   this->particle_paths_buffer =
     cl::Buffer(
@@ -461,31 +463,25 @@ void OclPtxHandler::WriteInitialPosToDevice(
 }
 
 
-void OclPtxHandler::SingleBufferInit(
-  unsigned int particle_interval_size,
-  unsigned int step_interval_size
-)
+void OclPtxHandler::SingleBufferInit()
 {
-  this->num_steps = step_interval_size;
-
-  this->particles_size = particle_interval_size;
   unsigned int interval_mem_size =
-    particle_interval_size*sizeof(unsigned int);
+    this->section_size*sizeof(unsigned int);
 
   // first iteration is same size
-  this->todo_range.push_back( particle_interval_size );
+  this->todo_range.push_back( this->section_size );
 
   std::vector<unsigned int> temp;
   this->particle_todo.push_back(temp);
 
-  for (unsigned int k=0; k<particle_interval_size; k++)
+  for (unsigned int k=0; k<this->section_size; k++)
   {
     this->particle_todo.at(0).push_back(
       this->particle_indeces_left.back());
     this->particle_indeces_left.pop_back();
   }
 
-  // Initialize both buffers
+  // Initialize buffer
 
   this->compute_index_buffers.push_back(
     cl::Buffer(
@@ -496,7 +492,7 @@ void OclPtxHandler::SingleBufferInit(
       NULL)
   );
 
-  // Copy over initial data to both buffers
+  // Copy over initial data to buffer
   this->ocl_cq->enqueueWriteBuffer(
     this->compute_index_buffers.at(0),
     CL_FALSE,
@@ -512,88 +508,6 @@ void OclPtxHandler::SingleBufferInit(
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
   this->ocl_cq->finish();
-
-}
-
-//
-// This should be totally changed to support Jeff's scheme
-// Currently does not work for some reason.
-//
-void OclPtxHandler::DoubleBufferInit(
-  unsigned int particle_interval_size,
-  unsigned int step_interval_size
-)
-{
-  this->num_steps = step_interval_size;
-
-  this->particles_size = particle_interval_size;
-  unsigned int interval_mem_size =
-    particle_interval_size*sizeof(unsigned int);
-
-  // first iteration is same size
-  this->todo_range.push_back( particle_interval_size );
-  this->todo_range.push_back( particle_interval_size );
-
-  std::vector<unsigned int> temp;
-  this->particle_todo.push_back(temp);
-  this->particle_todo.push_back(temp);
-
-  for (unsigned int k=0; k<particle_interval_size; k++)
-  {
-    this->particle_todo.at(0).push_back(
-      this->particle_indeces_left.back());
-    this->particle_indeces_left.pop_back();
-    this->particle_todo.at(1).push_back(
-      this->particle_indeces_left.back());
-    this->particle_indeces_left.pop_back();
-  }
-
-  // Initialize both buffers
-
-  this->compute_index_buffers.push_back(
-    cl::Buffer(
-      *(this->ocl_context),
-      CL_MEM_READ_WRITE,
-      interval_mem_size,
-      NULL,
-      NULL)
-  );
-  this->compute_index_buffers.push_back(
-    cl::Buffer(
-      *(this->ocl_context),
-      CL_MEM_READ_WRITE,
-      interval_mem_size,
-      NULL,
-      NULL)
-  );
-
-  // Copy over initial data to both buffers
-  this->ocl_cq->enqueueWriteBuffer(
-    this->compute_index_buffers.at(0),
-    CL_FALSE,
-    static_cast<unsigned int>(0),
-    interval_mem_size,
-    this->particle_todo.at(0).data(),
-    NULL,
-    NULL
-  );
-
-  this->ocl_cq->enqueueWriteBuffer(
-    this->compute_index_buffers.at(1),
-    CL_FALSE,
-    static_cast<unsigned int>(0),
-    interval_mem_size,
-    this->particle_todo.at(1).data(),
-    NULL,
-    NULL
-  );
-
-  this->total_gpu_mem_size += 2*interval_mem_size;
-
-  // may not need to do this here, may want to wait to block until
-  // all "initialization" operations are finished.
-  this->ocl_cq->finish();
-
 }
 
 //*********************************************************************
@@ -602,87 +516,6 @@ void OclPtxHandler::DoubleBufferInit(
 //
 //*********************************************************************
 
-void OclPtxHandler::ReduceInit(unsigned int particles_per,
-                                std::string reduction_style)
-{
-  // actually might not need this thanks to DoubleBufferInit
-
-}
-
-void OclPtxHandler::Reduce()
-{
-  unsigned int t_sec = this->target_section  & 0x00000000;
-
-  std::cout<<"t_sec : " << t_sec <<"\n";
-
-  std::vector<unsigned int>* reduce_vector =
-    &(this->particle_todo.at(t_sec));
-  std::vector<unsigned int>* done_vector =
-    &(this->particle_complete);
-  std::vector<unsigned int>* left_vector =
-    &(this->particle_indeces_left);
-
-  unsigned int s_size = this->num_steps;
-
-  unsigned int new_todo_range = 0;
-
-  // first pop all of the finished indeces
-
-  // apparently in CL1.1 + ,
-  // all command queue CALLS are thread safe
-  // std::unique_lock<std::mutex> cqlock(this->cq_mutex);
-
-  this->ocl_cq->enqueueReadBuffer(
-    this->particle_done_buffer,
-    CL_TRUE, // blocking
-    0,
-    this->particle_uint_mem_size,
-    done_vector->data()
-  );
-
-  //cqlock.unlock();
-
-  for (unsigned int i = 0; i < reduce_vector->size(); i++)
-  {
-    if (done_vector->at(i) > 0)
-      reduce_vector->erase(reduce_vector->begin() + i);
-  }
-
-  unsigned int old_size_left = reduce_vector->size();
-  unsigned int particles_left = this->particle_indeces_left.size();
-  unsigned int gap_size = s_size - old_size_left;
-
-  if ( gap_size > particles_left )
-    gap_size = particles_left;
-
-  for (unsigned int i = 0; i < gap_size; i++)
-  {
-    reduce_vector->push_back(left_vector->back());
-    left_vector->pop_back();
-  }
-
-  if (left_vector->size() == 0)
-    this->interpolation_complete = true;
-
-  new_todo_range = old_size_left + gap_size;
-
-  this->ocl_cq->enqueueWriteBuffer(
-    this->compute_index_buffers.at(t_sec),
-    CL_TRUE, //blocking
-    (unsigned int) 0,
-    new_todo_range*sizeof(unsigned int),
-    left_vector->data(),
-    NULL,
-    NULL
-  );
-
-  std::unique_lock<std::mutex> rdlock(this->reduce_mutex);
-  this->target_section = t_sec;
-  this->todo_range.at(t_sec) = new_todo_range;
-
-  std::cout<<"new range: " << new_todo_range <<"\n";
-  rdlock.unlock();
-}
 
 //*********************************************************************
 //
@@ -717,14 +550,14 @@ void OclPtxHandler::Interpolate()
   this->ptx_kernel->setArg(6, this->theta_samples_buffer);
   this->ptx_kernel->setArg(7, this->brain_mask_buffer);
 
-  this->ptx_kernel->setArg(8, this->section_size);
+  this->ptx_kernel->setArg(8, this->section_size); // dont need this?
   this->ptx_kernel->setArg(9, this->max_steps);
   this->ptx_kernel->setArg(10, this->sample_nx);
   this->ptx_kernel->setArg(11, this->sample_ny);
   this->ptx_kernel->setArg(12, this->sample_nz);
   this->ptx_kernel->setArg(13, this->sample_ns);
 
-  this->ptx_kernel->setArg(14, this->num_steps);
+  this->ptx_kernel->setArg(14, this->max_steps);
   this->ptx_kernel->setArg(15, this->curvature_threshold);
   // Now I have to write a kernel!!! Yaaaay : )
 
