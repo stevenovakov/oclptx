@@ -248,6 +248,8 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
    }
    else
    {
+      std::cout<<"File included\n";
+      _nParticles = seeds.Nrows();
       if (seeds.Ncols()!=3 && seeds.Nrows()==3)
       {
          seeds=seeds.t();
@@ -258,7 +260,8 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
          seed.x = seeds(t,1);
          seed.y = seeds(t,2);
          seed.z = seeds(t,3);
-         GenerateSeedParticlesHelper(seed, aSampleVoxel);
+         _seedParticles.push_back(seed);
+         //GenerateSeedParticlesHelper(seed, aSampleVoxel);
       }
    }
 }

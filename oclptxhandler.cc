@@ -161,6 +161,7 @@ void OclPtxHandler::ParticlePathsToFile()
     //if (p_steps > 0)
     std::cout<<"Particle " << n << " Steps Taken: " << p_steps <<"\n";
     
+    // took this out for comparison test to ptx2, add back in.
     p_steps += 1;
 
     fprintf(path_file, "[");
