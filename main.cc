@@ -1,19 +1,14 @@
 // Copyright 2014 Jeff Taylor
-//
-// Initialization routines for multi-thread testing.  Goal of this project:
-//  - Check that my mult-CPU reduction model is functional, and optimal.
-//  - Create a testbed for working on alternative ideas.  For example, my
-//    current model does a decent amount of copying, maybe something else
-//    could work?
 
 #include <unistd.h>
 #include <cassert>
 #include <thread>
 
-#include "oclptx/gpu.h"
-#include "oclptx/threading.h"
+#include "gpu.h"
+#include "threading.h"
+#include "particle/col_particle.h"
 
-// Basic log base 2
+// log base 2
 int lb(int x)
 {
   int r = 0;
@@ -29,7 +24,6 @@ int lb(int x)
 // 54 72 36 12 17 42 53 16 873 14 423
 int main(int argc, char **argv)
 {
-  const int kParticlesPerSide = 2;
   const int kStepsPerKernel = 3;
   const int kNumReducers = 2;
 
@@ -39,19 +33,31 @@ int main(int argc, char **argv)
     return -1;
   }
 
-  Fifo<threading::collatz_data> particles(lb(argc-1)+1);
-  struct threading::collatz_data *data;
+  // Add the particles to our list
+  Fifo<particle::particle_data> particles(lb(argc-1)+1);
+  struct particle::particle_data *data;
   for (int i = 1; i < argc; ++i)
   {
-    data = new threading::collatz_data;
-    *data = {(uint64_t) atoi(argv[i]), 0, 0};
+    data = new particle::particle_data;
+    *data = {(uint64_t) atoi(argv[i])};
     particles.PushOrDie(data);
   }
 
-  Gpu gpu(kParticlesPerSide, kStepsPerKernel);
+  // Create our oclenv
+  OclEnv env("collatz");
+
+  struct particle_attrs attrs = {kStepsPerKernel, 0};
+
+  // Create some particle buffers
+  struct particles *gpu_particles = NewParticles(&env, &attrs);
+
+  // Create a new oclptxhandler.
+  OclPtxHandler handler(environment.GetContext(),
+                        environment.GetCq(0),
+                        environment.GetKernel(0));
 
   // Start up the threads.
-  std::thread gpu_manager(threading::RunThreads, &gpu, &particles, kNumReducers);
+  std::thread gpu_manager(threading::RunThreads, &gpu_particles, &handler, &particles, kNumReducers);
   gpu_manager.join();
 
   return 0;

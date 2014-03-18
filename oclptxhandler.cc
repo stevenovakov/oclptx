@@ -450,229 +450,28 @@ void OclPtxHandler::WriteInitialPosToDevice(
   delete[] pos_container;
 }
 
-void OclPtxHandler::DoubleBufferInit(
-  unsigned int particle_interval_size,
-  unsigned int step_interval_size
-)
+void OclPtxHandler::RunCollatzKernel(struct particles *p, int side)
 {
-  this->num_steps = step_interval_size;
-
-  this->particles_size = particle_interval_size;
-  unsigned int interval_mem_size =
-    particle_interval_size*sizeof(unsigned int);
-
-  // first iteration is same size
-  this->todo_range.push_back( step_interval_size );
-  this->todo_range.push_back( step_interval_size );
-
-  std::vector<unsigned int> temp;
-  this->particle_todo.push_back(temp);
-  this->particle_todo.push_back(temp);
-
-  for (unsigned int k=0; k<particle_interval_size; k++)
-  {
-    this->particle_todo.at(0).push_back(
-      this->particle_indeces_left.back());
-    this->particle_indeces_left.pop_back();
-    this->particle_todo.at(1).push_back(
-      this->particle_indeces_left.back());
-    this->particle_indeces_left.pop_back();
-  }
-
-  // Initialize both buffers
-
-  this->compute_index_buffers.push_back(
-    cl::Buffer(
-      *(this->ocl_context),
-      CL_MEM_READ_WRITE,
-      interval_mem_size,
-      NULL,
-      NULL)
-  );
-  this->compute_index_buffers.push_back(
-    cl::Buffer(
-      *(this->ocl_context),
-      CL_MEM_READ_WRITE,
-      interval_mem_size,
-      NULL,
-      NULL)
-  );
-
-  // Copy over initial data to both buffers
-  this->ocl_cq->enqueueWriteBuffer(
-    this->compute_index_buffers.at(0),
-    CL_FALSE,
-    static_cast<unsigned int>(0),
-    interval_mem_size,
-    this->particle_todo.at(0).data(),
-    NULL,
-    NULL
-  );
-
-  this->ocl_cq->enqueueWriteBuffer(
-    this->compute_index_buffers.at(1),
-    CL_FALSE,
-    static_cast<unsigned int>(0),
-    interval_mem_size,
-    this->particle_todo.at(1).data(),
-    NULL,
-    NULL
-  );
-
-  // may not need to do this here, may want to wait to block until
-  // all "initialization" operations are finished.
-  this->ocl_cq->finish();
-
-}
-
-//*********************************************************************
-//
-// OclPtxHandler Reduction
-//
-//*********************************************************************
-
-void OclPtxHandler::ReduceInit(unsigned int particles_per,
-                                std::string reduction_style)
-{
-  // actually might not need this thanks to DoubleBufferInit
-
-}
-
-void OclPtxHandler::Reduce()
-{
-  unsigned int t_sec = this->target_section  & 0x00000000;
-
-  std::vector<unsigned int>* reduce_vector =
-    &(this->particle_todo.at(t_sec));
-  std::vector<unsigned int>* done_vector =
-    &(this->particle_complete);
-  std::vector<unsigned int>* left_vector =
-    &(this->particle_indeces_left);
-
-  unsigned int s_size = this->num_steps;
-
-  unsigned int new_todo_range = 0;
-
-  // first pop all of the finished indeces
-
-  // apparently in CL1.1 + ,
-  // all command queue CALLS are thread safe
-  // std::unique_lock<std::mutex> cqlock(this->cq_mutex);
-
-  this->ocl_cq->enqueueReadBuffer(
-    this->particle_done_buffer,
-    CL_TRUE, // blocking
-    0,
-    this->particle_uint_mem_size,
-    done_vector->data()
-  );
-
-  //cqlock.unlock();
-
-  for (unsigned int i = 0; i < reduce_vector->size(); i++)
-  {
-    if (done_vector->at(i) > 0)
-      reduce_vector->erase(reduce_vector->begin() + i);
-  }
-
-  unsigned int old_size_left = reduce_vector->size();
-  unsigned int particles_left = this->particle_indeces_left.size();
-  unsigned int gap_size = s_size - old_size_left;
-
-  if ( gap_size > particles_left )
-    gap_size = particles_left;
-
-  for (unsigned int i = 0; i < gap_size; i++)
-  {
-    reduce_vector->push_back(left_vector->back());
-    left_vector->pop_back();
-  }
-
-  if (left_vector->size() == 0)
-    this->interpolation_complete = true;
-
-  new_todo_range = old_size_left + gap_size;
-
-  this->ocl_cq->enqueueWriteBuffer(
-    this->compute_index_buffers.at(t_sec),
-    CL_TRUE, //blocking
-    (unsigned int) 0,
-    new_todo_range*sizeof(unsigned int),
-    left_vector->data(),
-    NULL,
-    NULL
-  );
-
-  std::unique_lock<std::mutex> rdlock(this->reduce_mutex);
-  this->target_section = t_sec;
-  this->todo_range.at(t_sec) = new_todo_range;
-  rdlock.unlock();
-}
-
-//*********************************************************************
-//
-// OclPtxHandler Tractography
-//
-//*********************************************************************
-
-void OclPtxHandler::Interpolate()
-{
-  //std::lock_guard<std::mutex> klock(this->kernel_mutex);
-
-  unsigned int t_sec = this->target_section;
-
-  //
-  // Currently Handles single voxel/mask + No other options ONLY
-  //
-
-  cl::NDRange global_range(this->todo_range.at(t_sec));
+  cl::NDRange particles_to_compute(p->attrs->particles_per_side);
+  cl::NDRange particle_offset(p->attrs->particles_per_side * side);
   cl::NDRange local_range(1);
 
-  // the indeces to compute, always first
-  this->ptx_kernel->setArg(0, this->compute_index_buffers.at(t_sec));
-
-  // particle status buffers
-  this->ptx_kernel->setArg(1, this->particle_paths_buffer);
-  this->ptx_kernel->setArg(2, this->particle_steps_taken_buffer);
-  this->ptx_kernel->setArg(3, this->particle_elem_buffer);
-  this->ptx_kernel->setArg(4, this->particle_done_buffer);
-
-  // sample data buffers
-  this->ptx_kernel->setArg(5, this->f_samples_buffer);
-  this->ptx_kernel->setArg(6, this->phi_samples_buffer);
-  this->ptx_kernel->setArg(7, this->theta_samples_buffer);
-  this->ptx_kernel->setArg(8, this->brain_mask_buffer);
-
-  this->ptx_kernel->setArg(9, this->section_size);
-  this->ptx_kernel->setArg(10, this->max_steps);
-  this->ptx_kernel->setArg(11, this->sample_nx);
-  this->ptx_kernel->setArg(12, this->sample_ny);
-  this->ptx_kernel->setArg(13, this->sample_nz);
-  this->ptx_kernel->setArg(14, this->sample_ns);
-
-  this->ptx_kernel->setArg(15, this->num_steps);
-  // Now I have to write a kernel!!! Yaaaay : )
+  this->ptx_kernel->setArg(
+      0,
+      reinterpret_cast<void*>(&p->attrs),
+      sizeof(struct particle_attrs));
+  this->ptx_kernel->setArg(1, p->gpu_data);
+  this->ptx_kernel->setArg(2, p->gpu_status);
+  this->ptx_kernel->setArg(3, p->gpu_path);
 
   this->ocl_cq->enqueueNDRangeKernel(
     *(this->ptx_kernel),
-    cl::NullRange,
-    global_range,
+    particle_offset,
+    particles_to_compute,
     local_range,
     NULL,
-    NULL
-  );
+    NULL);
 
-  // BLOCK
   this->ocl_cq->finish();
 }
 
-
-//*********************************************************************
-//
-// Assorted Functions
-//
-//*********************************************************************
-
-
-
-//EOF

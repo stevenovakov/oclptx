@@ -11,8 +11,15 @@ namespace threading
 {
 
 struct shared_data {
-  struct collatz_data_chunk chunk;  // TODO(jeff) split two directions
+  int chunk_size;  // Amount of space allocated
+  int count;  // Number of occupied elements
+
+  struct particle_data *chunk;
+  cl_bool *status;
+  int *particle_offset;
+  int chunk_offset
   std::mutex data_lock;
+
 
   bool data_ready;
   std::condition_variable data_ready_cv;
@@ -25,7 +32,7 @@ struct shared_data {
 };
 
 // Worker thread.  Controls the GPU.
-void Worker(struct shared_data *p, Gpu *gpu, int num_reducers)
+void Worker(struct shared_data *sdata, OclPtxHandler *handler, struct particles *gpu, int num_reducers)
 {
   // Note, there are two "sides" of GPU memory.  At all times, a kernel must
   // only access the one side.  We must only copy data to and from the
@@ -42,9 +49,9 @@ void Worker(struct shared_data *p, Gpu *gpu, int num_reducers)
       for (int i = 0; i < num_reducers; ++i)
       {
         // Wake up reducers and have them exit.
-        std::unique_lock<std::mutex> lock(p[i].data_lock);
-        p[i].done = true;
-        p[i].data_ready_cv.notify_one();
+        std::unique_lock<std::mutex> lock(sdata[i].data_lock);
+        sdata[i].done = true;
+        sdata[i].data_ready_cv.notify_one();
         lock.unlock();
       }
       return;
@@ -53,24 +60,25 @@ void Worker(struct shared_data *p, Gpu *gpu, int num_reducers)
     has_data_side[inactive_side] = false;
     for (int i = 0; i < num_reducers; ++i)
     {
-      lk[i] = new std::unique_lock<std::mutex>(p[i].data_lock);
-      while (!p[i].reduction_complete)
+      lk[i] = new std::unique_lock<std::mutex>(sdata[i].data_lock);
+      while (!sdata[i].reduction_complete)
       {
-        p[i].reduction_complete_cv.wait_for(*lk[i],
+        sdata[i].reduction_complete_cv.wait_for(*lk[i],
                                             std::chrono::milliseconds(100));
       }
-      p[i].reduction_complete = false;
+      sdata[i].reduction_complete = false;
 
-      if (p[i].has_data)
+      if (sdata[i].has_data)
       {
         has_data_side[inactive_side] = true;
-        gpu->WriteParticles(&p[i].chunk);
+        for (int j = 0; j < sdata[i].count; ++j)
+          WriteParticle(gpu, &sdata[i].chunk[j], sdata[i].particle_offset[j]);
       }
     }
 
-    gpu->WaitForKernel();
+    //gpu->WaitForKernel(); // TODO(jeff) oclptxhandler equiv?
 
-    gpu->RunKernelAsync(inactive_side);
+    handler->RunCollatzKernel(inactive_side);
 
     // Inactive side is now active
     inactive_side = (0 == inactive_side)? 1: 0;
@@ -79,82 +87,81 @@ void Worker(struct shared_data *p, Gpu *gpu, int num_reducers)
     // This is a work-queue style of operation, which is relatively
     // standard, but that's not obvious.  Making it more obvious would greatly
     // improve readability.
-    int leftover_particles = gpu->particles_per_side_ % num_reducers;
-    int offset = gpu->particles_per_side_ * inactive_side;
+    int leftover_particles = particles_per_side(gpu) % num_reducers;
+    int offset = particles_per_side(gpu) * inactive_side;
     int count;
     for (int i = 0; i < num_reducers; ++i)
     {
       // We still have data lock i
-      count = gpu->particles_per_side_ / num_reducers;
+      count = particles_per_side(gpu) / num_reducers;
       if (leftover_particles)
       {
         count++;
         leftover_particles--;
       }
-      gpu->ReadParticles(&p[i].chunk, offset, count);
+      ReadStatus(gpu, offset, count, status); // TODO(jeff) add status
       offset += count;
 
-      p[i].data_ready = true;
-      p[i].data_ready_cv.notify_one();
+      sdata[i].data_ready = true;
+      sdata[i].data_ready_cv.notify_one();
       delete lk[i];
     }
   }
 }
 
-// Reducer thread.
-// TODO(jeff) here: separate IN and OUT.  Having them shared is fairly ugly.
-// I'm really close to having this fixed.
-void Reducer(struct shared_data *p, Fifo<collatz_data> *particles)
+void Reducer(struct shared_data *sdata, Fifo<particle_data> *particles)
 {
-  struct collatz_data *particle;
+  struct particle_data *particle;
   int reduced_count;
 
   while (1)
   {
     // Wait for data to be ready.
-    std::unique_lock<std::mutex> lk(p->data_lock);
-    while (!p->data_ready)
+    std::unique_lock<std::mutex> lk(sdata->data_lock);
+    while (!sdata->data_ready)
     {
-      p->data_ready_cv.wait_for(lk, std::chrono::milliseconds(100));
-      if (p->done)
+      sdata->data_ready_cv.wait_for(lk, std::chrono::milliseconds(100));
+      if (sdata->done)
         return;
     }
-    p->data_ready = false;
+    sdata->data_ready = false;
 
     // Do the actual reduction
     reduced_count = 0;
-    p->has_data = false;
-    for (int i = 0; i < p->chunk.last; i++)
+    sdata->has_data = false;
+    for (int i = 0; i < sdata->count; i++)
     {
-      if (p->chunk.v[i].complete)
+      if (sdata->complete[i])
       {
         // Do something with the finished particle here, if we so desire.
-        // It's "chunk.v[i]".
+        // It's "chunk.v[i]".  Note: the first few particles will be
+        // unprocessed garbage.  I might need to add an extra state to the
+        // status buffer.
 
         // New particle.
         particle = particles->Pop();
         if (!particle)
           break;  // No particles left.
 
-        p->chunk.v[reduced_count] = *particle;
-        p->chunk.v[reduced_count].offset = p->chunk.offset + i;
+        sdata->chunk[reduced_count] = *particle;
+        sdata->particle_offset[reduced_count] = sdata->chunk_offset + i;
         ++reduced_count;
-        p->has_data = true;
+        sdata->has_data = true;
 
         delete particle;
       }
       else
-        p->has_data = true;
+        sdata->has_data = true;
     }
-    p->chunk.last = reduced_count;
+    sdata->count = reduced_count;
 
-    p->reduction_complete = true;
-    p->reduction_complete_cv.notify_one();
+    sdata->reduction_complete = true;
+    sdata->reduction_complete_cv.notify_one();
     lk.unlock();
   }
 }
 
-void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers)
+void RunThreads(struct particles *gpu, OclPtxHandler *handler, Fifo<particle_data> *particles, int num_reducers)
 {
   // Push blank data with complete=1 to reducer.  It will fill it in with
   // particles.
@@ -164,13 +171,11 @@ void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers)
   int offset = 0;
   int count;
   struct threading::shared_data sdata[num_reducers];
-  struct threading::collatz_data *data;
+  struct threading::particle_data *data;
+  cl_bool *status;
+  int *particle_offset;
   for (int i = 0; i < num_reducers; ++i)
   {
-    data = new threading::collatz_data[chunk_size];
-    for (int j = 0; j < chunk_size; ++j)
-      data[j] = {0, 0, 1}; // No data, complete = 1
-
     count = gpu->particles_per_side_ / num_reducers;
     if (leftover_particles)
     {
@@ -178,7 +183,20 @@ void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers)
       leftover_particles--;
     }
 
-    sdata[i].chunk = {data, offset, count, chunk_size};
+    data = new threading::particle_data[chunk_size];
+    status = new cl_bool[chunk_size];
+    particle_offset = new int[chunk_size];
+
+    for (int j = 0; j < chunk_size; ++j)
+      status[j] = true; // complete = 1
+
+    sdata[i].chunk = data;
+    sdata[i].chunk_offset = offset;
+    sdata[i].status = status;
+    sdata[i].particle_offset = particle_offset;
+    sdata[i].count = count;
+    sdata[i].chunk_size = chunk_size;
+
     sdata[i].data_ready = true;
 
     sdata[i].reduction_complete = false;
@@ -194,14 +212,16 @@ void RunThreads(Gpu *gpu, Fifo<collatz_data> *particles, int num_reducers)
   {
     reducers[i] = new std::thread(threading::Reducer, &sdata[i], particles);
   }
-  Worker(sdata, gpu, num_reducers);
+  Worker(sdata, handler, gpu, num_reducers);
 
-
+  // Clean everything up.
   for (int i = 0; i < num_reducers; ++i)
   {
     reducers[i]->join();
     delete reducers[i];
-    delete sdata[i].chunk.v;
+    delete[] sdata[i].particle_offset;
+    delete[] sdata[i].status;
+    delete[] sdata[i].chunk;
   }
 }
 

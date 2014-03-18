@@ -16,7 +16,6 @@ namespace particle
 
     OclEnv *env;
     struct particle_attrs attrs;
-    int num_particles;
   };
 
   struct particle_data
@@ -26,8 +25,9 @@ namespace particle
 
   struct particle_attrs
   {
-    int num_steps;
-  };
+    cl_int num_steps;
+    cl_int particles_per_side;
+  } __attribute__ ((aligned(8)));
 }  // namespace particle
 
 #endif  // COL_PARTICLE_H_

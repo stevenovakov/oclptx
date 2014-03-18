@@ -87,31 +87,7 @@ class OclPtxHandler{
     // may want to compute offset beforehand in samplemanager,
     // can decide later.
 
-    void WriteInitialPosToDevice( const float4* initial_positions,
-                                  const int4* initial_elem,
-                                  unsigned int nparticles,
-                                  unsigned int max_steps,
-                                  unsigned int ndevices,
-                                  unsigned int device_num
-                                );
-
-    void DoubleBufferInit(  unsigned int particle_interval_size,
-                            unsigned int step_interval_size
-                          );
-    //
-    // Reduction
-    //
-
-    void ReduceInit(  unsigned int particles_per,
-                      std::string reduction_style); //ran once only.
-    void Reduce();
-
-    //
-    // Interpolation
-    //
-
     void Interpolate();
-
 
   private:
     //

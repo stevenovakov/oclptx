@@ -38,6 +38,8 @@ void WriteParticle(struct particles *p, struct particle_data *data, int offset);
 // Read the "completion" buffer back into the vector pointed to by ret.
 void ReadStatus(struct particles *p, int offset, int count, cl_bool *ret);
 
+int particles_per_side(struct particles *p);
+
 void DumpPath(struct particles *p, int offset, int count, FILE *fd);
 
 }  // namespace particle
