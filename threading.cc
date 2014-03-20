@@ -15,7 +15,7 @@ struct shared_data {
   int count;  // Number of occupied elements
 
   struct particle_data *chunk;
-  cl_bool *status;
+  cl_bool *complete;
   int *particle_offset;
   int chunk_offset
   std::mutex data_lock;
@@ -99,7 +99,7 @@ void Worker(struct shared_data *sdata, OclPtxHandler *handler, struct particles 
         count++;
         leftover_particles--;
       }
-      ReadStatus(gpu, offset, count, status); // TODO(jeff) add status
+      ReadStatus(gpu, offset, count, sdata[i].complete); // TODO(jeff) add status
       offset += count;
 
       sdata[i].data_ready = true;
@@ -165,25 +165,25 @@ void RunThreads(struct particles *gpu, OclPtxHandler *handler, Fifo<particle_dat
 {
   // Push blank data with complete=1 to reducer.  It will fill it in with
   // particles.
-  int leftover_particles = gpu->particles_per_side_ % num_reducers;
-  int chunk_size = gpu->particles_per_side_ / num_reducers + 1;
+  int leftover_particles = particles_per_side(gpu) % num_reducers;
+  int chunk_size = particles_per_side(gpu) / num_reducers + 1;
 
   int offset = 0;
   int count;
-  struct threading::shared_data sdata[num_reducers];
-  struct threading::particle_data *data;
+  struct shared_data sdata[num_reducers];
+  struct particle::particle_data *data;
   cl_bool *status;
   int *particle_offset;
   for (int i = 0; i < num_reducers; ++i)
   {
-    count = gpu->particles_per_side_ / num_reducers;
+    count = particles_per_side(gpu) / num_reducers;
     if (leftover_particles)
     {
       count++;
       leftover_particles--;
     }
 
-    data = new threading::particle_data[chunk_size];
+    data = new particle::particle_data[chunk_size];
     status = new cl_bool[chunk_size];
     particle_offset = new int[chunk_size];
 
@@ -192,7 +192,7 @@ void RunThreads(struct particles *gpu, OclPtxHandler *handler, Fifo<particle_dat
 
     sdata[i].chunk = data;
     sdata[i].chunk_offset = offset;
-    sdata[i].status = status;
+    sdata[i].complete = status;
     sdata[i].particle_offset = particle_offset;
     sdata[i].count = count;
     sdata[i].chunk_size = chunk_size;
@@ -210,7 +210,7 @@ void RunThreads(struct particles *gpu, OclPtxHandler *handler, Fifo<particle_dat
   std::thread *reducers[num_reducers];
   for (int i = 0; i < num_reducers; ++i)
   {
-    reducers[i] = new std::thread(threading::Reducer, &sdata[i], particles);
+    reducers[i] = new std::thread(Reducer, &sdata[i], particles);
   }
   Worker(sdata, handler, gpu, num_reducers);
 
@@ -220,7 +220,7 @@ void RunThreads(struct particles *gpu, OclPtxHandler *handler, Fifo<particle_dat
     reducers[i]->join();
     delete reducers[i];
     delete[] sdata[i].particle_offset;
-    delete[] sdata[i].status;
+    delete[] sdata[i].complete;
     delete[] sdata[i].chunk;
   }
 }

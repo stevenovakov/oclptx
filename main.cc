@@ -4,9 +4,11 @@
 #include <cassert>
 #include <thread>
 
-#include "gpu.h"
+#include "fifo.h"
+#include "oclenv.h"
+#include "oclptxhandler.h"
 #include "threading.h"
-#include "particle/col_particle.h"
+#include "collatz_particle.h"
 
 // log base 2
 int lb(int x)
