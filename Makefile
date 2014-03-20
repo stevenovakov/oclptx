@@ -1,13 +1,6 @@
-# NOTE
-# Based off of Makefile of ptx2
-#
-# -std=c++0x is required for using:
-#		<thread>	<chrono>	<mutex>
-#
-
 include $(FSLCONFDIR)/default.mk
 
-PROJNAME =fdt
+PROJNAME=fdt
 
 DBGFLAGS=-g -O0
 USRCXXFLAGS=-std=c++0x -MMD -MP
@@ -19,6 +12,7 @@ LIB_OPENCL=/opt/AMD-APP-SDK-v2.8-RC-lnx64/lib/x86_64
 #INC_OPENCL=/usr/local/cuda-5.5/include
 INC_OPENCL=/opt/AMD-APP-SDK-v2.8-RC-lnx64/include
 
+USRINCFLAGS = -I${INC_NEWMAT} -I${INC_NEWRAN} -I${INC_CPROB} -I${INC_PROB} -I${INC_BOOST} -I${INC_ZLIB} -I${INC_OPENCL} -I..
 USRLDFLAGS = -L${LIB_NEWMAT} -L${LIB_NEWRAN} -L${LIB_CPROB} -L${LIB_PROB} -L${LIB_ZLIB} -L${LIB_OPENCL}
 
 DLIBS =	-lwarpfns -lbasisfield -lfslsurface	-lfslvtkio -lmeshclass -lnewimage -lutils -lmiscmaths -lnewmat -lnewran -lfslio -lgiftiio -lexpat -lfirst_lib -lniftiio -lznz -lcprob -lutils -lprob -lm -lz -lOpenCL
