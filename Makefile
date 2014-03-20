@@ -45,7 +45,8 @@ ${RNGTEST}: ${RNGTESTOBJ}
 ${FIFOTEST}: ${FIFOTESTOBJ}
 	${CXX} ${CXXFLAGS} ${LDFLAGS} -o $@ $^ ${DLIBS}
 
-lint: *.cc *.h *.cl
-	bash -c 'python cpplint.py --extensions=cc,h,cl --filter=-whitespace/braces $^ > lint 2>&1'
+.PHONY: lint
+lint:
+	bash -c 'python cpplint.py --extensions=cc,h,cl --filter=-whitespace/braces `find ./ -name \*.h -o -name \*.cc -o -name \*.cl` > lint 2>&1'
 
 -include $(OCLPTXOBJ:%.o=%.d)
