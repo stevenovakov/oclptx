@@ -256,6 +256,10 @@ cl::Program OclEnv::CreateProgram()
   {
     source_list.push_back(fold + slash + "basic.cl");
   }
+  else if (this->ocl_routine_name == "standard")
+  {
+    source_list.push_back(fold + slash + "interpolate.cl");
+  }
 
   for (sit = source_list.begin(); sit != source_list.end(); ++sit)
   {
@@ -345,6 +349,12 @@ cl::Program OclEnv::CreateProgram()
     {
       this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
                                                 "BasicInterpolate",
+                                                NULL));
+    }
+        else if (this->ocl_routine_name == "standard" )
+    {
+      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
+                                                "OclPtxInterpolate",
                                                 NULL));
     }
   }

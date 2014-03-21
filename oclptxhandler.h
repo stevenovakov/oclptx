@@ -67,7 +67,7 @@ class OclPtxHandler{
     // Set/Get
     //
 
-    void ParticlePathsToFile();   // do at end
+    void ParticlePathsToFile(std::string filename = "");   // do at end
 
     bool IsFinished(){ return this->interpolation_complete; };
     
@@ -82,7 +82,7 @@ class OclPtxHandler{
     //
     // void Initialize()
 
-    void WriteSamplesToDevice( const BedpostXData* f_data,
+    void WriteSamplesToDevice(  const BedpostXData* f_data,
                                 const BedpostXData* phi_data,
                                 const BedpostXData* theta_data,
                                 unsigned int num_directions,
@@ -99,6 +99,10 @@ class OclPtxHandler{
                                 );
                                 
     void SingleBufferInit();
+
+    void PrngInit();
+
+    void BlockCq(){this->ocl_cq->finish();};
     //
     // Reduction
     //
@@ -162,6 +166,7 @@ class OclPtxHandler{
 
     cl::Buffer particle_paths_buffer;
     cl::Buffer particle_steps_taken_buffer;
+    cl::Buffer particle_rng_buffer;
 
     cl::Buffer particle_done_buffer;
     //cl:Buffer particle_waypoint_buffer;

@@ -37,7 +37,10 @@
 #include <vector>
 #include <mutex>
 
+#include <assert.h>
+#include <fcntl.h>
 #include <stdio.h>
+#include <unistd.h>
 //#include <mutex>
 //#include <thread>
 
@@ -54,10 +57,13 @@
 
 #include "oclptxhandler.h"
 
+typedef cl_ulong8 rng_t;
+
 //
 // Assorted Functions Declerations
 //
-
+uint64_t rand_64();
+int init_rng(rng_t* rng, int seed, int count);
 
 //*********************************************************************
 //
@@ -103,7 +109,7 @@ OclPtxHandler::~OclPtxHandler()
 //
 //*********************************************************************
 
-void OclPtxHandler::ParticlePathsToFile()
+void OclPtxHandler::ParticlePathsToFile(std::string path_filename)
 {
   float4 * particle_paths;
   particle_paths =
@@ -133,26 +139,11 @@ void OclPtxHandler::ParticlePathsToFile()
 
   FILE * path_file;
 
-  std::ostringstream convert(std::ostringstream::ate);
-  std::string path_filename;
+  std::vector<float> temp_x, temp_y, temp_z;
 
-  std::vector<float> temp_x;
-  std::vector<float> temp_y;
-  std::vector<float> temp_z;
-
-  time_t t = time(0);
-  struct tm * now = localtime(&t);
-
-  convert << "OclPtx Results/"<< now->tm_yday << "-" <<
-    static_cast<int>(now->tm_year) + 1900 << "_"<< now->tm_hour <<
-      ":" << now->tm_min << ":" << now->tm_sec;
-
-  path_filename = convert.str() + "_PATHS.dat";
   std::cout << "Writing to " << path_filename << "\n";
 
   path_file = fopen(path_filename.c_str(), "wb");
-
-  fprintf(path_file, "[");
 
   for (unsigned int n = 0; n < this->section_size; n++)
   {
@@ -191,8 +182,6 @@ void OclPtxHandler::ParticlePathsToFile()
     if (n < this->n_particles -1)
       fprintf(path_file, ",\n");
   }
-
-  fprintf(path_file, "]");
 
   fclose(path_file);
   delete[] particle_paths;
@@ -244,12 +233,12 @@ void OclPtxHandler::WriteSamplesToDevice(
   this->sample_ns = f_data->ns;
 
   // diagnostics
-  std::cout<<"Brain Mem Size: "<< brain_mem_size <<"\n";
-  std::cout<<"Samples Size: "<< single_direction_mem_size << "\n";
-  std::cout<<"Nx : " << this->sample_nx <<"\n";
-  std::cout<<"Ny : " << this->sample_ny <<"\n";
-  std::cout<<"Nz : " << this->sample_nz <<"\n";
-  std::cout<<"Ns : " << this->sample_ns <<"\n";
+  // std::cout<<"Brain Mem Size: "<< brain_mem_size <<"\n";
+  // std::cout<<"Samples Size: "<< single_direction_mem_size << "\n";
+  // std::cout<<"Nx : " << this->sample_nx <<"\n";
+  // std::cout<<"Ny : " << this->sample_ny <<"\n";
+  // std::cout<<"Nz : " << this->sample_nz <<"\n";
+  // std::cout<<"Ns : " << this->sample_ns <<"\n";
   // diagnostics
 
   this->f_samples_buffer =
@@ -338,7 +327,7 @@ void OclPtxHandler::WriteSamplesToDevice(
 
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
-  this->ocl_cq->finish();
+  //this->ocl_cq->finish();
 }
 
 void OclPtxHandler::WriteInitialPosToDevice(
@@ -359,6 +348,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
   unsigned int path_mem_size =
     this->section_size*this->particle_path_size*sizeof(float4);
   unsigned int path_steps_mem_size = this->section_size*sizeof(unsigned int);
+
   this->particle_uint_mem_size = path_steps_mem_size;
   this->particles_mem_size = path_mem_size;
 
@@ -387,13 +377,13 @@ void OclPtxHandler::WriteInitialPosToDevice(
     this->particle_complete.push_back(static_cast<unsigned int>(0));
   }
 
-  std::cout<<"Sec Size: "<< this->section_size <<"\n";
-  std::cout<<"N Particles: " << this->n_particles <<"\n";
-  std::cout<<"Max Steps: " << this->max_steps <<"\n";
-  std::cout<<"Particle Steps Mem Size: "<<
-    this->particle_uint_mem_size<<"\n";
-  std::cout<<"Particle Paths Mem Size: " <<
-    this->particles_mem_size<<"\n";
+  // std::cout<<"Sec Size: "<< this->section_size <<"\n";
+  // std::cout<<"N Particles: " << this->n_particles <<"\n";
+  // std::cout<<"Max Steps: " << this->max_steps <<"\n";
+  // std::cout<<"Particle Steps Mem Size: "<<
+  //   this->particle_uint_mem_size<<"\n";
+  // std::cout<<"Particle Paths Mem Size: " <<
+  //   this->particles_mem_size<<"\n";
 
   this->particle_paths_buffer =
     cl::Buffer(
@@ -458,9 +448,54 @@ void OclPtxHandler::WriteInitialPosToDevice(
   this->total_gpu_mem_size += path_mem_size + 2*path_steps_mem_size;
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
-  this->ocl_cq->finish();
+  //this->ocl_cq->finish();
 
   delete[] pos_container;
+}
+
+void OclPtxHandler::PrngInit()
+{
+  std::cout<< "test: " << sizeof(cl_ulong8) <<"\n";
+
+  unsigned int path_rng_mem_size = this->section_size * sizeof(cl_ulong8);
+
+  std::cout<<"Path rng size " << path_rng_mem_size <<"\n";
+// segfault here wtf...
+  
+  rng_t *rng = new rng_t[this->section_size];
+
+  // TODO @STEVE
+  // Use for now, for testing, replace with user seed options later
+  int seed = time(NULL);
+
+  init_rng(rng, seed, this->section_size);
+
+  std::cout<<"create\n";
+  this->particle_rng_buffer =
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_WRITE,
+      path_rng_mem_size,
+      NULL,
+      NULL
+    );
+
+  std::cout<<"write\n";
+  this->ocl_cq->enqueueWriteBuffer(
+    this->particle_rng_buffer,
+    CL_FALSE,
+    static_cast<unsigned int>(0),
+    path_rng_mem_size,
+    rng,
+    NULL,
+    NULL
+  );
+
+  this->total_gpu_mem_size += path_rng_mem_size;
+
+  delete[] rng;
+
+  //this->ocl_cq->finish();
 }
 
 
@@ -508,7 +543,7 @@ void OclPtxHandler::SingleBufferInit()
 
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
-  this->ocl_cq->finish();
+  //this->ocl_cq->finish();
 }
 
 //*********************************************************************
@@ -544,14 +579,14 @@ void OclPtxHandler::Interpolate()
   this->ptx_kernel->setArg(1, this->particle_paths_buffer);
   this->ptx_kernel->setArg(2, this->particle_steps_taken_buffer);
   this->ptx_kernel->setArg(3, this->particle_done_buffer);
+  this->ptx_kernel->setArg(4, this->particle_rng_buffer);
 
   // sample data buffers
-  this->ptx_kernel->setArg(4, this->f_samples_buffer);
-  this->ptx_kernel->setArg(5, this->phi_samples_buffer);
-  this->ptx_kernel->setArg(6, this->theta_samples_buffer);
-  this->ptx_kernel->setArg(7, this->brain_mask_buffer);
+  this->ptx_kernel->setArg(5, this->f_samples_buffer);
+  this->ptx_kernel->setArg(6, this->phi_samples_buffer);
+  this->ptx_kernel->setArg(7, this->theta_samples_buffer);
+  this->ptx_kernel->setArg(8, this->brain_mask_buffer);
 
-  this->ptx_kernel->setArg(8, this->section_size); // dont need this?
   this->ptx_kernel->setArg(9, this->max_steps);
   this->ptx_kernel->setArg(10, this->sample_nx);
   this->ptx_kernel->setArg(11, this->sample_ny);
@@ -582,6 +617,43 @@ void OclPtxHandler::Interpolate()
 //
 //*********************************************************************
 
+uint64_t rand_64()
+{
+  // Assumption: rand() gives at least 16 bits.  It gives 31 on my system.
+  assert(RAND_MAX >= (1<<16));
 
+  uint64_t a,b,c,d;
+  a = rand() & ((1<<16)-1);
+  b = rand() & ((1<<16)-1);
+  c = rand() & ((1<<16)-1);
+  d = rand() & ((1<<16)-1);
+
+  uint64_t r = ((a << (16*3)) | (b << (16*2)) | (c << (16)) | d);
+
+  return r;
+}
+
+int init_rng(rng_t* rng, int seed, int count)
+{
+  // TODO
+  // Hmm, not sure how to use this to cleanly exit the program yet,
+  //
+  // if (RAND_MAX < (1<<16)) {
+  //   puts("RAND_MAX is too small");
+  //   return -1;
+  // }
+
+  srand(seed);
+
+  uint64_t init;
+  for (int i = 0; i < count; ++i)
+    for (int j = 0; j < 5; j++)
+    {
+      init = rand_64();
+      rng[i].s[j] = init;
+    }
+
+  return 0;
+}
 
 //EOF

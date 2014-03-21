@@ -32,6 +32,9 @@
 #ifndef  OCLPTX_OCLPTX_H_
 #define  OCLPTX_OCLPTX_H_
 
+#include <stdio.h>
+#include <time.h>
+
 #include "oclenv.h"
 #include "oclptxhandler.h"
 #include "samplemanager.h"

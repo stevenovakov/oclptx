@@ -56,7 +56,7 @@ void SimpleInterpolationTest( cl::Context * ocl_context,
                               cl::Kernel * test_kernel
                             );
 
-std::string DetermineKernel(); //args undetermined yet
+std::string GenerateSaveFile();
 
 //*********************************************************************
 //
@@ -158,47 +158,97 @@ int main(int argc, char *argv[] )
     // somwhere in here, this should initialize, based on s_manager
     // actions:
     //
-    OclEnv environment("basic");
+    OclEnv environment("standard");
     unsigned int n_devices = environment.HowManyDevices();
     //
     // and then (this is a naive, "serial" implementation;
     //
 
-    OclPtxHandler handler(environment.GetContext(),
-                          environment.GetCq(0),
-                          environment.GetKernel(0),
-                          curvature_threshold);
+    std::cout<<"Using " << n_devices << " Devices\n";
 
-    std::cout<<"init done\n";
-    handler.WriteSamplesToDevice( f_data,
-                                  phi_data,
-                                  theta_data,
-                                  static_cast<unsigned int>(1),
-                                  brain_mask);
-    std::cout<<"samples done\n";
-    handler.WriteInitialPosToDevice(  initial_positions,
-                                      n_particles,
-                                      max_steps,
-                                      n_devices,
-                                      static_cast<unsigned int>(0));
-    std::cout<<"pos done\n";
-    handler.SingleBufferInit();
-    //handler.DoubleBufferInit( n_particles/2, max_steps);
-    std::cout<<"dbuff done\n";
+    std::vector<OclPtxHandler*> handlers;
 
-    std::cout<<"Total GPU Memory Allocated (MB): "<<
-      handler.GpuMemUsed()/1e6 << "\n";
+    for (unsigned int d = 0; d < n_devices; d++)
+    {
+      std::cout<<"Device " << d <<"\n";
+
+      handlers.push_back(
+        new OclPtxHandler(environment.GetContext(),
+                          environment.GetCq(d),
+                          environment.GetKernel(d),
+                          curvature_threshold));
+
+      std::cout<<"\tinit done\n";
+      handlers.back()->WriteSamplesToDevice(
+                                    f_data,
+                                    phi_data,
+                                    theta_data,
+                                    static_cast<unsigned int>(1),
+                                    brain_mask);
+      std::cout<<"\tsamples done\n";
+      handlers.back()->WriteInitialPosToDevice(
+                                        initial_positions,
+                                        n_particles,
+                                        max_steps,
+                                        n_devices,
+                                        d);
+      std::cout<<"\tpos done\n";
+      handlers.back()->PrngInit();
+      std::cout<<"\tPrng Done\n";
+      handlers.back()->SingleBufferInit();
+      //handler.DoubleBufferInit( n_particles/2, max_steps);
+      std::cout<<"\tdbuff done\n";
+    }
+
+    for (unsigned int d = 0; d < n_devices; d++)
+    {
+      handlers.at(d)->BlockCq();
+    }
+
+    for (unsigned int d = 0; d < n_devices; d++)
+    {
+      std::cout<<"Device " << d << ", Total GPU Memory Allocated (MB): "<<
+        handlers.at(d)->GpuMemUsed()/1e6 << "\n";
+    }
+
     std::cout<<"Press Any Button To Continue...\n";
     std::cin.get();
 
-    handler.Interpolate();
-    std::cout<<"interp done\n";
+    for (unsigned int d = 0; d < n_devices; d++)
+    {
+      handlers.at(d)->Interpolate();
+      std::cout<<"Device " << d << ", interp done\n";
+    }
     //handler.Reduce();
     //std::cout<<"reduce done\n";
     //handler.Interpolate();
     //std::cout<<"interp done\n";
+    std::string path_filename = GenerateSaveFile();
+    FILE * path_file;
+    path_file = fopen(path_filename.c_str(), "wb");
+    fprintf(path_file, "[");
+    fclose(path_file);
 
-    handler.ParticlePathsToFile();
+    for (unsigned int d = 0; d < n_devices; d++)
+    {
+      handlers.at(d)->ParticlePathsToFile(path_filename);
+
+      if( d < n_devices - 1)
+      {
+        path_file = fopen(path_filename.c_str(), "wb");
+        fprintf(path_file, ",\n");
+        fclose(path_file);
+      }
+    }
+
+    path_file = fopen(path_filename.c_str(), "wb");
+    fprintf(path_file, "]");
+    fclose(path_file);
+
+    for (unsigned int d = 0; d < n_devices; d++)
+    {
+      delete handlers.at(d);
+    }
 
     delete[] brain_mask;
     //delete[] test_point;
@@ -213,10 +263,28 @@ int main(int argc, char *argv[] )
 // Assorted Functions
 //
 //*********************************************************************
-std::string DetermineKernel()
+std::string GenerateSaveFile()
 {
-  return std::string("interptest");
+  std::ostringstream convert(std::ostringstream::ate);
+  std::string path_filename;
+
+  std::vector<float> temp_x;
+  std::vector<float> temp_y;
+  std::vector<float> temp_z;
+
+  time_t t = time(0);
+  struct tm * now = localtime(&t);
+
+  convert << "OclPtx Results/"<< now->tm_yday << "-" <<
+    static_cast<int>(now->tm_year) + 1900 << "_"<< now->tm_hour <<
+      ":" << now->tm_min << ":" << now->tm_sec;
+
+  path_filename = convert.str() + "_PATHS.dat";
+
+  return path_filename;
 }
+
+
 
 void SimpleInterpolationTest( cl::Context* ocl_context,
                               cl::CommandQueue* cq,
