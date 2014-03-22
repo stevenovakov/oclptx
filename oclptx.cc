@@ -235,13 +235,13 @@ int main(int argc, char *argv[] )
 
       if( d < n_devices - 1)
       {
-        path_file = fopen(path_filename.c_str(), "wb");
+        path_file = fopen(path_filename.c_str(), "ab");
         fprintf(path_file, ",\n");
         fclose(path_file);
       }
     }
 
-    path_file = fopen(path_filename.c_str(), "wb");
+    path_file = fopen(path_filename.c_str(), "ab");
     fprintf(path_file, "]");
     fclose(path_file);
 

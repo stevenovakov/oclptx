@@ -32,17 +32,13 @@
 
 
 #include <iostream>
-#include <fstream>
-#include <sstream>
+#include <cstdlib>
 #include <vector>
-#include <mutex>
 
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
-//#include <mutex>
-//#include <thread>
 
 
 #define __CL_ENABLE_EXCEPTIONS
@@ -57,13 +53,11 @@
 
 #include "oclptxhandler.h"
 
-typedef cl_ulong8 rng_t;
-
 //
 // Assorted Functions Declerations
 //
 uint64_t rand_64();
-int init_rng(rng_t* rng, int seed, int count);
+int init_rng(cl_ulong8* rng, int seed, int count);
 
 //*********************************************************************
 //
@@ -141,16 +135,16 @@ void OclPtxHandler::ParticlePathsToFile(std::string path_filename)
 
   std::vector<float> temp_x, temp_y, temp_z;
 
-  std::cout << "Writing to " << path_filename << "\n";
+  printf("Writing to %s\n", path_filename.c_str());
 
-  path_file = fopen(path_filename.c_str(), "wb");
+  path_file = fopen(path_filename.c_str(), "ab");
 
   for (unsigned int n = 0; n < this->section_size; n++)
   {
     unsigned int p_steps = particle_steps[n];
 
     //if (p_steps > 0)
-    std::cout<<"Particle " << n << " Steps Taken: " << p_steps <<"\n";
+    printf("Particle: %d, Steps Taken: %d\n", n, p_steps);
     
     // took this out for comparison test to ptx2, add back in.
     p_steps += 1;
@@ -327,7 +321,7 @@ void OclPtxHandler::WriteSamplesToDevice(
 
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
-  //this->ocl_cq->finish();
+  this->ocl_cq->finish();
 }
 
 void OclPtxHandler::WriteInitialPosToDevice(
@@ -448,21 +442,22 @@ void OclPtxHandler::WriteInitialPosToDevice(
   this->total_gpu_mem_size += path_mem_size + 2*path_steps_mem_size;
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
-  //this->ocl_cq->finish();
+  this->ocl_cq->finish();
 
   delete[] pos_container;
 }
 
 void OclPtxHandler::PrngInit()
 {
-  std::cout<< "test: " << sizeof(cl_ulong8) <<"\n";
+  printf("test: %lu\n", sizeof(cl_ulong8));
+  printf("test2: %u\n", this->section_size);
 
-  unsigned int path_rng_mem_size = this->section_size * sizeof(cl_ulong8);
+  unsigned int path_rng_mem_size = this->section_size *
+    static_cast<unsigned int>(sizeof(cl_ulong8));
 
-  std::cout<<"Path rng size " << path_rng_mem_size <<"\n";
-// segfault here wtf...
+  printf("Path rng size: %u \n", path_rng_mem_size);
   
-  rng_t *rng = new rng_t[this->section_size];
+  cl_ulong8 *rng = new cl_ulong8[this->section_size];
 
   // TODO @STEVE
   // Use for now, for testing, replace with user seed options later
@@ -470,7 +465,7 @@ void OclPtxHandler::PrngInit()
 
   init_rng(rng, seed, this->section_size);
 
-  std::cout<<"create\n";
+  printf("create\n");
   this->particle_rng_buffer =
     cl::Buffer(
       *(this->ocl_context),
@@ -495,7 +490,9 @@ void OclPtxHandler::PrngInit()
 
   delete[] rng;
 
-  //this->ocl_cq->finish();
+  // may not need to do this here, may want to wait to block until
+  // all "initialization" operations are finished.
+  this->ocl_cq->finish();
 }
 
 
@@ -543,7 +540,7 @@ void OclPtxHandler::SingleBufferInit()
 
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
-  //this->ocl_cq->finish();
+  this->ocl_cq->finish();
 }
 
 //*********************************************************************
@@ -633,7 +630,7 @@ uint64_t rand_64()
   return r;
 }
 
-int init_rng(rng_t* rng, int seed, int count)
+int init_rng(cl_ulong8* rng, int seed, int count)
 {
   // TODO
   // Hmm, not sure how to use this to cleanly exit the program yet,
