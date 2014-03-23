@@ -34,9 +34,6 @@
 
 #include <iostream>
 #include <vector>
-#include <mutex>
-//#include <thread>
-//#include <mutex>
 
 #define __CL_ENABLE_EXCEPTIONS
 // adds exception support from CL libraries
@@ -129,6 +126,13 @@ class OclPtxHandler{
     cl::Kernel* ptx_kernel;
     
     unsigned int total_gpu_mem_size;
+
+    //
+    // Environment
+    //
+
+    EnvironmentData env_dat;
+
     //
     // BedpostX Data
     //
@@ -188,12 +192,6 @@ class OclPtxHandler{
     std::vector< std::vector<unsigned int> > particle_todo;
     // NDRange of current pair of enqueueNDRangeKernel
     std::vector<unsigned int> todo_range;
-
-    // mutex for reduction/interpolation conflicts on local objects
-    std::mutex reduce_mutex;
-    // mutex for kernel
-    std::mutex kernel_mutex;
-    // mutex for command queue access
 
     // which half of particle_indeces/particle_complete needs to be
     // interpolated next (either 0, or 1)

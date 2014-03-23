@@ -439,5 +439,33 @@ std::string OclEnv::OclErrorStrings(cl_int error)
   return cl_error_string[ -1*error];
 }
 
+//*********************************************************************
+//
+// Resource Allocation
+//
+//*********************************************************************
+
+int OclEnv::AvailableGPUMem(EnvironmentData * env_data)
+{
+  cl_ulong max_buff_size;
+  cl_ulong gl_mem_size;
+
+  std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
+
+  dit->getInfo(CL_DEVICE_MAX_MEM_ALLOC_SIZE, &max_buff_size);
+  env_data->max_buffer_size = max_buff_size;
+
+  dit->getInfo(CL_DEVICE_GLOBAL_MEM_SIZE, &max_buff_size);
+  env_data->global_mem_size = max_buff_size;
+
+  return 0;
+}
+
+
+void OclEnv::AllocateSamples()
+{
+
+  
+}
 
 //EOF

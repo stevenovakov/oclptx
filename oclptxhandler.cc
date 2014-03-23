@@ -72,7 +72,8 @@ OclPtxHandler::OclPtxHandler(
     cl::Context* cc,
     cl::CommandQueue* cq,
     cl::Kernel* ck,
-    float curv_thresh
+    float curv_thresh,
+    EnvironmentData env
 )
 {
   this->interpolation_complete = false;
@@ -85,6 +86,8 @@ OclPtxHandler::OclPtxHandler(
   this->curvature_threshold = curv_thresh;
 
   this->total_gpu_mem_size = 0;
+
+  this->env_dat = env;
 }
 
 
@@ -606,7 +609,6 @@ void OclPtxHandler::Interpolate()
   // BLOCK
   this->ocl_cq->finish();
 }
-
 
 //*********************************************************************
 //

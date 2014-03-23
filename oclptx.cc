@@ -87,9 +87,6 @@ int main(int argc, char *argv[] )
   }
   else
   {
-    //int countAll = 0;
-    //int countNonZero = 0;
-
     s_manager.ParseCommandLine(argc, argv);
 
     const BedpostXData* f_data = s_manager.GetFDataPtr();
@@ -99,159 +96,120 @@ int main(int argc, char *argv[] )
     unsigned int n_particles = s_manager.GetNumParticles();
     unsigned int max_steps = s_manager.GetNumMaxSteps();
 
+    // do not calld delete[] on
     const float4* initial_positions =
       s_manager.GetSeedParticles()->data();
       
     const unsigned short int* brain_mask =
       s_manager.GetBrainMaskToArray();
     
-    // float4 * test_point = new float4[n_particles];
-    // for( unsigned int i = 0; i < n_particles; i++ )
-    // {
-    //   test_point[i].x = 52.0;
-    //   test_point[i].y = 52.0;
-    //   test_point[i].z = 34.0;
-    // }
-    
     // TODO get curv thresh from sample manager
     float curvature_threshold = 0.2;
       
-    //for(unsigned int t = 1; t < theta_data->ns; t++)
-    //{
-    //unsigned int nx, ny, nz;
-    
-    //nx = theta_data->nx;
-    //ny = theta_data->ny;
-    //nz = theta_data->nz;
-    
-    //std::cout<<"Data, Mask Tests: \n";
-    //for (unsigned int x = 45; x<55; x++)
-    //{
-      //for (unsigned int y=45; y<55; y++)
-      //{
-        //for (unsigned int z=25; z<35; z++)
-        //{
-          //unsigned short int bmask =
-            //brain_mask[ x*(ny*nz) + y*nz + z];
-          
-          //std::cout<<"("<<x<<","<<y<<","<<z<<"): "<< bmask<<"\n";
-        //}
-      //}
-    //}
-    
-    //std::cout<<"BMaskTest: "<< s_manager.GetBrainMask( 51,51,30) <<"\n";
-    //std::cout<<"FTest: "<< s_manager.GetfData(0, 0, 51,51,30) <<"\n";
-    //std::cout<<"ThetaTest: "<< s_manager.GetThetaData(0, 0, 51,51,29) <<"\n";
-    //std::cout<<"PhiTest: "<< s_manager.GetPhiData(0, 0, 51,51,29) <<"\n";
-    //}
-
-    //std::cin.get();
-
-    // Access this array like so for a given x,y,z:
-    // seedMask[z*seedMaskVol.xsize()*seedMaskVol.ysize() +
-    //   y*seedMaskVol.zsize() + x]
-
-
-    //cout<<"Count of All Data = "<<countAll<<endl;
-    //cout<<"Count of Non Zero Data = "<<countNonZero<<endl;
-
-    // somwhere in here, this should initialize, based on s_manager
-    // actions:
-    //
     OclEnv environment("standard");
     unsigned int n_devices = environment.HowManyDevices();
-    //
-    // and then (this is a naive, "serial" implementation;
-    //
 
-    std::cout<<"Using " << n_devices << " Devices\n";
+    int enough_mem;
+    enough_mem = environment.AvailableGPUMem(); // will pass args later
 
-    std::vector<OclPtxHandler*> handlers;
-
-    for (unsigned int d = 0; d < n_devices; d++)
+    if (enough_mem < 0)
     {
-      std::cout<<"Device " << d <<"\n";
-
-      handlers.push_back(
-        new OclPtxHandler(environment.GetContext(),
-                          environment.GetCq(d),
-                          environment.GetKernel(d),
-                          curvature_threshold));
-
-      std::cout<<"\tinit done\n";
-      handlers.back()->WriteSamplesToDevice(
-                                    f_data,
-                                    phi_data,
-                                    theta_data,
-                                    static_cast<unsigned int>(1),
-                                    brain_mask);
-      std::cout<<"\tsamples done\n";
-      handlers.back()->WriteInitialPosToDevice(
-                                        initial_positions,
-                                        n_particles,
-                                        max_steps,
-                                        n_devices,
-                                        d);
-      std::cout<<"\tpos done\n";
-      handlers.back()->PrngInit();
-      std::cout<<"\tPrng Done\n";
-      handlers.back()->SingleBufferInit();
-      //handler.DoubleBufferInit( n_particles/2, max_steps);
-      std::cout<<"\tdbuff done\n";
+      printf("Insufficient GPU Memory: Terminating Program\n\n";)
     }
-
-    for (unsigned int d = 0; d < n_devices; d++)
+    else
     {
-      handlers.at(d)->BlockCq();
-    }
+      //
+      // and then (this is a naive, "serial" implementation;
+      //
 
-    for (unsigned int d = 0; d < n_devices; d++)
-    {
-      std::cout<<"Device " << d << ", Total GPU Memory Allocated (MB): "<<
-        handlers.at(d)->GpuMemUsed()/1e6 << "\n";
-    }
+      std::cout<<"Using " << n_devices << " Devices\n";
 
-    std::cout<<"Press Any Button To Continue...\n";
-    std::cin.get();
+      std::vector<OclPtxHandler*> handlers;
 
-    for (unsigned int d = 0; d < n_devices; d++)
-    {
-      handlers.at(d)->Interpolate();
-      std::cout<<"Device " << d << ", interp done\n";
-    }
-    //handler.Reduce();
-    //std::cout<<"reduce done\n";
-    //handler.Interpolate();
-    //std::cout<<"interp done\n";
-    std::string path_filename = GenerateSaveFile();
-    FILE * path_file;
-    path_file = fopen(path_filename.c_str(), "wb");
-    fprintf(path_file, "[");
-    fclose(path_file);
-
-    for (unsigned int d = 0; d < n_devices; d++)
-    {
-      handlers.at(d)->ParticlePathsToFile(path_filename);
-
-      if( d < n_devices - 1)
+      for (unsigned int d = 0; d < n_devices; d++)
       {
-        path_file = fopen(path_filename.c_str(), "ab");
-        fprintf(path_file, ",\n");
-        fclose(path_file);
+        std::cout<<"Device " << d <<"\n";
+
+        handlers.push_back(
+          new OclPtxHandler(environment.GetContext(),
+                            environment.GetCq(d),
+                            environment.GetKernel(d),
+                            curvature_threshold));
+
+        std::cout<<"\tinit done\n";
+        handlers.back()->WriteSamplesToDevice(
+                                      f_data,
+                                      phi_data,
+                                      theta_data,
+                                      static_cast<unsigned int>(1),
+                                      brain_mask);
+        std::cout<<"\tsamples done\n";
+        handlers.back()->WriteInitialPosToDevice(
+                                          initial_positions,
+                                          n_particles,
+                                          max_steps,
+                                          n_devices,
+                                          d);
+        std::cout<<"\tpos done\n";
+        handlers.back()->PrngInit();
+        std::cout<<"\tPrng Done\n";
+        handlers.back()->SingleBufferInit();
+        //handler.DoubleBufferInit( n_particles/2, max_steps);
+        std::cout<<"\tdbuff done\n";
+      }
+
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        handlers.at(d)->BlockCq();
+      }
+
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        std::cout<<"Device " << d << ", Total GPU Memory Allocated (MB): "<<
+          handlers.at(d)->GpuMemUsed()/1e6 << "\n";
+      }
+
+      std::cout<<"Press Any Button To Continue...\n";
+      std::cin.get();
+
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        handlers.at(d)->Interpolate();
+        std::cout<<"Device " << d << ", interp done\n";
+      }
+      //handler.Reduce();
+      //std::cout<<"reduce done\n";
+      //handler.Interpolate();
+      //std::cout<<"interp done\n";
+      std::string path_filename = GenerateSaveFile();
+      FILE * path_file;
+      path_file = fopen(path_filename.c_str(), "wb");
+      fprintf(path_file, "[");
+      fclose(path_file);
+
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        handlers.at(d)->ParticlePathsToFile(path_filename);
+
+        if( d < n_devices - 1)
+        {
+          path_file = fopen(path_filename.c_str(), "ab");
+          fprintf(path_file, ",\n");
+          fclose(path_file);
+        }
+      }
+
+      path_file = fopen(path_filename.c_str(), "ab");
+      fprintf(path_file, "]");
+      fclose(path_file);
+
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        delete handlers.at(d);
       }
     }
 
-    path_file = fopen(path_filename.c_str(), "ab");
-    fprintf(path_file, "]");
-    fclose(path_file);
-
-    for (unsigned int d = 0; d < n_devices; d++)
-    {
-      delete handlers.at(d);
-    }
-
     delete[] brain_mask;
-    //delete[] test_point;
   }
 
   std::cout<<"\n\nExiting...\n\n";

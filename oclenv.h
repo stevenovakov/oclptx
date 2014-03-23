@@ -90,6 +90,14 @@ class OclEnv{
 
     std::string OclErrorStrings(cl_int error);
 
+    //
+    // Resource Allocation
+    //
+
+    void OclEnv::AllocateSamples();
+
+    int AvailableGPUMem(EnvironmentData * env_data);
+
   private:
     //
     // OpenCL Objects
@@ -109,6 +117,12 @@ class OclEnv{
     std::string ocl_routine_name;
 
     bool ocl_profiling;
+
+    //
+    // Sample Buffers
+    //
+
+    
 };
 
 #endif
