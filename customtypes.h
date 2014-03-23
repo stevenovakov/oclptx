@@ -89,6 +89,8 @@ struct BedpostXData
   std::vector<float*> data;
   unsigned int nx, ny, nz;  // discrete dimensions of mesh
   unsigned int ns;          //number of samples
+  // unsigned int num_dir;
+  // cl::Buffer data_cl_buffer;
 };
 //
 // Note on particle positions re:bedpostx mesh :
@@ -102,9 +104,16 @@ struct BedpostXData
 // multiply by the direction #, (from 0 to n-1)
 //
 
+//TODO @STEVE
+//
+// Declare these all as const, and then have oclEnv initialize them
+// Maybe this should be a class.
+//
 struct EnvironmentData
 {
   //OpenCL Related
+  cl::Context* ocl_context;
+
   cl_ulong max_buffer_size;
   cl_ulong global_mem_size;
 
@@ -128,18 +137,39 @@ struct EnvironmentData
   unsigned int loopcheck_fraction;
   unsigned int max_steps;
   bool save_paths;
+  bool euler_streamline;
 
   unsigned int section_size;
+  unsigned int pdf_entries_per_particle;
 
   //values to use for computation, buffers
   unsigned int interval_size; //2R in Oclptx Data Diagram 2.odg
 
-  unsigned int samples_buffer_size;
-  unsigned int particle_paths_mem_size;
-  unsigned int particle_uint_mem_size;
-  unsigned int particles_prng_mem_size;
-  unsigned int mask_mem_size;
-  unsigned int pdf_mem_size;
+  cl_uint samples_buffer_size;
+  cl_uint particle_paths_mem_size;
+  cl_uint particle_uint_mem_size;
+  cl_uint particles_prng_mem_size;
+  cl_uint mask_mem_size;
+  cl_uint particle_pdf_mask_size;
+  cl_uint global_pdf_mem_size;
+
+  unsigned int total_static_gpu_mem;
+  unsigned int dynamic_gpu_mem_left;
+
+  //
+  // TODO (these probably should not be here)
+  // Sample Data Buffers (figure out how to delete properly later
+  // may need to make this a class)
+  //
+
+  cl::Buffer* f_samples_buffer;
+  cl::Buffer* phi_samples_buffer;
+  cl::Buffer* theta_samples_buffer;
+  cl::Buffer* brain_mask_buffer;
+
+  std::vector<cl::Buffer*> waypoint_masks;
+  cl::Buffer* exclusion_mask_buffer;
+  cl::Buffer* termination_mask_buffer;
 };
 
 #endif

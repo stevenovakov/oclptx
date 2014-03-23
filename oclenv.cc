@@ -29,12 +29,10 @@
  *
  */
 
-
-
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <vector>
+#include <cmath>
 //#include <mutex>
 //#include <thread>
 
@@ -52,9 +50,9 @@
 #include "oclenv.h"
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-static const std::string slash="\\";
+  static const std::string slash="\\";
 #else
-static const std::string slash="/";
+  static const std::string slash="/";
 #endif
 
 //*********************************************************************
@@ -75,7 +73,14 @@ OclEnv::OclEnv(
   this->OclInit();
   this->OclDeviceInfo();
   this->NewCLCommandQueues();
-  this->CreateProgram();
+  this->CreateKernels();
+
+  this->env_data.f_samples_buffer = NULL;
+  this->env_data.phi_samples_buffer = NULL;
+  this->env_data.theta_samples_buffer = NULL;
+  this->env_data.brain_mask_buffer = NULL;
+  this->env_data.exclusion_mask_buffer = NULL;
+  this->env_data.termination_mask_buffer = NULL;
 }
 
 //
@@ -84,7 +89,18 @@ OclEnv::OclEnv(
 OclEnv::~OclEnv()
 {
   std::cout<<"~OclEnv\n";
-  // no pointer data elements at the moment...
+  delete this->env_data.f_samples_buffer;
+  delete this->env_data.phi_samples_buffer;
+  delete this->env_data.theta_samples_buffer;
+  delete this->env_data.brain_mask_buffer;
+  
+  if (this->env_data.exclusion_mask_buffer != NULL)
+    delete this->env_data.exclusion_mask_buffer;
+  if (this->env_data.termination_mask_buffer != NULL)
+    delete this->env_data.termination_mask_buffer;
+
+  for (unsigned int i = 0; i < this->env_data.waypoint_masks.size(); i++)
+    delete this->env_data.waypoint_masks.at(i);
 }
 
 //*********************************************************************
@@ -108,10 +124,20 @@ cl::Kernel * OclEnv::GetKernel(unsigned int kernel_num)
   return &(this->ocl_kernel_set.at(kernel_num));
 }
 
+cl::Kernel * OclEnv::GetSumKernel(unsigned int kernel_num)
+{
+  return &(this->sum_kernel_set.at(kernel_num));
+}
+
 void OclEnv::SetOclRoutine(std::string new_routine)
 {
   this->ocl_routine_name = new_routine;
-  this->CreateProgram();
+  this->CreateKernels();
+}
+
+EnvironmentData * OclEnv::GetEnvData()
+{
+  return &(this->env_data);
 }
 
 
@@ -223,143 +249,135 @@ void OclEnv::NewCLCommandQueues()
 //
 //
 //
-cl::Program OclEnv::CreateProgram()
+void OclEnv::CreateKernels()
 {
   this->ocl_kernel_set.clear();
+  this->sum_kernel_set.clear();
+
+  cl_int err;
 
   // Read Source
 
-  std::string line_str, kernel_source;
+  std::string interp_kernel_source;
 
-  std::ifstream source_file;
-
-  std::vector<std::string> source_list;
-  std::vector<std::string>::iterator sit;
-  
   std::string fold = "oclkernels";
 
-  if (this->ocl_routine_name == "oclptx")
+  if (this->ocl_routine_name == "standard")
   {
-    source_list.push_back(fold + slash + "prngmethods.cl");
-    source_list.push_back(fold + slash + "interpolate.cl");
+    interp_kernel_source = fold + slash + "interpolate.cl";
   }
   else if (this->ocl_routine_name == "rng_test")
   {
-    source_list.push_back(fold + slash + "rng_test.cl");
+    interp_kernel_source = fold + slash + "rng_test.cl";
   }
   else if (this->ocl_routine_name == "interptest")
   {
     //source_list.push_back("prngmethods.cl");
-    source_list.push_back(fold + slash + "interptest.cl");
+    interp_kernel_source = fold + slash + "interptest.cl";
   }
   else if (this->ocl_routine_name == "basic")
   {
-    source_list.push_back(fold + slash + "basic.cl");
-  }
-  else if (this->ocl_routine_name == "standard")
-  {
-    source_list.push_back(fold + slash + "interpolate.cl");
+    interp_kernel_source = fold + slash + "basic.cl";
   }
 
-  for (sit = source_list.begin(); sit != source_list.end(); ++sit)
-  {
-    line_str = *sit;
-    source_file.open(line_str.c_str());
+  std::string sum_kernel_source = fold + slash + "summing.cl";
 
-    std::getline(source_file, line_str);
+  std::ifstream main_stream(interp_kernel_source);
+  std::string main_code(  (std::istreambuf_iterator<char>(main_stream) ),
+                            (std::istreambuf_iterator<char>()));
 
-    while(source_file){
-
-      kernel_source += line_str + "\n";
-
-      std::getline(source_file, line_str);
-    }
-    source_file.close();
-  }
-  //TODO
-  // no else  because we will check for routine_name at init
-  //
-
+  std::ifstream sum_stream(interp_kernel_source);
+  std::string sum_code(  (std::istreambuf_iterator<char>(sum_stream) ),
+                            (std::istreambuf_iterator<char>()));
   //
   // Build Program files here
   //
 
-  //std::cout<<kernel_source;
-
-
-  cl::Program::Sources prog_source(
+  cl::Program::Sources main_source(
     1,
-    std::make_pair(kernel_source.c_str(), kernel_source.length())
+    std::make_pair(main_code.c_str(), main_code.length())
   );
 
-  cl::Program ocl_program(this->ocl_context, prog_source);
+  cl::Program::Sources sum_source(
+    1,
+    std::make_pair(sum_code.c_str(), sum_code.length())
+  );
 
-  try
+
+  cl::Program main_program(this->ocl_context, main_source);
+
+  err = main_program.build(this->ocl_devices, "-I ./oclkernels -D PRNG");
+
+  if( this->OclErrorStrings(err) != "CL_SUCCESS")
   {
-    ocl_program.build(this->ocl_devices, "-I ./oclkernels");
+    std::cout<<"ERROR: " <<
+      " ( " << this->OclErrorStrings(err) << ")\n";
+
+    std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
+
+    std::cout<<"BUILD OPTIONS: \n" <<
+      main_program.getBuildInfo<CL_PROGRAM_BUILD_OPTIONS>(*dit) <<
+       "\n";
+    std::cout<<"BUILD LOG: \n" <<
+      main_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*dit) <<"\n";
+
+    exit(EXIT_FAILURE);
   }
-  catch(cl::Error err){
 
-    // TODO
-    //  dump all error logging to logfile
-    //  maybe differentiate b/w regular errors and cl errors
+  cl::Program sum_program(this->ocl_context, main_source);
 
-    if( this->OclErrorStrings(err.err()) != "CL_SUCCESS")
-    {
-      std::cout<<"ERROR: " << err.what() <<
-        " ( " << this->OclErrorStrings(err.err()) << ")\n";
+  err = sum_program.build(this->ocl_devices, "-I ./oclkernels");
 
-      for(std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
-        dit != this->ocl_devices.end(); dit++)
-      {
+  if( this->OclErrorStrings(err) != "CL_SUCCESS")
+  {
+    std::cout<<"ERROR: " <<
+      " ( " << this->OclErrorStrings(err) << ")\n";
 
-        std::cout<<"BUILD OPTIONS: \n" <<
-          ocl_program.getBuildInfo<CL_PROGRAM_BUILD_OPTIONS>(*dit) <<
-           "\n";
-        std::cout<<"BUILD LOG: \n" <<
-          ocl_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*dit) <<"\n";
-      }
-    }
+    std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
+
+    std::cout<<"BUILD OPTIONS: \n" <<
+      sum_program.getBuildInfo<CL_PROGRAM_BUILD_OPTIONS>(*dit) <<
+       "\n";
+    std::cout<<"BUILD LOG: \n" <<
+      sum_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*dit) <<"\n";
+
+    exit(EXIT_FAILURE);
   }
+  
 
   //
   // Compile Kernels from Program
   //
   for( unsigned int k = 0; k < this->ocl_devices.size(); k++)
   {
-    if (this->ocl_routine_name == "oclptx" )
+    if (this->ocl_routine_name == "standard" )
     {
-      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
-                                                "OclPtxKernel",
-                                                NULL ));
+      this->ocl_kernel_set.push_back(cl::Kernel(main_program,
+                                                "OclPtxInterpolate",
+                                                NULL));
+      this->sum_kernel_set.push_back(cl::Kernel(sum_program,
+                                                "PdfSum",
+                                                NULL));
     }
     else if (this->ocl_routine_name == "rng_test")
     {
-      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
+      this->ocl_kernel_set.push_back(cl::Kernel(main_program,
                                                 "RngTest",
                                                 NULL));
     }
     else if (this->ocl_routine_name == "interptest" )
     {
-      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
+      this->ocl_kernel_set.push_back(cl::Kernel(main_program,
                                                 "InterpolateTestKernel",
                                                 NULL));
     }
     else if (this->ocl_routine_name == "basic" )
     {
-      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
+      this->ocl_kernel_set.push_back(cl::Kernel(main_program,
                                                 "BasicInterpolate",
                                                 NULL));
     }
-        else if (this->ocl_routine_name == "standard" )
-    {
-      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
-                                                "OclPtxInterpolate",
-                                                NULL));
-    }
   }
-
-  return ocl_program;
 }
 
 
@@ -445,27 +463,110 @@ std::string OclEnv::OclErrorStrings(cl_int error)
 //
 //*********************************************************************
 
-int OclEnv::AvailableGPUMem(EnvironmentData * env_data)
+int OclEnv::AvailableGPUMem(
+  float mem_fraction //also pass oclptxoptions here
+)
 {
   cl_ulong max_buff_size;
   cl_ulong gl_mem_size;
+  cl_ulong dynamic_mem_left;
 
   std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
 
   dit->getInfo(CL_DEVICE_MAX_MEM_ALLOC_SIZE, &max_buff_size);
-  env_data->max_buffer_size = max_buff_size;
+  this->env_data.max_buffer_size = max_buff_size;
 
-  dit->getInfo(CL_DEVICE_GLOBAL_MEM_SIZE, &max_buff_size);
-  env_data->global_mem_size = max_buff_size;
+  dit->getInfo(CL_DEVICE_GLOBAL_MEM_SIZE, &gl_mem_size);
+  this->env_data.global_mem_size = gl_mem_size;
+
+  this->env_data.bpx_dirs = 1;
+
+  gl_mem_size = std::floor(gl_mem_size * mem_fraction);
+
+  dynamic_mem_left = gl_mem_size - this->env_data.total_static_gpu_mem;
+  this->env_data.dynamic_gpu_mem_left = dynamic_mem_left;
 
   return 0;
 }
 
 
-void OclEnv::AllocateSamples()
+void OclEnv::AllocateSamples(
+  const BedpostXData* f_data,
+  const BedpostXData* phi_data,
+  const BedpostXData* theta_data,
+  const unsigned short int* brain_mask
+)
 {
+  cl_uint single_direction_size =
+    f_data->nx * f_data->ny * f_data->nz;
 
-  
+  cl_uint single_pdf_mask_size = (single_direction_size / 32)  + 1;
+
+  cl_uint brain_mem_size =
+    single_direction_size * sizeof(unsigned short int);
+
+  cl_uint single_direction_mem_size =
+    single_direction_size*f_data->ns*sizeof(float);
+
+  cl_uint total_mem_size =
+    single_direction_mem_size*this->env_data.bpx_dirs;
+
+  this->env_data.samples_buffer_size = total_mem_size;
+
+  this->env_data.nx = f_data->nx;
+  this->env_data.ny = f_data->ny;
+  this->env_data.nz = f_data->nz;
+  this->env_data.ns = f_data->ns;
+
+  this->env_data.f_samples_buffer = new
+    cl::Buffer(
+      this->ocl_context,
+      CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR,
+      total_mem_size,
+      f_data->data.at(0),
+      NULL
+    );
+
+  this->env_data.theta_samples_buffer = new
+    cl::Buffer(
+      this->ocl_context,
+      CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR,
+      total_mem_size,
+      theta_data->data.at(0),
+      NULL
+    );
+
+  this->env_data.phi_samples_buffer = new
+    cl::Buffer(
+      this->ocl_context,
+      CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR,
+      total_mem_size,
+      phi_data->data.at(0),
+      NULL
+    );
+
+  this->env_data.brain_mask_buffer = new
+    cl::Buffer(
+      this->ocl_context,
+      CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR,
+      brain_mem_size,
+      const_cast<unsigned short int*>(brain_mask),
+      NULL
+    );
+
+    // 2*brain mem size for the pdf. Each device has a pdf.
+    this->env_data.total_static_gpu_mem = 3*total_mem_size + 2*brain_mem_size;
+
+    this->env_data.global_pdf_mem_size =
+      single_direction_size * sizeof(uint32_t);
+    this->env_data.particle_pdf_mask_size =
+      single_pdf_mask_size * sizeof(uint32_t);
+    this->env_data.pdf_entries_per_particle = single_pdf_mask_size;
 }
+
+// void OclEnv::ProcessOptions( oclptxOptions* options)
+// {
+
+// }
 
 //EOF

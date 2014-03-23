@@ -71,23 +71,24 @@ int init_rng(cl_ulong8* rng, int seed, int count);
 OclPtxHandler::OclPtxHandler(
     cl::Context* cc,
     cl::CommandQueue* cq,
-    cl::Kernel* ck,
+    cl::Kernel* ptx,
+    cl::Kernel* sum,
     float curv_thresh,
-    EnvironmentData env
+    EnvironmentData * env
 )
 {
   this->interpolation_complete = false;
-  this->target_section = 0;
 
   this->ocl_context = cc;
   this->ocl_cq = cq;
-  this->ptx_kernel = ck;
+  this->ptx_kernel = ptx;
+  this->sum_kernel = sum;
   
   this->curvature_threshold = curv_thresh;
 
-  this->total_gpu_mem_size = 0;
-
   this->env_dat = env;
+
+  this->total_gpu_mem_size = env->total_static_gpu_mem;
 }
 
 
@@ -190,6 +191,23 @@ unsigned int OclPtxHandler::GpuMemUsed()
   return this->total_gpu_mem_size;
 }
 
+void OclPtxHandler::GetPdfData( uint32_t * container)
+{
+  unsigned int vol_size = this->env_dat->nx*this->env_dat->ny*this->env_dat->nz;
+
+  container =
+    new uint32_t[vol_size];
+  this->ocl_cq->enqueueReadBuffer(
+    this->global_pdf_buffer,
+    CL_FALSE,
+    0,
+    this->env_dat->global_pdf_mem_size,
+    container
+  );
+
+  this->ocl_cq->finish();
+}
+
 //*********************************************************************
 //
 // OclPtxHandler Container Initializations
@@ -202,130 +220,130 @@ unsigned int OclPtxHandler::GpuMemUsed()
 // void Initialize()
 
 // TODO @STEVE add brain mask support
-void OclPtxHandler::WriteSamplesToDevice(
-  const BedpostXData* f_data,
-  const BedpostXData* phi_data,
-  const BedpostXData* theta_data,
-  unsigned int num_directions,
-  const unsigned short int* brain_mask
-)
-{
-  unsigned int single_direction_size =
-    f_data->nx * f_data->ny * f_data->nz;
+// void OclPtxHandler::WriteSamplesToDevice(
+//   const BedpostXData* f_data,
+//   const BedpostXData* phi_data,
+//   const BedpostXData* theta_data,
+//   unsigned int num_directions,
+//   const unsigned short int* brain_mask
+// )
+// {
+//   unsigned int single_direction_size =
+//     f_data->nx * f_data->ny * f_data->nz;
 
-  unsigned int brain_mem_size =
-    single_direction_size * sizeof(unsigned short int);
+//   unsigned int brain_mem_size =
+//     single_direction_size * sizeof(unsigned short int);
 
-  unsigned int single_direction_mem_size =
-    single_direction_size*f_data->ns*sizeof(float);
+//   unsigned int single_direction_mem_size =
+//     single_direction_size*f_data->ns*sizeof(float);
 
-  unsigned int total_mem_size =
-    single_direction_mem_size*num_directions;
+//   unsigned int total_mem_size =
+//     single_direction_mem_size*num_directions;
 
-  this->samples_buffer_size = total_mem_size;
+//   this->samples_buffer_size = total_mem_size;
 
-  this->sample_nx = f_data->nx;
-  this->sample_ny = f_data->ny;
-  this->sample_nz = f_data->nz;
-  this->sample_ns = f_data->ns;
+//   this->sample_nx = f_data->nx;
+//   this->sample_ny = f_data->ny;
+//   this->sample_nz = f_data->nz;
+//   this->sample_ns = f_data->ns;
 
-  // diagnostics
-  // std::cout<<"Brain Mem Size: "<< brain_mem_size <<"\n";
-  // std::cout<<"Samples Size: "<< single_direction_mem_size << "\n";
-  // std::cout<<"Nx : " << this->sample_nx <<"\n";
-  // std::cout<<"Ny : " << this->sample_ny <<"\n";
-  // std::cout<<"Nz : " << this->sample_nz <<"\n";
-  // std::cout<<"Ns : " << this->sample_ns <<"\n";
-  // diagnostics
+//   // diagnostics
+//   // std::cout<<"Brain Mem Size: "<< brain_mem_size <<"\n";
+//   // std::cout<<"Samples Size: "<< single_direction_mem_size << "\n";
+//   // std::cout<<"Nx : " << this->sample_nx <<"\n";
+//   // std::cout<<"Ny : " << this->sample_ny <<"\n";
+//   // std::cout<<"Nz : " << this->sample_nz <<"\n";
+//   // std::cout<<"Ns : " << this->sample_ns <<"\n";
+//   // diagnostics
 
-  this->f_samples_buffer =
-    cl::Buffer(
-      *(this->ocl_context),
-      CL_MEM_READ_ONLY,
-      total_mem_size,
-      NULL,
-      NULL
-    );
+//   this->f_samples_buffer =
+//     cl::Buffer(
+//       *(this->ocl_context),
+//       CL_MEM_READ_ONLY,
+//       total_mem_size,
+//       NULL,
+//       NULL
+//     );
 
-  this->theta_samples_buffer =
-    cl::Buffer(
-      *(this->ocl_context),
-      CL_MEM_READ_ONLY,
-      total_mem_size,
-      NULL,
-      NULL
-    );
+//   this->theta_samples_buffer =
+//     cl::Buffer(
+//       *(this->ocl_context),
+//       CL_MEM_READ_ONLY,
+//       total_mem_size,
+//       NULL,
+//       NULL
+//     );
 
-  this->phi_samples_buffer =
-    cl::Buffer(
-      *(this->ocl_context),
-      CL_MEM_READ_ONLY,
-      total_mem_size,
-      NULL,
-      NULL
-    );
+//   this->phi_samples_buffer =
+//     cl::Buffer(
+//       *(this->ocl_context),
+//       CL_MEM_READ_ONLY,
+//       total_mem_size,
+//       NULL,
+//       NULL
+//     );
 
-  this->brain_mask_buffer =
-    cl::Buffer(
-      *(this->ocl_context),
-      CL_MEM_READ_ONLY,
-      brain_mem_size,
-      NULL,
-      NULL
-    );
+//   this->brain_mask_buffer =
+//     cl::Buffer(
+//       *(this->ocl_context),
+//       CL_MEM_READ_ONLY,
+//       brain_mem_size,
+//       NULL,
+//       NULL
+//     );
 
-  // enqueue writes
+//   // enqueue writes
 
-  for (unsigned int d=0; d<num_directions; d++)
-  {
+//   for (unsigned int d=0; d<num_directions; d++)
+//   {
 
-    this->ocl_cq->enqueueWriteBuffer(
-        this->f_samples_buffer,
-        CL_FALSE,
-        d * single_direction_mem_size,
-        single_direction_mem_size,
-        f_data->data.at(d),
-        NULL,
-        NULL
-    );
+//     this->ocl_cq->enqueueWriteBuffer(
+//         this->f_samples_buffer,
+//         CL_FALSE,
+//         d * single_direction_mem_size,
+//         single_direction_mem_size,
+//         f_data->data.at(d),
+//         NULL,
+//         NULL
+//     );
 
-    this->ocl_cq->enqueueWriteBuffer(
-      this->theta_samples_buffer,
-      CL_FALSE,
-      d * single_direction_mem_size,
-      single_direction_mem_size,
-      theta_data->data.at(d),
-      NULL,
-      NULL
-    );
+//     this->ocl_cq->enqueueWriteBuffer(
+//       this->theta_samples_buffer,
+//       CL_FALSE,
+//       d * single_direction_mem_size,
+//       single_direction_mem_size,
+//       theta_data->data.at(d),
+//       NULL,
+//       NULL
+//     );
 
-    this->ocl_cq->enqueueWriteBuffer(
-      this->phi_samples_buffer,
-      CL_FALSE,
-      d * single_direction_mem_size,
-      single_direction_mem_size,
-      phi_data->data.at(d),
-      NULL,
-      NULL
-    );
-  }
+//     this->ocl_cq->enqueueWriteBuffer(
+//       this->phi_samples_buffer,
+//       CL_FALSE,
+//       d * single_direction_mem_size,
+//       single_direction_mem_size,
+//       phi_data->data.at(d),
+//       NULL,
+//       NULL
+//     );
+//   }
 
-  this->ocl_cq->enqueueWriteBuffer(
-    this->brain_mask_buffer,
-    CL_FALSE,
-    static_cast<unsigned int>(0),
-    brain_mem_size,
-    brain_mask,
-    NULL,
-    NULL
-  );
+//   this->ocl_cq->enqueueWriteBuffer(
+//     this->brain_mask_buffer,
+//     CL_FALSE,
+//     static_cast<unsigned int>(0),
+//     brain_mem_size,
+//     brain_mask,
+//     NULL,
+//     NULL
+//   );
 
-  this->total_gpu_mem_size += 3*total_mem_size + brain_mem_size;
+//   this->total_gpu_mem_size += 3*total_mem_size + brain_mem_size;
 
-  // may not need to do this here, may want to wait to block until
-  // all "initialization" operations are finished.
-  this->ocl_cq->finish();
-}
+//   // may not need to do this here, may want to wait to block until
+//   // all "initialization" operations are finished.
+//   this->ocl_cq->finish();
+// }
 
 void OclPtxHandler::WriteInitialPosToDevice(
   const float4* initial_positions,
@@ -408,7 +426,22 @@ void OclPtxHandler::WriteInitialPosToDevice(
       NULL,
       NULL
     );
-
+  this->global_pdf_buffer =
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_WRITE,
+      this->env_dat->global_pdf_mem_size,
+      NULL,
+      NULL
+    );
+  this->particles_pdf_buffer =
+    cl::Buffer(
+      *(this->ocl_context),
+      CL_MEM_READ_WRITE,
+      this->env_dat->particle_pdf_mask_size * this->n_particles,
+      NULL,
+      NULL
+    );
   // enqueue writes
   // both "steps taken" and "done" write the same array (all zeros)
 
@@ -498,14 +531,13 @@ void OclPtxHandler::PrngInit()
   this->ocl_cq->finish();
 }
 
-
 void OclPtxHandler::SingleBufferInit()
 {
   unsigned int interval_mem_size =
     this->section_size*sizeof(unsigned int);
 
   // first iteration is same size
-  this->todo_range.push_back( this->section_size );
+  this->todo_range = this->section_size;
 
   std::vector<unsigned int> temp;
   this->particle_todo.push_back(temp);
@@ -519,18 +551,18 @@ void OclPtxHandler::SingleBufferInit()
 
   // Initialize buffer
 
-  this->compute_index_buffers.push_back(
+  this->compute_index_buffer =
     cl::Buffer(
       *(this->ocl_context),
       CL_MEM_READ_WRITE,
       interval_mem_size,
       NULL,
-      NULL)
-  );
+      NULL
+    );
 
   // Copy over initial data to buffer
   this->ocl_cq->enqueueWriteBuffer(
-    this->compute_index_buffers.at(0),
+    this->compute_index_buffer,
     CL_FALSE,
     static_cast<unsigned int>(0),
     interval_mem_size,
@@ -561,19 +593,14 @@ void OclPtxHandler::SingleBufferInit()
 
 void OclPtxHandler::Interpolate()
 {
-  //std::lock_guard<std::mutex> klock(this->kernel_mutex);
-
-  unsigned int t_sec = this->target_section;
-
   //
   // Currently Handles single voxel/mask + No other options ONLY
   //
-
-  cl::NDRange global_range(this->todo_range.at(t_sec));
+  cl::NDRange global_range(this->todo_range);
   cl::NDRange local_range(1);
 
   // the indeces to compute, always first
-  this->ptx_kernel->setArg(0, this->compute_index_buffers.at(t_sec));
+  this->ptx_kernel->setArg(0, this->compute_index_buffer);
 
   // particle status buffers
   this->ptx_kernel->setArg(1, this->particle_paths_buffer);
@@ -582,16 +609,16 @@ void OclPtxHandler::Interpolate()
   this->ptx_kernel->setArg(4, this->particle_rng_buffer);
 
   // sample data buffers
-  this->ptx_kernel->setArg(5, this->f_samples_buffer);
-  this->ptx_kernel->setArg(6, this->phi_samples_buffer);
-  this->ptx_kernel->setArg(7, this->theta_samples_buffer);
-  this->ptx_kernel->setArg(8, this->brain_mask_buffer);
+  this->ptx_kernel->setArg(5, *(this->env_dat->f_samples_buffer));
+  this->ptx_kernel->setArg(6, *(this->env_dat->phi_samples_buffer));
+  this->ptx_kernel->setArg(7, *(this->env_dat->theta_samples_buffer));
+  this->ptx_kernel->setArg(8, *(this->env_dat->brain_mask_buffer));
 
   this->ptx_kernel->setArg(9, this->max_steps);
-  this->ptx_kernel->setArg(10, this->sample_nx);
-  this->ptx_kernel->setArg(11, this->sample_ny);
-  this->ptx_kernel->setArg(12, this->sample_nz);
-  this->ptx_kernel->setArg(13, this->sample_ns);
+  this->ptx_kernel->setArg(10, this->env_dat->nx);
+  this->ptx_kernel->setArg(11, this->env_dat->ny);
+  this->ptx_kernel->setArg(12, this->env_dat->nz);
+  this->ptx_kernel->setArg(13, this->env_dat->ns);
 
   this->ptx_kernel->setArg(14, this->max_steps);
   this->ptx_kernel->setArg(15, this->curvature_threshold);
@@ -599,6 +626,31 @@ void OclPtxHandler::Interpolate()
 
   this->ocl_cq->enqueueNDRangeKernel(
     *(this->ptx_kernel),
+    cl::NullRange,
+    global_range,
+    local_range,
+    NULL,
+    NULL
+  );
+
+  // BLOCK
+  this->ocl_cq->finish();
+}
+
+void OclPtxHandler::PdfSum()
+{
+  cl::NDRange global_range(
+      this->env_dat->nx, this->env_dat->ny, this->env_dat->nz);
+  cl::NDRange local_range(1);
+
+  this->sum_kernel->setArg(1, this->global_pdf_buffer);
+  this->sum_kernel->setArg(2, this->particles_pdf_buffer);
+  this->ptx_kernel->setArg(3, this->particle_done_buffer);
+  this->sum_kernel->setArg(4, this->n_particles);
+  this->sum_kernel->setArg(5, this->env_dat->pdf_entries_per_particle);
+
+  this->ocl_cq->enqueueNDRangeKernel(
+    *(this->sum_kernel),
     cl::NullRange,
     global_range,
     local_range,

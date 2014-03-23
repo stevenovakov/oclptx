@@ -44,51 +44,51 @@
 //
 
 __kernel void OclPtxInterpolate(
-  __global unsigned int* particle_indeces, //R
+  __global uint* particle_indeces, //R
   __global float4* particle_paths, //R
-  __global unsigned int* particle_steps_taken, //RW
-  __global unsigned int* particle_done, //RW
+  __global uint* particle_steps_taken, //RW
+  __global uint* particle_done, //RW
   __global rng_t *rng, //RW
   __global float* f_samples, //R
   __global float* phi_samples, //R
   __global float* theta_samples, //R
-  __global unsigned short int* brain_mask, //R
-  unsigned int max_steps,
-  unsigned int sample_nx,
-  unsigned int sample_ny,
-  unsigned int sample_nz,
-  unsigned int sample_ns,
-  unsigned int interval_steps,
+  __global ushort* brain_mask, //R
+  uint max_steps,
+  uint sample_nx,
+  uint sample_ny,
+  uint sample_nz,
+  uint sample_ns,
+  uint interval_steps,
   float curvature_threshold
 #ifdef WAYPOINTS
-  , __global unsigned short int * waypoint_masks, //R //unsire if want double ptr
-  __global unsigned short int * particle_waypoints, //W
-  unsigned int n_waypoint_masks
+  , __global ushort* waypoint_masks, //R //unsire if want double ptr
+  __global ushort* particle_waypoints, //W
+  uint n_waypoint_masks
 #endif
 #ifdef EXCLUSION
-  , __global unsigned short int * exclusion_mask, //R
-  __global unsigned short int * particle_exclusion //W
+  , __global ushort* exclusion_mask, //R
+  __global ushort* particle_exclusion //W
 #endif
 #ifdef TERMINATION
-  , __global unsigned short int * termination_mask //R
+  , __global ushort* termination_mask //R
 #endif
 )
 {
-  unsigned int glid = get_global_id(0);
+  uint glid = get_global_id(0);
   
-  unsigned int particle_index = particle_indeces[glid];
-  unsigned int steps_taken = particle_steps_taken[particle_index];
-  unsigned int current_path_index =
+  uint particle_index = particle_indeces[glid];
+  uint steps_taken = particle_steps_taken[particle_index];
+  uint current_path_index =
     particle_index*(max_steps + 1) + steps_taken;
     
-  unsigned int interval_steps_taken;
+  uint interval_steps_taken;
   
   uint3 current_select_vertex;
 
   float3 volume_fraction;
   
-  unsigned int diffusion_index;
-  unsigned int sample;
+  uint diffusion_index;
+  uint sample;
   
   // last location of particle
   float4 particle_pos = particle_paths[current_path_index];
@@ -110,9 +110,9 @@ __kernel void OclPtxInterpolate(
 
   float rand_max = 18446744073709551616.; //0xFFFFFFFFFFFFFFFF;
         
-  unsigned int mask_index;
+  uint mask_index;
   //unsigned int termination_mask_index;
-  unsigned short int bounds_test;
+  ushort bounds_test;
   
   for (interval_steps_taken = 0; interval_steps_taken < interval_steps;
     interval_steps_taken++)
@@ -125,13 +125,29 @@ __kernel void OclPtxInterpolate(
     volume_fraction.s0 = particle_pos.s0 - (float) current_select_vertex.s0;
     volume_fraction.s1 = particle_pos.s1 - (float) current_select_vertex.s1;
     volume_fraction.s2 = particle_pos.s2 - (float) current_select_vertex.s2;
-    
+
+#ifdef EULER_STREAMLINE
+    // not yet!
+    //
+    // TODO @STEVE
+    // Maybe Implement a function that encapsulates "stepping" so that
+    // we don't have to duplicate code
+    //
+#else
     // Pick Sample
+    //
+    // TODO @STEVE
+    // Implement multiple direction selection if more than one direction of
+    // bedpost data being used
+    //
+#ifdef PRNG
     rng_output = Rand(rng  + particle_index);
     sample = rng_output % sample_ns;
-
+#else
+    sample = 0;
+#endif
     // Volume Fraction Selection
-
+#ifdef PRNG
     rng_output = Rand(rng  + particle_index);
     vol_frac = volume_fraction.s0 * rand_max;
 
@@ -155,7 +171,7 @@ __kernel void OclPtxInterpolate(
     {
       current_select_vertex.s2 += 1;
     }
-
+#
     // pick flow vertex
     diffusion_index =
       sample*(sample_nz*sample_ny*sample_nx)+
@@ -186,7 +202,6 @@ __kernel void OclPtxInterpolate(
     if (jump_dot < 0.0 )
     {
       dr = dr*-1.0;
-
       jump_dot = dr.s0*last_dr.s0 + dr.s1*last_dr.s1 +
       dr.s2*last_dr.s2;
     }
@@ -208,7 +223,7 @@ __kernel void OclPtxInterpolate(
 
     // update particle position
     temp_pos = particle_pos + dr;
-    
+#endif
     //
     // Complete out of bounds test (just in case)
     //
@@ -233,7 +248,12 @@ __kernel void OclPtxInterpolate(
       particle_done[particle_index] = 1;
       break;
     }
-
+#ifdef TERMINATION
+#endif
+#ifdef EXCLUSION
+#endif
+#ifdef WAYPOINTS
+#endif
     // update current location
     particle_pos = temp_pos;
 
@@ -245,6 +265,13 @@ __kernel void OclPtxInterpolate(
     steps_taken = steps_taken + 1;
     // update step location
     particle_steps_taken[particle_index] = steps_taken;
+
+    // update particle pdf
+    //
+    //
+    //
+    //
+    //
     
     if (steps_taken == max_steps){
       particle_done[particle_index] = 1;

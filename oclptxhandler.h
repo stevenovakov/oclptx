@@ -54,8 +54,10 @@ class OclPtxHandler{
 
     OclPtxHandler(  cl::Context* cc,
                     cl::CommandQueue* cq,
-                    cl::Kernel* ck,
-                    float curv_thresh = 10.0
+                    cl::Kernel* ptx_kernel,
+                    cl::Kernel* sum_kernel,
+                    float curv_thresh,
+                    EnvironmentData * env
                   );
 
     ~OclPtxHandler();
@@ -70,6 +72,8 @@ class OclPtxHandler{
     
     unsigned int GpuMemUsed();
 
+    void GetPdfData(uint32_t * container);
+
     //
     // OCL Initialization
     //
@@ -79,12 +83,12 @@ class OclPtxHandler{
     //
     // void Initialize()
 
-    void WriteSamplesToDevice(  const BedpostXData* f_data,
-                                const BedpostXData* phi_data,
-                                const BedpostXData* theta_data,
-                                unsigned int num_directions,
-                                const unsigned short int* brain_mask
-                              );
+    // void WriteSamplesToDevice(  const BedpostXData* f_data,
+    //                             const BedpostXData* phi_data,
+    //                             const BedpostXData* theta_data,
+    //                             unsigned int num_directions,
+    //                             const unsigned short int* brain_mask
+    //                           );
     // may want to compute offset beforehand in samplemanager,
     // can decide later.
 
@@ -114,6 +118,8 @@ class OclPtxHandler{
 
     void Interpolate();
 
+    void PdfSum();
+
 
   private:
     //
@@ -124,6 +130,7 @@ class OclPtxHandler{
     cl::CommandQueue* ocl_cq;
 
     cl::Kernel* ptx_kernel;
+    cl::Kernel* sum_kernel;
     
     unsigned int total_gpu_mem_size;
 
@@ -131,19 +138,19 @@ class OclPtxHandler{
     // Environment
     //
 
-    EnvironmentData env_dat;
+    EnvironmentData * env_dat;
 
     //
     // BedpostX Data
     //
 
-    cl::Buffer f_samples_buffer;
-    cl::Buffer phi_samples_buffer;
-    cl::Buffer theta_samples_buffer;
-    cl::Buffer brain_mask_buffer;
+    // cl::Buffer f_samples_buffer;
+    // cl::Buffer phi_samples_buffer;
+    // cl::Buffer theta_samples_buffer;
+    // cl::Buffer brain_mask_buffer;
 
-    unsigned int samples_buffer_size;
-    unsigned int sample_nx, sample_ny, sample_nz, sample_ns;
+    // unsigned int samples_buffer_size;
+    // unsigned int sample_nx, sample_ny, sample_nz, sample_ns;
 
     //
     // Output Data
@@ -171,6 +178,8 @@ class OclPtxHandler{
     cl::Buffer particle_paths_buffer;
     cl::Buffer particle_steps_taken_buffer;
     cl::Buffer particle_rng_buffer;
+    cl::Buffer global_pdf_buffer;
+    cl::Buffer particles_pdf_buffer;
 
     cl::Buffer particle_done_buffer;
     //cl:Buffer particle_waypoint_buffer;
@@ -183,7 +192,7 @@ class OclPtxHandler{
     // These are the "double buffer" objects
     //
 
-    std::vector<cl::Buffer> compute_index_buffers;
+    cl::Buffer compute_index_buffer;
 
     std::vector< unsigned int > particle_indeces_left;
     std::vector< unsigned int > particle_complete;
@@ -191,7 +200,7 @@ class OclPtxHandler{
     // of particles
     std::vector< std::vector<unsigned int> > particle_todo;
     // NDRange of current pair of enqueueNDRangeKernel
-    std::vector<unsigned int> todo_range;
+    unsigned int todo_range;
 
     // which half of particle_indeces/particle_complete needs to be
     // interpolated next (either 0, or 1)
