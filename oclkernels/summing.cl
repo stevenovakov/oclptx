@@ -32,7 +32,7 @@ __kernel void PdfSum( __global uint* total_pdf,
       entry_num = vertex_num / 32;
       shift_num = (vertex_num % 32) - 1;
 
-      particle_entry = particle_pdfs[p * num_particles + entry_num];
+      particle_entry = particle_pdfs[p * entries_per_particle + entry_num];
       running_total += ((particle_entry >> shift_num) & 0x00000001);
     }
   }

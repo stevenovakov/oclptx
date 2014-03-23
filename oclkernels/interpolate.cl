@@ -45,7 +45,8 @@
 
 __kernel void OclPtxInterpolate(
   __global uint* particle_indeces, //R
-  __global float4* particle_paths, //R
+  __global float4* particle_paths, //RW
+  __global uint* particle_pdfs, //RW
   __global uint* particle_steps_taken, //RW
   __global uint* particle_done, //RW
   __global rng_t* rng, //RW
@@ -54,6 +55,7 @@ __kernel void OclPtxInterpolate(
   __global float* theta_samples, //R
   __global ushort* brain_mask, //R
   uint max_steps,
+  uint n_particles,
   uint sample_nx,
   uint sample_ny,
   uint sample_nz,
@@ -113,6 +115,11 @@ __kernel void OclPtxInterpolate(
   uint mask_index;
   //unsigned int termination_mask_index;
   ushort bounds_test;
+
+  uint vertex_num;
+  uint entry_num;
+  uint shift_num;
+  uint particle_entry;
   
   for (interval_steps_taken = 0; interval_steps_taken < interval_steps;
     interval_steps_taken++)
@@ -267,11 +274,13 @@ __kernel void OclPtxInterpolate(
     particle_steps_taken[particle_index] = steps_taken;
 
     // update particle pdf
-    //
-    //
-    //
-    //
-    //
+    vertex_num =
+      round(particle_pos.s0)*round(particle_pos.s1)*round(particle_pos.s2);
+    entry_num = vertex_num / 32;
+    shift_num = (vertex_num % 32) - 1;
+
+    particle_entry = particle_pdfs[particle_index * n_particles + entry_num];
+    particle_pdfs[particle_index * n_particles + entry_num] = particle_entry | (0x00000001 << shift_num);
     
     if (steps_taken == max_steps){
       particle_done[particle_index] = 1;
