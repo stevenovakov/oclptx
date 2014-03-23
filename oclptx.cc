@@ -212,6 +212,7 @@ int main(int argc, char *argv[] )
       std::vector<uint32_t> global_pdf(pdf_size, 0);
       uint32_t* device_pdf = new uint32_t[pdf_size];
 
+      std::cout<<"Writing PDF Data to File\n";
       for (unsigned int d = 0; d < n_devices; d++)
       {
         handlers.at(d)->GetPdfData(device_pdf);

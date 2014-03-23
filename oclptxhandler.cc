@@ -148,7 +148,7 @@ void OclPtxHandler::ParticlePathsToFile(std::string path_filename)
     unsigned int p_steps = particle_steps[n];
 
     //if (p_steps > 0)
-    printf("Particle: %d, Steps Taken: %d\n", n, p_steps);
+    //printf("Particle: %d, Steps Taken: %d\n", n, p_steps);
     
     // took this out for comparison test to ptx2, add back in.
     p_steps += 1;
