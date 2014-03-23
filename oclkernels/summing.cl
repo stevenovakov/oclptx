@@ -4,7 +4,7 @@
  *    Jeff Taylor
  */
 __kernel void PdfSum( __global uint* total_pdf,
-                      __global unit* particle_pdfs,
+                      __global uint* particle_pdfs,
                       __global uint* particles_done,
                       uint num_particles,
                       uint entries_per_particle
@@ -15,7 +15,7 @@ __kernel void PdfSum( __global uint* total_pdf,
   uint glidz = get_global_id(2);
 
   uint entry_num;
-  uint bit_num;
+  uint shift_num;
   uint p;
 
   uint vertex_num = glidx*glidy*glidz;
@@ -24,7 +24,7 @@ __kernel void PdfSum( __global uint* total_pdf,
 
   uint running_total = 0;
 
-  for ( p = 0, p < num_particles, p++)
+  for ( p = 0; p < num_particles; p++)
   {
     particle_done = particles_done[p];
     if (particle_done > 0)

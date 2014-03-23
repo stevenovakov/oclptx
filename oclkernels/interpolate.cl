@@ -48,7 +48,7 @@ __kernel void OclPtxInterpolate(
   __global float4* particle_paths, //R
   __global uint* particle_steps_taken, //RW
   __global uint* particle_done, //RW
-  __global rng_t *rng, //RW
+  __global rng_t* rng, //RW
   __global float* f_samples, //R
   __global float* phi_samples, //R
   __global float* theta_samples, //R
@@ -171,7 +171,7 @@ __kernel void OclPtxInterpolate(
     {
       current_select_vertex.s2 += 1;
     }
-#
+#endif
     // pick flow vertex
     diffusion_index =
       sample*(sample_nz*sample_ny*sample_nx)+
@@ -220,10 +220,10 @@ __kernel void OclPtxInterpolate(
     last_dr = dr;
 
     dr = dr*0.25; // implement actual step length argument later
-
+#endif
     // update particle position
     temp_pos = particle_pos + dr;
-#endif
+
     //
     // Complete out of bounds test (just in case)
     //

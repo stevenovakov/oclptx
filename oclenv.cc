@@ -37,7 +37,7 @@
 //#include <thread>
 
 
-#define __CL_ENABLE_EXCEPTIONS
+//#define __CL_ENABLE_EXCEPTIONS
 // adds exception support from CL libraries
 // define before CL headers inclusion
 
@@ -286,7 +286,7 @@ void OclEnv::CreateKernels()
   std::string main_code(  (std::istreambuf_iterator<char>(main_stream) ),
                             (std::istreambuf_iterator<char>()));
 
-  std::ifstream sum_stream(interp_kernel_source);
+  std::ifstream sum_stream(sum_kernel_source);
   std::string sum_code(  (std::istreambuf_iterator<char>(sum_stream) ),
                             (std::istreambuf_iterator<char>()));
   //
@@ -324,7 +324,7 @@ void OclEnv::CreateKernels()
     exit(EXIT_FAILURE);
   }
 
-  cl::Program sum_program(this->ocl_context, main_source);
+  cl::Program sum_program(this->ocl_context, sum_source);
 
   err = sum_program.build(this->ocl_devices, "-I ./oclkernels");
 
@@ -463,6 +463,11 @@ std::string OclEnv::OclErrorStrings(cl_int error)
 //
 //*********************************************************************
 
+// TODO @STEVE
+// Right now I've just kluged together AllocateSamples, but really
+// AvailableGPUMem should run more thoroughly and calculate a lot of the vallues
+// currently bneing calculated in AllocateSamples
+//
 int OclEnv::AvailableGPUMem(
   float mem_fraction //also pass oclptxoptions here
 )
@@ -562,6 +567,9 @@ void OclEnv::AllocateSamples(
     this->env_data.particle_pdf_mask_size =
       single_pdf_mask_size * sizeof(uint32_t);
     this->env_data.pdf_entries_per_particle = single_pdf_mask_size;
+
+    std::cout<<"global: "<<this->env_data.global_pdf_mem_size <<"\n";
+    std::cout<<"part: "<<this->env_data.particle_pdf_mask_size <<"\n";
 }
 
 // void OclEnv::ProcessOptions( oclptxOptions* options)

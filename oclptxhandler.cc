@@ -426,6 +426,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
       NULL,
       NULL
     );
+
   this->global_pdf_buffer =
     cl::Buffer(
       *(this->ocl_context),
@@ -434,6 +435,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
       NULL,
       NULL
     );
+
   this->particles_pdf_buffer =
     cl::Buffer(
       *(this->ocl_context),
@@ -475,7 +477,8 @@ void OclPtxHandler::WriteInitialPosToDevice(
     NULL
   );
 
-  this->total_gpu_mem_size += path_mem_size + 2*path_steps_mem_size;
+  this->total_gpu_mem_size += path_mem_size + 2*path_steps_mem_size +
+    this->env_dat->particle_pdf_mask_size * this->n_particles;
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
   this->ocl_cq->finish();
@@ -641,23 +644,31 @@ void OclPtxHandler::PdfSum()
 {
   cl::NDRange global_range(
       this->env_dat->nx, this->env_dat->ny, this->env_dat->nz);
-  cl::NDRange local_range(1);
+  cl::NDRange local_range(1,1,1);
 
-  this->sum_kernel->setArg(1, this->global_pdf_buffer);
-  this->sum_kernel->setArg(2, this->particles_pdf_buffer);
-  this->ptx_kernel->setArg(3, this->particle_done_buffer);
-  this->sum_kernel->setArg(4, this->n_particles);
-  this->sum_kernel->setArg(5, this->env_dat->pdf_entries_per_particle);
+  this->sum_kernel->setArg(0, this->global_pdf_buffer);
+  this->sum_kernel->setArg(1, this->particles_pdf_buffer);
+  this->sum_kernel->setArg(2, this->particle_done_buffer);
+  this->sum_kernel->setArg(3, this->n_particles);
+  this->sum_kernel->setArg(4, this->env_dat->pdf_entries_per_particle);
 
-  this->ocl_cq->enqueueNDRangeKernel(
-    *(this->sum_kernel),
-    cl::NullRange,
-    global_range,
-    local_range,
-    NULL,
-    NULL
-  );
-
+  try{
+    this->ocl_cq->enqueueNDRangeKernel(
+      *(this->sum_kernel),
+      cl::NullRange,
+      global_range,
+      local_range,
+      NULL,
+      NULL
+    );
+  }
+  catch(cl::Error err){
+    if( (err.err()) != 0)
+    {
+      std::cout<<"ERROR: " << err.what() << ":" << err.err() << "\n";
+      std::cin.get();
+    }
+  }
   // BLOCK
   this->ocl_cq->finish();
 }
