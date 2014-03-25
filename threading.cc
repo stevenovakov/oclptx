@@ -3,21 +3,27 @@
 // Various thread functions
 //
 
+#include <fcntl.h>
 #include <unistd.h>
+#include <condition_variable>
 
-#include "oclptx/gpu.h"
+#include "fifo.h"
+#include "oclptxhandler.h"
+#include "particle.h"
 
 namespace threading
 {
+
+FILE *global_fd;
 
 struct shared_data {
   int chunk_size;  // Amount of space allocated
   int count;  // Number of occupied elements
 
-  struct particle_data *chunk;
-  cl_bool *complete;
+  struct particle::particle_data *chunk;
+  cl_ushort *complete;
   int *particle_offset;
-  int chunk_offset
+  int chunk_offset;
   std::mutex data_lock;
 
 
@@ -32,7 +38,7 @@ struct shared_data {
 };
 
 // Worker thread.  Controls the GPU.
-void Worker(struct shared_data *sdata, OclPtxHandler *handler, struct particles *gpu, int num_reducers)
+void Worker(struct shared_data *sdata, OclPtxHandler *handler, struct particle::particles *gpu, int num_reducers)
 {
   // Note, there are two "sides" of GPU memory.  At all times, a kernel must
   // only access the one side.  We must only copy data to and from the
@@ -72,13 +78,13 @@ void Worker(struct shared_data *sdata, OclPtxHandler *handler, struct particles 
       {
         has_data_side[inactive_side] = true;
         for (int j = 0; j < sdata[i].count; ++j)
-          WriteParticle(gpu, &sdata[i].chunk[j], sdata[i].particle_offset[j]);
+          particle::WriteParticle(gpu, (sdata[i].chunk + j), sdata[i].particle_offset[j]);
       }
     }
 
     //gpu->WaitForKernel(); // TODO(jeff) oclptxhandler equiv?
 
-    handler->RunCollatzKernel(inactive_side);
+    handler->RunCollatzKernel(gpu, inactive_side);
 
     // Inactive side is now active
     inactive_side = (0 == inactive_side)? 1: 0;
@@ -87,13 +93,13 @@ void Worker(struct shared_data *sdata, OclPtxHandler *handler, struct particles 
     // This is a work-queue style of operation, which is relatively
     // standard, but that's not obvious.  Making it more obvious would greatly
     // improve readability.
-    int leftover_particles = particles_per_side(gpu) % num_reducers;
-    int offset = particles_per_side(gpu) * inactive_side;
+    int leftover_particles = particle::particles_per_side(gpu) % num_reducers;
+    int offset = particle::particles_per_side(gpu) * inactive_side;
     int count;
     for (int i = 0; i < num_reducers; ++i)
     {
       // We still have data lock i
-      count = particles_per_side(gpu) / num_reducers;
+      count = particle::particles_per_side(gpu) / num_reducers;
       if (leftover_particles)
       {
         count++;
@@ -103,15 +109,19 @@ void Worker(struct shared_data *sdata, OclPtxHandler *handler, struct particles 
       offset += count;
 
       sdata[i].data_ready = true;
+      sdata[i].count = count;
       sdata[i].data_ready_cv.notify_one();
       delete lk[i];
     }
+
+    // Dump all paths
+    particle::DumpPath(gpu, inactive_side * particle::particles_per_side(gpu), particle::particles_per_side(gpu), global_fd);
   }
 }
 
-void Reducer(struct shared_data *sdata, Fifo<particle_data> *particles)
+void Reducer(struct shared_data *sdata, Fifo<particle::particle_data> *particles)
 {
-  struct particle_data *particle;
+  struct particle::particle_data *particle;
   int reduced_count;
 
   while (1)
@@ -146,12 +156,11 @@ void Reducer(struct shared_data *sdata, Fifo<particle_data> *particles)
         sdata->chunk[reduced_count] = *particle;
         sdata->particle_offset[reduced_count] = sdata->chunk_offset + i;
         ++reduced_count;
-        sdata->has_data = true;
 
         delete particle;
       }
-      else
-        sdata->has_data = true;
+
+      sdata->has_data = true;
     }
     sdata->count = reduced_count;
 
@@ -161,22 +170,30 @@ void Reducer(struct shared_data *sdata, Fifo<particle_data> *particles)
   }
 }
 
-void RunThreads(struct particles *gpu, OclPtxHandler *handler, Fifo<particle_data> *particles, int num_reducers)
+void RunThreads(struct particle::particles *gpu, OclPtxHandler *handler, Fifo<particle::particle_data> *particles, int num_reducers)
 {
   // Push blank data with complete=1 to reducer.  It will fill it in with
   // particles.
-  int leftover_particles = particles_per_side(gpu) % num_reducers;
-  int chunk_size = particles_per_side(gpu) / num_reducers + 1;
+  int leftover_particles = particle::particles_per_side(gpu) % num_reducers;
+  int chunk_size = particle::particles_per_side(gpu) / num_reducers + 1;
 
   int offset = 0;
   int count;
   struct shared_data sdata[num_reducers];
   struct particle::particle_data *data;
-  cl_bool *status;
+  cl_ushort *status;
   int *particle_offset;
+
+  global_fd = fopen("./path_output", "w");
+  if (NULL == global_fd)
+  {
+    perror("Couldn't open file");
+    exit(1);
+  }
+
   for (int i = 0; i < num_reducers; ++i)
   {
-    count = particles_per_side(gpu) / num_reducers;
+    count = particle::particles_per_side(gpu) / num_reducers;
     if (leftover_particles)
     {
       count++;
@@ -184,7 +201,7 @@ void RunThreads(struct particles *gpu, OclPtxHandler *handler, Fifo<particle_dat
     }
 
     data = new particle::particle_data[chunk_size];
-    status = new cl_bool[chunk_size];
+    status = new cl_ushort[chunk_size];
     particle_offset = new int[chunk_size];
 
     for (int j = 0; j < chunk_size; ++j)
@@ -223,6 +240,8 @@ void RunThreads(struct particles *gpu, OclPtxHandler *handler, Fifo<particle_dat
     delete[] sdata[i].complete;
     delete[] sdata[i].chunk;
   }
+
+  fclose(global_fd);
 }
 
 }  // namespace threading

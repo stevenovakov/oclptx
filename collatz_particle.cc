@@ -1,55 +1,60 @@
 // Definition for collatz particle methods.
 
-#include "particle/col_particle.h"
+#include "collatz_particle.h"
+
+#include <assert.h>
 
 namespace particle
 {
 
-struct particles
-{
-  cl::Buffer gpu_particle_data *gpu_data;  // Type particle_data
-  cl::Buffer *gpu_completion;  // Type cl_bool array
-
-  cl::Buffer *path_data;  // Type ulong
-
-  OclEnv *env;
-  struct particle_attrs attrs;
-};
-
 struct particles *NewParticles(
-    cl::OclEnv* env,
+    OclEnv* env,
     struct particle_attrs *attrs)
 {
   struct particles *p = new struct particles;
   if (!p)
     return NULL;
 
-  p->attrs = attrs;
+  p->attrs = *attrs;
   p->env = env;
 
   // TODO(jeff) compute num_particles
   p->attrs.particles_per_side = 42;
 
   p->gpu_data = new cl::Buffer(
-      env->GetContext(),
-      CL_MEM_WRITE_ONLY,
+      *env->GetContext(),
+      CL_MEM_READ_WRITE,
       2 * p->attrs.particles_per_side * sizeof(struct particle_data));
   if (!p->gpu_data)
     return NULL;
 
   p->gpu_complete = new cl::Buffer(
-      env->GetContext(),
-      CL_MEM_READ_WRITE,
-      2 * p->attrs.particles_per_side * sizeof(cl_bool));
+      *env->GetContext(),
+      CL_MEM_WRITE_ONLY,
+      2 * p->attrs.particles_per_side * sizeof(cl_ushort));
   if (!p->gpu_complete)
     return NULL;
 
   p->gpu_path = new cl::Buffer(
-      env->GetContext(),
-      CL_MEM_READ_ONLY,
+      *env->GetContext(),
+      CL_MEM_WRITE_ONLY,
       2 * p->attrs.particles_per_side * p->attrs.num_steps * sizeof(cl_ulong));
   if (!p->gpu_path)
     return NULL;
+
+  // Initialize "completion" buffer.
+  cl_ushort *temp_completion = new cl_ushort[2*p->attrs.particles_per_side];
+  for (int i = 0; i < 2 * p->attrs.particles_per_side; ++i)
+    temp_completion[i] = 1;
+
+  p->env->GetCq(0)->enqueueWriteBuffer(
+      *p->gpu_complete, 
+      true, 
+      0,
+      2 * p->attrs.particles_per_side * sizeof(cl_ushort),
+      reinterpret_cast<void*>(temp_completion));
+
+  delete[] temp_completion;
 
   return p;
 }
@@ -62,7 +67,7 @@ void FreeParticles(struct particles *p)
   delete p;
 }
 
-int WriteParticle(
+void WriteParticle(
     struct particles *p,
     struct particle_data *data,
     int offset)
@@ -71,17 +76,18 @@ int WriteParticle(
   // shouldn't matter because threading is set up for only one thread to ever
   // call these methods.
   cl_int ret;
-  cl_bool zero = 0;
-  assert(offset < 2 * attrs.particles_per_side);
+  cl_ushort zero = 0;
+  assert(offset < 2 * p->attrs.particles_per_side);
+
+  printf("Write particle %li to offset %i\n", data->value, offset);
 
   // Write particle_data
-  // TODO(jeff): think about multi-gpu
-  ret = p->env->getCq(0)->enqueueWriteBuffer(
-      p->gpu_data, 
+  ret = p->env->GetCq(0)->enqueueWriteBuffer(
+      *p->gpu_data, 
       true, 
       offset * sizeof(struct particle_data),
       sizeof(struct particle_data),
-      reinterpret_cast<void*>data);
+      reinterpret_cast<void*>(data));
   if (CL_SUCCESS != ret)
   {
     puts("Write failed!");
@@ -89,42 +95,41 @@ int WriteParticle(
   }
 
   // gpu_complete = 0
-  ret = p->env->getCq(0)->enqueueWriteBuffer(
-      p->gpu_complete,
+  ret = p->env->GetCq(0)->enqueueWriteBuffer(
+      *p->gpu_complete,
       true,
-      offset * sizeof(cl_bool),
-      sizeof(cl_bool),
+      offset * sizeof(cl_ushort),
+      sizeof(cl_ushort),
       reinterpret_cast<void*>(&zero));
   if (CL_SUCCESS != ret)
   {
     puts("Write failed!");
     abort();
   }
-
-  return 0;
 }
 
-void ReadStatus(struct particles *p, int offset, int count, cl_bool *ret)
+void ReadStatus(struct particles *p, int offset, int count, cl_ushort *ret)
 {
-  p->env->getCq(0)->enqueueReadBuffer(
-      p->gpu_complete,
+  p->env->GetCq(0)->enqueueReadBuffer(
+      *p->gpu_complete,
       true,
-      offset * sizeof(cl_bool),
-      count * sizeof(cl_bool),
-      reinterpret_cast<cl_bool*>(ret));
+      offset * sizeof(cl_ushort),
+      count * sizeof(cl_ushort),
+      reinterpret_cast<cl_ushort*>(ret));
 }
 
 void DumpPath(struct particles *p, int offset, int count, FILE *fd)
 {
-  cl_ulong *buf = new cl_ulong[count * num_steps];
+  cl_ulong *buf = new cl_ulong[count * p->attrs.num_steps];
   int ret;
+  int value;
 
-  ret = p->env->getCq(0)->enqueueReadBuffer(
-      p->gpu_path,
+  ret = p->env->GetCq(0)->enqueueReadBuffer(
+      *p->gpu_path,
       true,
-      offset * num_steps * sizeof(cl_ulong),
-      count * num_steps * sizeof(cl_ulong),
-      reinterpret_cast<cl_ulong*>(buf));
+      offset * p->attrs.num_steps * sizeof(cl_ulong),
+      count * p->attrs.num_steps * sizeof(cl_ulong),
+      reinterpret_cast<void*>(buf));
   if (CL_SUCCESS != ret)
   {
     puts("Failed to read back path");
@@ -132,12 +137,12 @@ void DumpPath(struct particles *p, int offset, int count, FILE *fd)
   }
 
   // Now dumpify.
-  for (int id = 0; id < count, ++id)
+  for (int id = 0; id < count; ++id)
   {
-    for (int step = 0; step < num_steps; ++step)
+    for (int step = 0; step < p->attrs.num_steps; ++step)
     {
-      value = buf[id * num_steps + step];
-      fprintf(fd, "%i:%i", id + offset, value);
+      value = buf[id * p->attrs.num_steps + step];
+      fprintf(fd, "%i:%i\n", id + offset, value);
     }
   }
 

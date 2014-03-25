@@ -48,128 +48,100 @@
 #include <CL/cl.hpp>
 #endif
 
+#include "collatz_particle.h"
 #include "customtypes.h"
 
 class OclPtxHandler{
+ public:
+  OclPtxHandler(){};
+  OclPtxHandler(cl::Context* cc,
+                cl::CommandQueue* cq,
+                cl::Kernel* ck);
+  ~OclPtxHandler();
 
-  public:
-    OclPtxHandler(){};
+  void ParticlePathsToFile();   // do at end
+  bool IsFinished(){ return this->interpolation_complete; };
 
-    OclPtxHandler(  cl::Context* cc,
-                    cl::CommandQueue* cq,
-                    cl::Kernel* ck);
+  // Initialization
+  void WriteSamplesToDevice( const BedpostXData* f_data,
+                              const BedpostXData* phi_data,
+                              const BedpostXData* theta_data,
+                              unsigned int num_directions,
+                              const unsigned short int* brain_mask);
+  void Interpolate();
+  void RunCollatzKernel(struct particle::particles *p, int side);
+private:
+  // OpenCL Interface
+  cl::Context* ocl_context;
+  cl::CommandQueue* ocl_cq;
+  cl::Kernel* ptx_kernel;
 
-    ~OclPtxHandler();
+  // BedpostX Data
+  cl::Buffer f_samples_buffer;
+  cl::Buffer phi_samples_buffer;
+  cl::Buffer theta_samples_buffer;
+  cl::Buffer brain_mask_buffer;
 
-    //
-    // Set/Get
-    //
+  unsigned int samples_buffer_size;
+  unsigned int sample_nx, sample_ny, sample_nz, sample_ns;
 
-    void ParticlePathsToFile();   // do at end
+  // Output Data
+  unsigned int n_particles;
+  unsigned int max_steps;
 
-    bool IsFinished(){ return this->interpolation_complete; };
+  // TODO @STEVE:  Some of this stuff will be GPU memory limited
+  // figure out which and how
+  
+  // TODO @STEVE: May have to introduce additional "status" buffers
+  // for things like waypoint/stop mask ,etc to check which particles
+  // are desireable.
 
-    //
-    // OCL Initialization
-    //
+  unsigned int section_size;
+  unsigned int num_steps;
+  unsigned int particles_size;
 
-    // May want overarching initialize() that simply wraps everything
-    // below to be called by std::thread
-    //
-    // void Initialize()
+  cl::Buffer particle_paths_buffer;
+  cl::Buffer particle_steps_taken_buffer;
+  cl::Buffer particle_elem_buffer;
 
-    void WriteSamplesToDevice( const BedpostXData* f_data,
-                                const BedpostXData* phi_data,
-                                const BedpostXData* theta_data,
-                                unsigned int num_directions,
-                                const unsigned short int* brain_mask
-                              );
-    // may want to compute offset beforehand in samplemanager,
-    // can decide later.
+  cl::Buffer particle_done_buffer;
+  //cl:Buffer particle_waypoint_buffer;
+  
+  unsigned int particles_mem_size;
+  unsigned int particle_uint_mem_size;
+  // size (Total Particles)/numDevices * (sizeof(float4))
 
-    void Interpolate();
+  //
+  // These are the "double buffer" objects
+  //
 
-  private:
-    //
-    // OpenCL Interface
-    //
-    cl::Context* ocl_context;
+  std::vector<cl::Buffer> compute_index_buffers;
 
-    cl::CommandQueue* ocl_cq;
+  std::vector< unsigned int > particle_indeces_left;
+  std::vector< unsigned int > particle_complete;
+  // Vector of max size (N/2 ) , where n is the total number
+  // of particles
+  std::vector< std::vector<unsigned int> > particle_todo;
+  // NDRange of current pair of enqueueNDRangeKernel
+  std::vector<unsigned int> todo_range;
 
-    cl::Kernel* ptx_kernel;
-    //
-    // BedpostX Data
-    //
+  // mutex for reduction/interpolation conflicts on local objects
+  std::mutex reduce_mutex;
+  // mutex for kernel 
+  std::mutex kernel_mutex;
+  // mutex for command queue access
 
-    cl::Buffer f_samples_buffer;
-    cl::Buffer phi_samples_buffer;
-    cl::Buffer theta_samples_buffer;
-    cl::Buffer brain_mask_buffer;
+  // which half of particle_indeces/particle_complete needs to be
+  // interpolated next (either 0, or 1)
+  // TODO: Make sure there are no access conflicts within multithread
+  // scheme (e.g.  go to interpolate second half, but reduction
+  // method accidentally changed target_section to "0" again.
+  unsigned int target_section;
+  // this might need a mutex
 
-    unsigned int samples_buffer_size;
-    unsigned int sample_nx, sample_ny, sample_nz, sample_ns;
-
-    //
-    // Output Data
-    //
-
-    unsigned int n_particles;
-    unsigned int max_steps;
-
-    // TODO @STEVE:  Some of this stuff will be GPU memory limited
-    // figure out which and how
-    
-    // TODO @STEVE: May have to introduce additional "status" buffers
-    // for things like waypoint/stop mask ,etc to check which particles
-    // are desireable.
-
-    unsigned int section_size;
-    unsigned int num_steps;
-    unsigned int particles_size;
-
-    cl::Buffer particle_paths_buffer;
-    cl::Buffer particle_steps_taken_buffer;
-    cl::Buffer particle_elem_buffer;
-
-    cl::Buffer particle_done_buffer;
-    //cl:Buffer particle_waypoint_buffer;
-    
-    unsigned int particles_mem_size;
-    unsigned int particle_uint_mem_size;
-    // size (Total Particles)/numDevices * (sizeof(float4))
-
-    //
-    // These are the "double buffer" objects
-    //
-
-    std::vector<cl::Buffer> compute_index_buffers;
-
-    std::vector< unsigned int > particle_indeces_left;
-    std::vector< unsigned int > particle_complete;
-    // Vector of max size (N/2 ) , where n is the total number
-    // of particles
-    std::vector< std::vector<unsigned int> > particle_todo;
-    // NDRange of current pair of enqueueNDRangeKernel
-    std::vector<unsigned int> todo_range;
-
-    // mutex for reduction/interpolation conflicts on local objects
-    std::mutex reduce_mutex;
-    // mutex for kernel 
-    std::mutex kernel_mutex;
-    // mutex for command queue access
-
-    // which half of particle_indeces/particle_complete needs to be
-    // interpolated next (either 0, or 1)
-    // TODO: Make sure there are no access conflicts within multithread
-    // scheme (e.g.  go to interpolate second half, but reduction
-    // method accidentally changed target_section to "0" again.
-    unsigned int target_section;
-    // this might need a mutex
-
-    bool interpolation_complete;
-    // false until there are zero particle paths left to compute.
-    // operations should finalize after NEXT interpolate call.
+  bool interpolation_complete;
+  // false until there are zero particle paths left to compute.
+  // operations should finalize after NEXT interpolate call.
 };
 
 #endif

@@ -4,8 +4,6 @@
  *    Jeff Taylor
  */
 
-#include "oclkernels/collatz_kernel.cl"
-
 struct particle_data
 {
   ulong value;
@@ -17,10 +15,10 @@ struct particle_attrs
   int particles_per_side;
 } __attribute__ ((aligned(8)));
 
-__kernel void CollatzTest(
-  __global struct particle_attrs attrs,  /* RO */
+__kernel void Collatz(
+  struct particle_attrs attrs,  /* RO */
   __global struct particle_data *state,  /* RW */
-  __global bool  *complete,
+  __global ushort *complete,
   __global ulong *path_output)
 {
   int step;
@@ -34,11 +32,16 @@ __kernel void CollatzTest(
     else
       state[glid].value = state[glid].value >> 1;
 
-    if (1 == state[glid].value)
+    if (4 == state[glid].value ||
+        2 == state[glid].value ||
+        1 == state[glid].value)
       complete[glid] = true;
+    else
+      complete[glid] = false;
 
     index = glid * attrs.num_steps + step;
-    path_output[index] = Rand(rng + glid);
+    path_output[index] = state[glid].value;
+    //path_output[index] = complete[glid];
   }
 }
 

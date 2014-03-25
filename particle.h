@@ -8,6 +8,8 @@
 #ifndef PARTICLE_H_
 #define PARTICLE_H_
 
+#include "oclenv.h"
+
 namespace particle
 {
 
@@ -29,14 +31,14 @@ struct particle_data;
 struct particle_attrs;
 
 // Allocate new particles, both on GPU and on Host.
-struct particles *NewParticles(cl::OclEnv* env, struct particle_attrs *attrs);
+struct particles *NewParticles(OclEnv* env, struct particle_attrs *attrs);
 // Free Host side particles.
 void FreeParticles(struct particles *particles);
 
 // Write a single particle
 void WriteParticle(struct particles *p, struct particle_data *data, int offset);
 // Read the "completion" buffer back into the vector pointed to by ret.
-void ReadStatus(struct particles *p, int offset, int count, cl_bool *ret);
+void ReadStatus(struct particles *p, int offset, int count, cl_ushort *ret);
 
 int particles_per_side(struct particles *p);
 

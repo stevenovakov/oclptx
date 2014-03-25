@@ -4,45 +4,20 @@
  *    Jeff Taylor
  */
 
-/* oclptxhandler.cc
- *
- *
- * Part of
- *    oclptx
- * OpenCL-based, GPU accelerated probtrackx algorithm module, to be used
- * with FSL - FMRIB's Software Library
- *
- * This file is part of oclptx.
- *
- * oclptx is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * oclptx is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with oclptx.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
-
+#include "oclptxhandler.h"
 
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
 #include <mutex>
-//#include <mutex>
-//#include <thread>
 
+#include "collatz_particle.h"
 
 #define __CL_ENABLE_EXCEPTIONS
 // adds exception support from CL libraries
 // define before CL headers inclusion
+// jeff: seriously?  What about C++ ODR?
 
 #ifdef __APPLE__
 #include <OpenCL/opencl.hpp>
@@ -50,7 +25,6 @@
 #include <CL/cl.hpp>
 #endif
 
-#include "oclptxhandler.h"
 
 //
 // Assorted Functions Declerations
@@ -318,6 +292,7 @@ void OclPtxHandler::WriteSamplesToDevice(
   this->ocl_cq->finish();
 }
 
+#if 0
 void OclPtxHandler::WriteInitialPosToDevice(
   const float4* initial_positions,
   const int4* initial_elem,
@@ -449,20 +424,21 @@ void OclPtxHandler::WriteInitialPosToDevice(
 
   delete[] pos_container;
 }
+#endif
 
-void OclPtxHandler::RunCollatzKernel(struct particles *p, int side)
+void OclPtxHandler::RunCollatzKernel(struct particle::particles *p, int side)
 {
-  cl::NDRange particles_to_compute(p->attrs->particles_per_side);
-  cl::NDRange particle_offset(p->attrs->particles_per_side * side);
+  cl::NDRange particles_to_compute(p->attrs.particles_per_side);
+  cl::NDRange particle_offset(p->attrs.particles_per_side * side);
   cl::NDRange local_range(1);
 
   this->ptx_kernel->setArg(
       0,
-      reinterpret_cast<void*>(&p->attrs),
-      sizeof(struct particle_attrs));
-  this->ptx_kernel->setArg(1, p->gpu_data);
-  this->ptx_kernel->setArg(2, p->gpu_status);
-  this->ptx_kernel->setArg(3, p->gpu_path);
+      sizeof(struct particle::particle_attrs),
+      reinterpret_cast<void*>(&p->attrs));
+  this->ptx_kernel->setArg(1, *p->gpu_data);
+  this->ptx_kernel->setArg(2, *p->gpu_complete);
+  this->ptx_kernel->setArg(3, *p->gpu_path);
 
   this->ocl_cq->enqueueNDRangeKernel(
     *(this->ptx_kernel),
