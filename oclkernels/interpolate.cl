@@ -84,6 +84,8 @@ __kernel void OclPtxInterpolate(
     particle_index*(max_steps + 1) + steps_taken;
     
   uint interval_steps_taken;
+
+  uint pdf_entries_per_particle = (sample_nx*sample_ny*sample_nz / 32) + 1;
   
   uint3 current_select_vertex;
 
@@ -155,6 +157,9 @@ __kernel void OclPtxInterpolate(
 #endif
     // Volume Fraction Selection
 #ifdef PRNG
+    //
+    // Steve; Should I convert rng_output to float before compare? Ask jeff...
+    //
     rng_output = Rand(rng  + particle_index);
     vol_frac = volume_fraction.s0 * rand_max;
 
@@ -277,10 +282,12 @@ __kernel void OclPtxInterpolate(
     vertex_num =
       round(particle_pos.s0)*round(particle_pos.s1)*round(particle_pos.s2);
     entry_num = vertex_num / 32;
-    shift_num = (vertex_num % 32) - 1;
+    shift_num = 31 - (vertex_num % 32);
 
-    particle_entry = particle_pdfs[particle_index * n_particles + entry_num];
-    particle_pdfs[particle_index * n_particles + entry_num] = particle_entry | (0x00000001 << shift_num);
+    particle_entry =
+      particle_pdfs[particle_index * pdf_entries_per_particle + entry_num];
+    particle_pdfs[particle_index * pdf_entries_per_particle + entry_num] =
+      particle_entry | (0x00000001 << shift_num);
     
     if (steps_taken == max_steps){
       particle_done[particle_index] = 1;

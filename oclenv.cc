@@ -514,7 +514,7 @@ void OclEnv::AllocateSamples(
     single_direction_size*f_data->ns*sizeof(float);
 
   cl_uint total_mem_size =
-    single_direction_mem_size*this->env_data.bpx_dirs;
+    single_direction_mem_size;//*this->env_data.bpx_dirs;
 
   this->env_data.samples_buffer_size = total_mem_size;
 
@@ -523,39 +523,45 @@ void OclEnv::AllocateSamples(
   this->env_data.nz = f_data->nz;
   this->env_data.ns = f_data->ns;
 
+  printf("Voxel Dims (x,y,z): %u, %u, %u\n", f_data->nx, f_data->ny, f_data->nz);
+  printf("Num Samples: %u\n", f_data->ns);
+  printf("Sample Mem Size: %u (B), %.4f (MB), \n", single_direction_mem_size,
+    single_direction_mem_size/1e6);
+  std::cin.get();
+
   this->env_data.f_samples_buffer = new
     cl::Buffer(
       this->ocl_context,
-      CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR,
+      CL_MEM_READ_ONLY,
       total_mem_size,
-      f_data->data.at(0),
+      NULL,
       NULL
     );
 
   this->env_data.theta_samples_buffer = new
     cl::Buffer(
       this->ocl_context,
-      CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR,
+      CL_MEM_READ_ONLY,
       total_mem_size,
-      theta_data->data.at(0),
+      NULL,
       NULL
     );
 
   this->env_data.phi_samples_buffer = new
     cl::Buffer(
       this->ocl_context,
-      CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR,
+      CL_MEM_READ_ONLY,
       total_mem_size,
-      phi_data->data.at(0),
+      NULL,
       NULL
     );
 
   this->env_data.brain_mask_buffer = new
     cl::Buffer(
       this->ocl_context,
-      CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR,
+      CL_MEM_READ_ONLY,
       brain_mem_size,
-      const_cast<unsigned short int*>(brain_mask),
+      NULL,
       NULL
     );
 
@@ -568,8 +574,52 @@ void OclEnv::AllocateSamples(
       single_pdf_mask_size * sizeof(uint32_t);
     this->env_data.pdf_entries_per_particle = single_pdf_mask_size;
 
-    std::cout<<"global: "<<this->env_data.global_pdf_mem_size <<"\n";
-    std::cout<<"part: "<<this->env_data.particle_pdf_mask_size <<"\n";
+    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+    {
+      this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        *(this->env_data.f_samples_buffer),
+        CL_FALSE,
+        static_cast<unsigned int>(0),
+        total_mem_size,
+        f_data->data.at(0),
+        NULL,
+        NULL
+      );
+
+      this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        *(this->env_data.theta_samples_buffer),
+        CL_FALSE,
+        static_cast<unsigned int>(0),
+        total_mem_size,
+        theta_data->data.at(0),
+        NULL,
+        NULL
+      );
+
+      this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        *(this->env_data.phi_samples_buffer),
+        CL_FALSE,
+        static_cast<unsigned int>(0),
+        total_mem_size,
+        phi_data->data.at(0),
+        NULL,
+        NULL
+      );
+
+      this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        *(this->env_data.brain_mask_buffer),
+        CL_FALSE,
+        static_cast<unsigned int>(0),
+        brain_mem_size,
+        const_cast<unsigned short int*>(brain_mask),
+        NULL,
+        NULL
+      );
+    }
+    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+    {
+      this->ocl_device_queues.at(d).finish();
+    }
 }
 
 // void OclEnv::ProcessOptions( oclptxOptions* options)

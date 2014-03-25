@@ -77,6 +77,8 @@ int main(int argc, char *argv[] )
                           //environment.GetKernel(0));
 
   // Sample Manager
+  auto t_end = std::chrono::high_resolution_clock::now();
+  auto t_start = std::chrono::high_resolution_clock::now();
 
   SampleManager& s_manager = SampleManager::GetInstance();
   if(&s_manager == NULL)
@@ -171,17 +173,22 @@ int main(int argc, char *argv[] )
       std::cout<<"Press Any Button To Continue...\n";
       std::cin.get();
 
+      t_start = std::chrono::high_resolution_clock::now();
+
       for (unsigned int d = 0; d < n_devices; d++)
       {
         handlers.at(d)->Interpolate();
         std::cout<<"Device " << d << ", interp done\n";
+        //t_end = std::chrono::high_resolution_clock::now();
         handlers.at(d)->PdfSum();
         std::cout<<"Device " << d << ", pdf done\n";
       }
-      //handler.Reduce();
-      //std::cout<<"reduce done\n";
-      //handler.Interpolate();
-      //std::cout<<"interp done\n";
+
+      t_end = std::chrono::high_resolution_clock::now();
+      std::cout<< "Interpolation Test Time:" <<
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+            t_end-t_start).count() << std::endl;
+
       std::string path_filename = GenerateFile("_PATHS.dat");
       std::string pdf_filename = GenerateFile("_PDF.dat");
 
@@ -212,7 +219,7 @@ int main(int argc, char *argv[] )
       std::vector<uint32_t> global_pdf(pdf_size, 0);
       uint32_t* device_pdf = new uint32_t[pdf_size];
 
-      std::cout<<"Writing PDF Data to File\n";
+      printf("Writing PDF Data to %s\n", pdf_filename.c_str());
       for (unsigned int d = 0; d < n_devices; d++)
       {
         handlers.at(d)->GetPdfData(device_pdf);

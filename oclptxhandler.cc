@@ -139,7 +139,7 @@ void OclPtxHandler::ParticlePathsToFile(std::string path_filename)
 
   std::vector<float> temp_x, temp_y, temp_z;
 
-  printf("Writing to %s\n", path_filename.c_str());
+  printf("Writing Path Data to %s\n", path_filename.c_str());
 
   path_file = fopen(path_filename.c_str(), "ab");
 
@@ -360,6 +360,9 @@ void OclPtxHandler::WriteInitialPosToDevice(
   this->max_steps = maximum_steps;
   this->particle_path_size = maximum_steps + 1;
 
+  uint32_t global_pdf_size =
+    this->env_dat->nx*this->env_dat->ny*this->env_dat->nz;
+
   uint32_t path_mem_size =
     this->section_size*this->particle_path_size*sizeof(float4);
   uint32_t path_steps_mem_size = this->section_size*sizeof(unsigned int);
@@ -380,7 +383,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
   // also doubles as the "is done" initial data
   std::vector<uint32_t> initial_steps(this->section_size, 0);
   std::vector<uint32_t> init_pdfs(pdfs_size, 0);
-
+  std::vector<uint32_t> initial_global_pdf(global_pdf_size, 0);
   // delete this at end of function always
   float4* pos_container;
   pos_container = new float4[this->section_size * this->particle_path_size];
@@ -474,11 +477,11 @@ void OclPtxHandler::WriteInitialPosToDevice(
   );
 
   this->ocl_cq->enqueueWriteBuffer(
-    this->particle_done_buffer,
+    this->global_pdf_buffer,
     CL_FALSE,
     static_cast<uint32_t>(0),
-    path_steps_mem_size,
-    initial_steps.data(),
+    this->env_dat->global_pdf_mem_size,
+    initial_global_pdf.data(),
     NULL,
     NULL
   );
@@ -660,8 +663,11 @@ void OclPtxHandler::Interpolate()
 
 void OclPtxHandler::PdfSum()
 {
-  cl::NDRange global_range(
-      this->env_dat->nx, this->env_dat->ny, this->env_dat->nz);
+  // cl::NDRange global_range(
+  //     this->env_dat->nx, this->env_dat->ny, this->env_dat->nz);
+  // cl::NDRange local_range(1,1,1);
+
+  cl::NDRange global_range(this->env_dat->pdf_entries_per_particle);
   cl::NDRange local_range(1,1,1);
 
   this->sum_kernel->setArg(0, this->global_pdf_buffer);
@@ -669,6 +675,9 @@ void OclPtxHandler::PdfSum()
   this->sum_kernel->setArg(2, this->particle_done_buffer);
   this->sum_kernel->setArg(3, this->n_particles);
   this->sum_kernel->setArg(4, this->env_dat->pdf_entries_per_particle);
+  this->sum_kernel->setArg(5, this->env_dat->nx);
+  this->sum_kernel->setArg(6, this->env_dat->ny);
+  this->sum_kernel->setArg(7, this->env_dat->nz);
 
   try{
     this->ocl_cq->enqueueNDRangeKernel(
