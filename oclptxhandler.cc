@@ -6,21 +6,14 @@
 
 #include "oclptxhandler.h"
 
-#include "assert.h"
-
-#include <iostream>
+#include <assert.h>
 #include <fstream>
+#include <iostream>
 #include <sstream>
+#include <string>
 #include <vector>
-#include <mutex>
-
-#include "collatz_particle.h"
 
 #define __CL_ENABLE_EXCEPTIONS
-// adds exception support from CL libraries
-// define before CL headers inclusion
-// jeff: seriously?  What about C++ ODR?
-
 #ifdef __APPLE__
 #include <OpenCL/opencl.hpp>
 #else
@@ -34,7 +27,7 @@ void OclPtxHandler::Init(
   const BedpostXData *f,
   const BedpostXData *phi,
   const BedpostXData *theta,
-  unsigned int num_directions,
+  int num_directions,
   const unsigned short int *brain_mask,
   struct OclPtxHandler::particle_attrs *attrs)
 {
@@ -81,8 +74,8 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
     temp_completion[i] = 1;
 
   cq_->enqueueWriteBuffer(
-      *gpu_complete, 
-      true, 
+      *gpu_complete,
+      true,
       0,
       2 * attrs_.particles_per_side * sizeof(cl_ushort),
       reinterpret_cast<void*>(temp_completion));
@@ -106,18 +99,16 @@ void OclPtxHandler::ParticlePathsToFile()
 
   cq_->enqueueReadBuffer(
     this->particle_paths_buffer,
-    CL_FALSE, // blocking
+    CL_FALSE,  // blocking
     0,
     this->particles_mem_size,
-    particle_paths
-  );
+    particle_paths);
   cq_->enqueueReadBuffer(
     this->particle_steps_taken_buffer,
-    CL_FALSE, // blocking
+    CL_FALSE,  // blocking
     0,
     this->particle_uint_mem_size,
-    particle_steps
-  );
+    particle_steps);
   cq_->finish();
 
   // now dump to file
@@ -194,25 +185,25 @@ void OclPtxHandler::ParticlePathsToFile()
   delete[] particle_steps;
 }
 
-// TODO @STEVE add brain mask support
+// TODO(steve) add brain mask support
 void OclPtxHandler::WriteSamplesToDevice(
   const BedpostXData* f_data,
   const BedpostXData* phi_data,
   const BedpostXData* theta_data,
-  unsigned int num_directions,
+  int num_directions,
   const unsigned short int* brain_mask
 )
 {
-  unsigned int single_direction_size =
+  int single_direction_size =
     f_data->nx * f_data->ny * f_data->nz;
 
-  unsigned int brain_mem_size =
-    single_direction_size * sizeof(unsigned short int);
+  int brain_mem_size =
+    single_direction_size * sizeof(short);
 
-  unsigned int single_direction_mem_size =
+  int single_direction_mem_size =
     single_direction_size*f_data->ns*sizeof(float4);
 
-  unsigned int total_mem_size =
+  int total_mem_size =
     single_direction_mem_size*num_directions;
 
   this->samples_buffer_size = total_mem_size;
@@ -224,43 +215,39 @@ void OclPtxHandler::WriteSamplesToDevice(
 
   this->f_samples_buffer =
     cl::Buffer(
-      *(context_),
-      CL_MEM_READ_ONLY,
-      total_mem_size,
-      NULL,
-      NULL
-    );
+        *(context_),
+        CL_MEM_READ_ONLY,
+        total_mem_size,
+        NULL,
+        NULL);
 
   this->theta_samples_buffer =
     cl::Buffer(
-      *(context_),
-      CL_MEM_READ_ONLY,
-      total_mem_size,
-      NULL,
-      NULL
-    );
+        *(context_),
+        CL_MEM_READ_ONLY,
+        total_mem_size,
+        NULL,
+        NULL);
 
   this->phi_samples_buffer =
     cl::Buffer(
-      *(context_),
-      CL_MEM_READ_ONLY,
-      total_mem_size,
-      NULL,
-      NULL
-    );
+        *(context_),
+        CL_MEM_READ_ONLY,
+        total_mem_size,
+        NULL,
+        NULL);
 
   this->brain_mask_buffer =
     cl::Buffer(
-      *(context_),
-      CL_MEM_READ_ONLY,
-      brain_mem_size,
-      NULL,
-      NULL
-    );
+        *(context_),
+        CL_MEM_READ_ONLY,
+        brain_mem_size,
+        NULL,
+        NULL);
 
   // enqueue writes
 
-  for (unsigned int d=0; d<num_directions; d++)
+  for (int d = 0; d < num_directions; d++)
   {
     cq_->enqueueWriteBuffer(
         this->f_samples_buffer,
@@ -269,8 +256,7 @@ void OclPtxHandler::WriteSamplesToDevice(
         single_direction_mem_size,
         f_data->data.at(d),
         NULL,
-        NULL
-    );
+        NULL);
 
     cq_->enqueueWriteBuffer(
       this->theta_samples_buffer,
@@ -279,8 +265,7 @@ void OclPtxHandler::WriteSamplesToDevice(
       single_direction_mem_size,
       theta_data->data.at(d),
       NULL,
-      NULL
-    );
+      NULL);
 
     cq_->enqueueWriteBuffer(
       this->phi_samples_buffer,
@@ -289,8 +274,7 @@ void OclPtxHandler::WriteSamplesToDevice(
       single_direction_mem_size,
       phi_data->data.at(d),
       NULL,
-      NULL
-    );
+      NULL);
   }
 
   cq_->enqueueWriteBuffer(
@@ -300,8 +284,7 @@ void OclPtxHandler::WriteSamplesToDevice(
     brain_mem_size,
     brain_mask,
     NULL,
-    NULL
-  );
+    NULL);
 
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
@@ -348,8 +331,8 @@ void OclPtxHandler::WriteParticle(
 
   // Write particle_data
   ret = cq_->enqueueWriteBuffer(
-      *gpu_data, 
-      true, 
+      *gpu_data,
+      true,
       offset * sizeof(struct particle_data),
       sizeof(struct particle_data),
       reinterpret_cast<void*>(data));

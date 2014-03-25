@@ -7,13 +7,13 @@
 struct particle_data
 {
   ulong value;
-} __attribute__ ((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct particle_attrs
 {
   int num_steps;
   int particles_per_side;
-} __attribute__ ((aligned(8)));
+} __attribute__((aligned(8)));
 
 __kernel void Collatz(
   struct particle_attrs attrs,  /* RO */
@@ -41,7 +41,6 @@ __kernel void Collatz(
 
     index = glid * attrs.num_steps + step;
     path_output[index] = state[glid].value;
-    //path_output[index] = complete[glid];
   }
 }
 

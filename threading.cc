@@ -43,7 +43,7 @@ void Worker(struct shared_data *sdata, OclPtxHandler *handler, int num_reducers)
   // only access the one side.  We must only copy data to and from the
   // non-running side.
   int inactive_side = 0;
-  bool has_data_side[2] = {true,true};
+  bool has_data_side[2] = {true, true};
   std::unique_lock<std::mutex> *lk[num_reducers];
 
   while (1)
@@ -77,11 +77,11 @@ void Worker(struct shared_data *sdata, OclPtxHandler *handler, int num_reducers)
       {
         has_data_side[inactive_side] = true;
         for (int j = 0; j < sdata[i].count; ++j)
-          handler->WriteParticle((sdata[i].chunk + j), sdata[i].particle_offset[j]);
+          handler->WriteParticle(
+              (sdata[i].chunk + j),
+              sdata[i].particle_offset[j]);
       }
     }
-
-    //gpu->WaitForKernel(); // TODO(jeff) oclptxhandler equiv?
 
     handler->RunKernel(inactive_side);
 
@@ -120,7 +120,9 @@ void Worker(struct shared_data *sdata, OclPtxHandler *handler, int num_reducers)
   }
 }
 
-void Reducer(struct shared_data *sdata, Fifo<OclPtxHandler::particle_data> *particles)
+void Reducer(
+    struct shared_data *sdata,
+    Fifo<OclPtxHandler::particle_data> *particles)
 {
   struct OclPtxHandler::particle_data *particle;
   int reduced_count;
@@ -171,7 +173,10 @@ void Reducer(struct shared_data *sdata, Fifo<OclPtxHandler::particle_data> *part
   }
 }
 
-void RunThreads(OclPtxHandler *handler, Fifo<OclPtxHandler::particle_data> *particles, int num_reducers)
+void RunThreads(
+    OclPtxHandler *handler,
+    Fifo<OclPtxHandler::particle_data> *particles,
+    int num_reducers)
 {
   // Push blank data with complete=1 to reducer.  It will fill it in with
   // particles.
@@ -206,7 +211,7 @@ void RunThreads(OclPtxHandler *handler, Fifo<OclPtxHandler::particle_data> *part
     particle_offset = new int[chunk_size];
 
     for (int j = 0; j < chunk_size; ++j)
-      status[j] = true; // complete = 1
+      status[j] = true;  // complete = 1
 
     sdata[i].chunk = data;
     sdata[i].chunk_offset = offset;

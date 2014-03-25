@@ -8,7 +8,6 @@
 #include "oclenv.h"
 #include "oclptxhandler.h"
 #include "threading.h"
-#include "collatz_particle.h"
 
 // log base 2
 int lb(int x)
@@ -56,11 +55,15 @@ int main(int argc, char **argv)
   handler.Init(env.GetContext(),
                env.GetCq(0),
                env.GetKernel(0),
-               NULL, NULL, NULL, 0, NULL, // 5 bedpost data values.
+               NULL, NULL, NULL, 0, NULL,  // 5 bedpost data values.
                &attrs);
 
   // Start up the threads.
-  std::thread gpu_manager(threading::RunThreads, &handler, &particles_fifo, kNumReducers);
+  std::thread gpu_manager(
+      threading::RunThreads,
+      &handler,
+      &particles_fifo,
+      kNumReducers);
   gpu_manager.join();
 
   return 0;
