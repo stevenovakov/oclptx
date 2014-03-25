@@ -87,9 +87,9 @@ struct FloatVolume
 struct BedpostXData
 {
   std::vector<float*> data;
-  unsigned int nx, ny, nz;  // discrete dimensions of mesh
-  unsigned int ns;          //number of samples
-  // unsigned int num_dir;
+  uint32_t nx, ny, nz;  // discrete dimensions of mesh
+  uint32_t ns;          //number of samples
+  // uint32_t num_dir;
   // cl::Buffer data_cl_buffer;
 };
 //
@@ -124,37 +124,38 @@ struct EnvironmentData
   // in an attempt to stave off fragmentation issues.
 
   //Input Data - Size Related
-  unsigned int nx; //
-  unsigned int ny; // also serves as mask dims
-  unsigned int nz; //
-  unsigned int ns;
+  uint32_t nx; //
+  uint32_t ny; // also serves as mask dims
+  uint32_t nz; //
+  uint32_t ns;
 
-  unsigned int bpx_dirs;
-  unsigned int n_waypts;
+  uint32_t bpx_dirs;
+  uint32_t n_waypts;
   bool exclusion_mask;
   bool terminate_mask;
   bool prefdir;
-  unsigned int loopcheck_fraction;
-  unsigned int max_steps;
+  uint32_t loopcheck_fraction;
+  uint32_t max_steps;
   bool save_paths;
   bool euler_streamline;
 
-  unsigned int section_size;
-  unsigned int pdf_entries_per_particle;
-
+  uint32_t section_size;
+  uint32_t pdf_entries_per_particle;
+  uint32_t global_pdf_size;
+  
   //values to use for computation, buffers
-  unsigned int interval_size; //2R in Oclptx Data Diagram 2.odg
+  uint32_t interval_size; //2R in Oclptx Data Diagram 2.odg
 
   cl_uint samples_buffer_size;
   cl_uint particle_paths_mem_size;
   cl_uint particle_uint_mem_size;
   cl_uint particles_prng_mem_size;
   cl_uint mask_mem_size;
-  cl_uint particle_pdf_mask_size;
+  cl_uint particle_pdf_mask_mem_size;
   cl_uint global_pdf_mem_size;
 
-  unsigned int total_static_gpu_mem;
-  unsigned int dynamic_gpu_mem_left;
+  uint32_t total_static_gpu_mem;
+  uint32_t dynamic_gpu_mem_left;
 
   //
   // TODO (these probably should not be here)

@@ -185,7 +185,7 @@ int main(int argc, char *argv[] )
       }
 
       t_end = std::chrono::high_resolution_clock::now();
-      std::cout<< "Interpolation Test Time:" <<
+      std::cout<< "Total Tracking Time (ns): " <<
           std::chrono::duration_cast<std::chrono::nanoseconds>(
             t_end-t_start).count() << std::endl;
 
@@ -214,19 +214,19 @@ int main(int argc, char *argv[] )
       fclose(path_file);
 
       EnvironmentData * env_data = environment.GetEnvData();
-      uint32_t pdf_size = env_data->nx * env_data->ny * env_data->nz;
 
-      std::vector<uint32_t> global_pdf(pdf_size, 0);
-      uint32_t* device_pdf = new uint32_t[pdf_size];
+      std::vector<uint32_t> global_pdf(env_data->global_pdf_size, 0);
+      uint32_t* device_pdf = new uint32_t[env_data->global_pdf_size];
 
-      printf("Writing PDF Data to %s\n", pdf_filename.c_str());
+      printf("Summing PDF(s) from all Devices...\n");
       for (unsigned int d = 0; d < n_devices; d++)
       {
         handlers.at(d)->GetPdfData(device_pdf);
         WriteToPdf(&global_pdf, device_pdf);
       }
-
       delete[] device_pdf;
+
+      printf("Writing PDF Data to %s\n", pdf_filename.c_str());
       PdfToFile(pdf_filename, &global_pdf,
         env_data->nx, env_data->ny, env_data->nz);
 

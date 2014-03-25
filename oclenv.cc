@@ -257,10 +257,11 @@ void OclEnv::CreateKernels()
   cl_int err;
 
   // Read Source
+  std::string fold = "oclkernels";
 
   std::string interp_kernel_source;
-
-  std::string fold = "oclkernels";
+  std::string sum_kernel_source = fold + slash + "summing.cl";
+  std::string define_list =  "-I ./oclkernels -D PRNG";
 
   if (this->ocl_routine_name == "standard")
   {
@@ -280,7 +281,6 @@ void OclEnv::CreateKernels()
     interp_kernel_source = fold + slash + "basic.cl";
   }
 
-  std::string sum_kernel_source = fold + slash + "summing.cl";
 
   std::ifstream main_stream(interp_kernel_source);
   std::string main_code(  (std::istreambuf_iterator<char>(main_stream) ),
@@ -306,7 +306,7 @@ void OclEnv::CreateKernels()
 
   cl::Program main_program(this->ocl_context, main_source);
 
-  err = main_program.build(this->ocl_devices, "-I ./oclkernels -D PRNG");
+  err = main_program.build(this->ocl_devices, define_list.c_str());
 
   if( this->OclErrorStrings(err) != "CL_SUCCESS")
   {
@@ -505,7 +505,8 @@ void OclEnv::AllocateSamples(
   cl_uint single_direction_size =
     f_data->nx * f_data->ny * f_data->nz;
 
-  cl_uint single_pdf_mask_size = (single_direction_size / 32)  + 1;
+  cl_uint single_pdf_mask_size = (single_direction_size / 32)  +
+    ((single_direction_size%32 > 0)? 1 : 0);
 
   cl_uint brain_mem_size =
     single_direction_size * sizeof(unsigned short int);
@@ -527,6 +528,7 @@ void OclEnv::AllocateSamples(
   printf("Num Samples: %u\n", f_data->ns);
   printf("Sample Mem Size: %u (B), %.4f (MB), \n", single_direction_mem_size,
     single_direction_mem_size/1e6);
+  printf("Press any button to continue...\n");
   std::cin.get();
 
   this->env_data.f_samples_buffer = new
@@ -568,12 +570,18 @@ void OclEnv::AllocateSamples(
     // 2*brain mem size for the pdf. Each device has a pdf.
     this->env_data.total_static_gpu_mem = 3*total_mem_size + 2*brain_mem_size;
 
+    this->env_data.global_pdf_size = single_pdf_mask_size * 32;
     this->env_data.global_pdf_mem_size =
-      single_direction_size * sizeof(uint32_t);
-    this->env_data.particle_pdf_mask_size =
+      this->env_data.global_pdf_size * sizeof(uint32_t);
+    this->env_data.particle_pdf_mask_mem_size =
       single_pdf_mask_size * sizeof(uint32_t);
     this->env_data.pdf_entries_per_particle = single_pdf_mask_size;
 
+    //
+    // TODO @STEVE
+    // I should instantiate/write globalpdf here, it has to go to each
+    // device anyways...
+    //
     for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
     {
       this->ocl_device_queues.at(d).enqueueWriteBuffer(

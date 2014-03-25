@@ -72,7 +72,7 @@ class OclPtxHandler{
     
     unsigned int GpuMemUsed();
 
-    void GetPdfData(uint32_t * container);
+    void GetPdfData(uint32_t* container);
 
     //
     // OCL Initialization

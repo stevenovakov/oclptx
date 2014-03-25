@@ -191,12 +191,8 @@ unsigned int OclPtxHandler::GpuMemUsed()
   return this->total_gpu_mem_size;
 }
 
-void OclPtxHandler::GetPdfData( uint32_t * container)
+void OclPtxHandler::GetPdfData( uint32_t* container)
 {
-  unsigned int vol_size = this->env_dat->nx*this->env_dat->ny*this->env_dat->nz;
-
-  container =
-    new uint32_t[vol_size];
   this->ocl_cq->enqueueReadBuffer(
     this->global_pdf_buffer,
     CL_FALSE,
@@ -204,7 +200,6 @@ void OclPtxHandler::GetPdfData( uint32_t * container)
     this->env_dat->global_pdf_mem_size,
     container
   );
-
   this->ocl_cq->finish();
 }
 
@@ -213,137 +208,6 @@ void OclPtxHandler::GetPdfData( uint32_t * container)
 // OclPtxHandler Container Initializations
 //
 //*********************************************************************
-
-// May want overarching initialize() that simply wraps everything
-// below to be called by std::thread
-//
-// void Initialize()
-
-// TODO @STEVE add brain mask support
-// void OclPtxHandler::WriteSamplesToDevice(
-//   const BedpostXData* f_data,
-//   const BedpostXData* phi_data,
-//   const BedpostXData* theta_data,
-//   unsigned int num_directions,
-//   const unsigned short int* brain_mask
-// )
-// {
-//   unsigned int single_direction_size =
-//     f_data->nx * f_data->ny * f_data->nz;
-
-//   unsigned int brain_mem_size =
-//     single_direction_size * sizeof(unsigned short int);
-
-//   unsigned int single_direction_mem_size =
-//     single_direction_size*f_data->ns*sizeof(float);
-
-//   unsigned int total_mem_size =
-//     single_direction_mem_size*num_directions;
-
-//   this->samples_buffer_size = total_mem_size;
-
-//   this->sample_nx = f_data->nx;
-//   this->sample_ny = f_data->ny;
-//   this->sample_nz = f_data->nz;
-//   this->sample_ns = f_data->ns;
-
-//   // diagnostics
-//   // std::cout<<"Brain Mem Size: "<< brain_mem_size <<"\n";
-//   // std::cout<<"Samples Size: "<< single_direction_mem_size << "\n";
-//   // std::cout<<"Nx : " << this->sample_nx <<"\n";
-//   // std::cout<<"Ny : " << this->sample_ny <<"\n";
-//   // std::cout<<"Nz : " << this->sample_nz <<"\n";
-//   // std::cout<<"Ns : " << this->sample_ns <<"\n";
-//   // diagnostics
-
-//   this->f_samples_buffer =
-//     cl::Buffer(
-//       *(this->ocl_context),
-//       CL_MEM_READ_ONLY,
-//       total_mem_size,
-//       NULL,
-//       NULL
-//     );
-
-//   this->theta_samples_buffer =
-//     cl::Buffer(
-//       *(this->ocl_context),
-//       CL_MEM_READ_ONLY,
-//       total_mem_size,
-//       NULL,
-//       NULL
-//     );
-
-//   this->phi_samples_buffer =
-//     cl::Buffer(
-//       *(this->ocl_context),
-//       CL_MEM_READ_ONLY,
-//       total_mem_size,
-//       NULL,
-//       NULL
-//     );
-
-//   this->brain_mask_buffer =
-//     cl::Buffer(
-//       *(this->ocl_context),
-//       CL_MEM_READ_ONLY,
-//       brain_mem_size,
-//       NULL,
-//       NULL
-//     );
-
-//   // enqueue writes
-
-//   for (unsigned int d=0; d<num_directions; d++)
-//   {
-
-//     this->ocl_cq->enqueueWriteBuffer(
-//         this->f_samples_buffer,
-//         CL_FALSE,
-//         d * single_direction_mem_size,
-//         single_direction_mem_size,
-//         f_data->data.at(d),
-//         NULL,
-//         NULL
-//     );
-
-//     this->ocl_cq->enqueueWriteBuffer(
-//       this->theta_samples_buffer,
-//       CL_FALSE,
-//       d * single_direction_mem_size,
-//       single_direction_mem_size,
-//       theta_data->data.at(d),
-//       NULL,
-//       NULL
-//     );
-
-//     this->ocl_cq->enqueueWriteBuffer(
-//       this->phi_samples_buffer,
-//       CL_FALSE,
-//       d * single_direction_mem_size,
-//       single_direction_mem_size,
-//       phi_data->data.at(d),
-//       NULL,
-//       NULL
-//     );
-//   }
-
-//   this->ocl_cq->enqueueWriteBuffer(
-//     this->brain_mask_buffer,
-//     CL_FALSE,
-//     static_cast<unsigned int>(0),
-//     brain_mem_size,
-//     brain_mask,
-//     NULL,
-//     NULL
-//   );
-
-//   this->total_gpu_mem_size += 3*total_mem_size + brain_mem_size;
-
-//   // may not need to do this here, may want to wait to block until
-//   // all "initialization" operations are finished.
-//   this->ocl_cq->finish();
-// }
 
 void OclPtxHandler::WriteInitialPosToDevice(
   const float4* initial_positions,
@@ -370,7 +234,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
   uint32_t pdfs_size =
     this->env_dat->pdf_entries_per_particle * this->n_particles;
   uint32_t pdfs_mem_size =
-    this->env_dat->particle_pdf_mask_size * this->n_particles;
+    this->env_dat->particle_pdf_mask_mem_size * this->n_particles;
 
   this->particle_uint_mem_size = path_steps_mem_size;
   this->particles_mem_size = path_mem_size;
@@ -383,7 +247,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
   // also doubles as the "is done" initial data
   std::vector<uint32_t> initial_steps(this->section_size, 0);
   std::vector<uint32_t> init_pdfs(pdfs_size, 0);
-  std::vector<uint32_t> initial_global_pdf(global_pdf_size, 0);
+  std::vector<uint32_t> initial_global_pdf(this->env_dat->global_pdf_size, 0);
   // delete this at end of function always
   float4* pos_container;
   pos_container = new float4[this->section_size * this->particle_path_size];
@@ -497,7 +361,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
   );
 
   this->total_gpu_mem_size += path_mem_size + 2*path_steps_mem_size +
-    this->env_dat->particle_pdf_mask_size * this->n_particles;
+    this->env_dat->particle_pdf_mask_mem_size * this->n_particles;
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
   this->ocl_cq->finish();
@@ -668,16 +532,13 @@ void OclPtxHandler::PdfSum()
   // cl::NDRange local_range(1,1,1);
 
   cl::NDRange global_range(this->env_dat->pdf_entries_per_particle);
-  cl::NDRange local_range(1,1,1);
+  cl::NDRange local_range(1);
 
   this->sum_kernel->setArg(0, this->global_pdf_buffer);
   this->sum_kernel->setArg(1, this->particles_pdf_buffer);
   this->sum_kernel->setArg(2, this->particle_done_buffer);
   this->sum_kernel->setArg(3, this->n_particles);
   this->sum_kernel->setArg(4, this->env_dat->pdf_entries_per_particle);
-  this->sum_kernel->setArg(5, this->env_dat->nx);
-  this->sum_kernel->setArg(6, this->env_dat->ny);
-  this->sum_kernel->setArg(7, this->env_dat->nz);
 
   try{
     this->ocl_cq->enqueueNDRangeKernel(
