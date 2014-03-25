@@ -5,16 +5,14 @@
 #ifndef THREADING_H_
 #define THREADING_H_
 
-#include "particle.h"
 #include "fifo.h"
 
 namespace threading
 {
 
 void RunThreads(
-    struct particle::particles *gpu,
     OclPtxHandler *handler,
-    Fifo<struct particle::particle_data> *particles,
+    Fifo<struct OclPtxHandler::particle_data> *particles,
     int num_reducers);
 
 }  // namespace threading

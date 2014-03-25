@@ -53,28 +53,56 @@
 
 class OclPtxHandler{
  public:
-  OclPtxHandler(){};
-  OclPtxHandler(cl::Context* cc,
-                cl::CommandQueue* cq,
-                cl::Kernel* ck);
+  struct particle_data
+  {
+    cl_ulong value;
+  } __attribute__ ((aligned(8)));
+
+  struct particle_attrs
+  {
+    cl_int num_steps;
+    cl_int particles_per_side;
+  } __attribute__ ((aligned(8)));
+
+  OclPtxHandler() {};
   ~OclPtxHandler();
+  void Init(
+      cl::Context *cc,
+      cl::CommandQueue *cq,
+      cl::Kernel *ck,
+      const BedpostXData *f,
+      const BedpostXData *phi,
+      const BedpostXData *theta,
+      unsigned int num_directions,
+      const unsigned short int *brain_mask,
+      struct particle_attrs *attrs);
 
-  void ParticlePathsToFile();   // do at end
-  bool IsFinished(){ return this->interpolation_complete; };
+  // TODO(jeff) Kill these two after I check that I do everything.
+  void ParticlePathsToFile();
+  void Interpolate();
 
-  // Initialization
+  // Run Kernel asyncronously
+  void RunKernel(int side);
+  // Write a single particle
+  void WriteParticle(struct particle_data *data, int offset);
+  // Read the "completion" buffer back into the vector pointed to by ret.
+  void ReadStatus(int offset, int count, cl_ushort *ret);
+  void DumpPath(int offset, int count, FILE *fd);
+
+  int particles_per_side();
+ private:
+  // Init helpers
   void WriteSamplesToDevice( const BedpostXData* f_data,
                               const BedpostXData* phi_data,
                               const BedpostXData* theta_data,
                               unsigned int num_directions,
                               const unsigned short int* brain_mask);
-  void Interpolate();
-  void RunCollatzKernel(struct particle::particles *p, int side);
-private:
+  void InitParticles(struct particle_attrs *attrs);
+
   // OpenCL Interface
-  cl::Context* ocl_context;
-  cl::CommandQueue* ocl_cq;
-  cl::Kernel* ptx_kernel;
+  cl::Context* context_;
+  cl::CommandQueue* cq_;
+  cl::Kernel* kernel_;
 
   // BedpostX Data
   cl::Buffer f_samples_buffer;
@@ -89,13 +117,6 @@ private:
   unsigned int n_particles;
   unsigned int max_steps;
 
-  // TODO @STEVE:  Some of this stuff will be GPU memory limited
-  // figure out which and how
-  
-  // TODO @STEVE: May have to introduce additional "status" buffers
-  // for things like waypoint/stop mask ,etc to check which particles
-  // are desireable.
-
   unsigned int section_size;
   unsigned int num_steps;
   unsigned int particles_size;
@@ -103,47 +124,20 @@ private:
   cl::Buffer particle_paths_buffer;
   cl::Buffer particle_steps_taken_buffer;
   cl::Buffer particle_elem_buffer;
-
   cl::Buffer particle_done_buffer;
-  //cl:Buffer particle_waypoint_buffer;
   
   unsigned int particles_mem_size;
   unsigned int particle_uint_mem_size;
   // size (Total Particles)/numDevices * (sizeof(float4))
+  
+  // Particle Data
+  cl::Buffer *gpu_data;  // Type particle_data
+  cl::Buffer *gpu_complete;  // Type cl_ushort array
 
-  //
-  // These are the "double buffer" objects
-  //
+  cl::Buffer *gpu_path;  // Type ulong
 
-  std::vector<cl::Buffer> compute_index_buffers;
-
-  std::vector< unsigned int > particle_indeces_left;
-  std::vector< unsigned int > particle_complete;
-  // Vector of max size (N/2 ) , where n is the total number
-  // of particles
-  std::vector< std::vector<unsigned int> > particle_todo;
-  // NDRange of current pair of enqueueNDRangeKernel
-  std::vector<unsigned int> todo_range;
-
-  // mutex for reduction/interpolation conflicts on local objects
-  std::mutex reduce_mutex;
-  // mutex for kernel 
-  std::mutex kernel_mutex;
-  // mutex for command queue access
-
-  // which half of particle_indeces/particle_complete needs to be
-  // interpolated next (either 0, or 1)
-  // TODO: Make sure there are no access conflicts within multithread
-  // scheme (e.g.  go to interpolate second half, but reduction
-  // method accidentally changed target_section to "0" again.
-  unsigned int target_section;
-  // this might need a mutex
-
-  bool interpolation_complete;
-  // false until there are zero particle paths left to compute.
-  // operations should finalize after NEXT interpolate call.
+  struct particle_attrs attrs_;
 };
 
 #endif
 
-//EOF

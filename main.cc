@@ -36,11 +36,11 @@ int main(int argc, char **argv)
   }
 
   // Add the particles to our list
-  Fifo<struct particle::particle_data> particles_fifo(lb(argc-1)+1);
-  struct particle::particle_data *data;
+  Fifo<struct OclPtxHandler::particle_data> particles_fifo(lb(argc-1)+1);
+  struct OclPtxHandler::particle_data *data;
   for (int i = 1; i < argc; ++i)
   {
-    data = new particle::particle_data;
+    data = new OclPtxHandler::particle_data;
     *data = {(uint64_t) atoi(argv[i])};
     particles_fifo.PushOrDie(data);
   }
@@ -49,18 +49,18 @@ int main(int argc, char **argv)
   OclEnv env("collatz");
   env.Init();
 
-  struct particle::particle_attrs attrs = {kStepsPerKernel, 0};
-
-  // Create some particle buffers
-  struct particle::particles *gpu_particles = NewParticles(&env, &attrs);
+  struct OclPtxHandler::particle_attrs attrs = {kStepsPerKernel, 0};
 
   // Create a new oclptxhandler.
-  OclPtxHandler handler(env.GetContext(),
-                        env.GetCq(0),
-                        env.GetKernel(0));
+  OclPtxHandler handler;
+  handler.Init(env.GetContext(),
+               env.GetCq(0),
+               env.GetKernel(0),
+               NULL, NULL, NULL, 0, NULL, // 5 bedpost data values.
+               &attrs);
 
   // Start up the threads.
-  std::thread gpu_manager(threading::RunThreads, gpu_particles, &handler, &particles_fifo, kNumReducers);
+  std::thread gpu_manager(threading::RunThreads, &handler, &particles_fifo, kNumReducers);
   gpu_manager.join();
 
   return 0;
