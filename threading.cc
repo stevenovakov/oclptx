@@ -105,11 +105,14 @@ void Worker(struct shared_data *sdata, OclPtxHandler *handler, int num_reducers)
         leftover_particles--;
       }
       handler->ReadStatus(offset, count, sdata[i].complete);
-      offset += count;
 
       sdata[i].data_ready = true;
       sdata[i].count = count;
+      sdata[i].chunk_offset = offset;
       sdata[i].data_ready_cv.notify_one();
+
+      offset += count;
+
       delete lk[i];
     }
 
