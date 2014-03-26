@@ -19,6 +19,7 @@ __kernel void Collatz(
   struct particle_attrs attrs,  /* RO */
   __global struct particle_data *state,  /* RW */
   __global ushort *complete,
+  __global ushort *num_steps,
   __global ulong *path_output)
 {
   int step;
@@ -40,7 +41,14 @@ __kernel void Collatz(
         1 == state[glid].value)
       complete[glid] = true;
     else
+    {
       complete[glid] = false;
+      num_steps[glid] += 1;
+    }
+
+
+    index = glid * attrs.num_steps + step;
+    path_output[index] = state[glid].value;
   }
 }
 

@@ -46,7 +46,7 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   attrs_ = *attrs;
 
   // TODO(jeff) compute num_particles
-  attrs_.particles_per_side = 42;
+  attrs_.particles_per_side = 2;
 
   gpu_data = new cl::Buffer(
       *context_,
@@ -69,6 +69,13 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   if (!gpu_path)
     abort();
 
+  gpu_step_count = new cl::Buffer(
+      *context_,
+      CL_MEM_READ_WRITE,
+      2 * attrs_.particles_per_side * sizeof(cl_ushort));
+  if (!gpu_step_count)
+    abort();
+
   // Initialize "completion" buffer.
   cl_ushort *temp_completion = new cl_ushort[2*attrs_.particles_per_side];
   for (int i = 0; i < 2 * attrs_.particles_per_side; ++i)
@@ -89,6 +96,7 @@ OclPtxHandler::~OclPtxHandler()
   delete gpu_path;
   delete gpu_complete;
   delete gpu_data;
+  delete gpu_step_count;
 }
 
 void OclPtxHandler::ParticlePathsToFile()
@@ -193,7 +201,7 @@ void OclPtxHandler::WriteSamplesToDevice(
   const BedpostXData* theta_data,
   int num_directions,
   const unsigned short int* brain_mask
-)
+  )
 {
   int single_direction_size =
     f_data->nx * f_data->ny * f_data->nz;
@@ -304,7 +312,8 @@ void OclPtxHandler::RunKernel(int side)
       reinterpret_cast<void*>(&attrs_));
   kernel_->setArg(1, *gpu_data);
   kernel_->setArg(2, *gpu_complete);
-  kernel_->setArg(3, *gpu_path);
+  kernel_->setArg(3, *gpu_step_count);
+  kernel_->setArg(4, *gpu_path);
 
   cq_->enqueueNDRangeKernel(
     *(kernel_),
@@ -353,6 +362,19 @@ void OclPtxHandler::WriteParticle(
     puts("Write failed!");
     abort();
   }
+
+  // step_count = 0
+  ret = cq_->enqueueWriteBuffer(
+      *gpu_step_count,
+      true,
+      offset * sizeof(cl_ushort),
+      sizeof(cl_ushort),
+      reinterpret_cast<void*>(&zero));
+  if (CL_SUCCESS != ret)
+  {
+    puts("Write failed!");
+    abort();
+  }
 }
 
 void OclPtxHandler::ReadStatus(int offset, int count, cl_ushort *ret)
@@ -367,7 +389,8 @@ void OclPtxHandler::ReadStatus(int offset, int count, cl_ushort *ret)
 
 void OclPtxHandler::DumpPath(int offset, int count, FILE *fd)
 {
-  cl_ulong *buf = new cl_ulong[count * attrs_.num_steps];
+  cl_ulong *path_buf = new cl_ulong[count * attrs_.num_steps];
+  cl_ushort *step_count_buf = new cl_ulong[count * attrs_.num_steps];
   int ret;
   int value;
 
@@ -387,7 +410,19 @@ void OclPtxHandler::DumpPath(int offset, int count, FILE *fd)
       true,
       offset * attrs_.num_steps * sizeof(cl_ulong),
       count * attrs_.num_steps * sizeof(cl_ulong),
-      reinterpret_cast<void*>(buf));
+      reinterpret_cast<void*>(path_buf));
+  if (CL_SUCCESS != ret)
+  {
+    puts("Failed to read back path");
+    abort();
+  }
+
+  ret = cq_->enqueueReadBuffer(
+      *gpu_step_count,
+      true,
+      offset * attrs_.num_steps * sizeof(cl_ulong),
+      count * attrs_.num_steps * sizeof(cl_ulong),
+      reinterpret_cast<void*>(step_count_buf));
   if (CL_SUCCESS != ret)
   {
     puts("Failed to read back path");
@@ -399,12 +434,15 @@ void OclPtxHandler::DumpPath(int offset, int count, FILE *fd)
   {
     for (int step = 0; step < attrs_.num_steps; ++step)
     {
-      value = buf[id * attrs_.num_steps + step];
-      fprintf(fd, "%i:%i\n", id + offset, value);
+      value = path_buf[id * attrs_.num_steps + step];
+      // Only dump if this element is before the path's end.
+      if (step <= step_count_buf[id] % attrs_.num_steps)
+        fprintf(fd, "%i:%i\n", id + offset, value);
     }
   }
 
-  delete buf;
+  delete path_buf;
+  delete step_count_buf
 }
 
 int OclPtxHandler::particles_per_side()

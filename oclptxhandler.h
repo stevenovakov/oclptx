@@ -99,9 +99,11 @@ class OclPtxHandler{
 
   // Particle Data
   cl::Buffer *gpu_data;  // Type particle_data
-  cl::Buffer *gpu_complete;  // Type cl_ushort array
+  cl::Buffer *gpu_complete;  // Type ushort array
 
+  // Debug Data
   cl::Buffer *gpu_path;  // Type ulong
+  cl::Buffer *gpu_step_count; // Type ushort
 
   struct particle_attrs attrs_;
 
