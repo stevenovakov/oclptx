@@ -51,9 +51,9 @@ void Worker(struct shared_data *sdata, OclPtxHandler *handler, int num_reducers)
     // If no data on either side, we're done!
     if (!has_data_side[0] && !has_data_side[1])
     {
+      // Wake up reducers and have them exit.
       for (int i = 0; i < num_reducers; ++i)
       {
-        // Wake up reducers and have them exit.
         std::unique_lock<std::mutex> lock(sdata[i].data_lock);
         sdata[i].done = true;
         sdata[i].data_ready_cv.notify_one();
