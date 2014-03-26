@@ -157,7 +157,7 @@ void Reducer(
         // New particle.
         particle = particles->Pop();
         if (!particle)
-          break;  // No particles left.
+          continue;  // No particles left.
 
         sdata->chunk[reduced_count] = *particle;
         sdata->particle_offset[reduced_count] = sdata->chunk_offset + i;
