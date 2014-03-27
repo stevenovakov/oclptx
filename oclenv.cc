@@ -248,6 +248,10 @@ cl::Program OclEnv::CreateProgram()
   {
     source_list.push_back(fold + slash + "rng_test.cl");
   }
+  else if (this->ocl_routine_name == "collatz")
+  {
+    source_list.push_back(fold + slash + "collatz.cl");
+  }
   else if (this->ocl_routine_name == "interptest")
   {
     //source_list.push_back("prngmethods.cl");
@@ -334,6 +338,12 @@ cl::Program OclEnv::CreateProgram()
     {
       this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
                                                 "RngTest",
+                                                NULL));
+    }
+    else if (this->ocl_routine_name == "collatz")
+    {
+      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
+                                                "Collatz",
                                                 NULL));
     }
     else if (this->ocl_routine_name == "interptest" )
