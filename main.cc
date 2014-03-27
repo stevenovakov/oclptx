@@ -27,6 +27,7 @@ int main(int argc, char **argv)
 {
   const int kStepsPerKernel = 10;
   const int kNumReducers = 2;
+  FILE *global_fd;
 
   if (argc < 2)
   {
@@ -48,6 +49,13 @@ int main(int argc, char **argv)
   OclEnv env("collatz");
   env.Init();
 
+  global_fd = fopen("./path_output", "w");
+  if (NULL == global_fd)
+  {
+    perror("Couldn't open file");
+    exit(1);
+  }
+
   struct OclPtxHandler::particle_attrs attrs = {kStepsPerKernel, 0};
   int num_dev = env.HowManyDevices();
 
@@ -61,7 +69,8 @@ int main(int argc, char **argv)
                     env.GetCq(i),
                     env.GetKernel(i),
                     NULL, NULL, NULL, 0, NULL,  // 5 bedpost data values.
-                    &attrs);
+                    &attrs,
+                    global_fd);
 
     gpu_managers[i] = new std::thread(
         threading::RunThreads,
@@ -75,6 +84,8 @@ int main(int argc, char **argv)
     gpu_managers[i]->join();
   }
   delete[] handler;
+
+  fclose(global_fd);
 
   return 0;
 }

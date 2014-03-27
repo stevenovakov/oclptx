@@ -29,12 +29,14 @@ void OclPtxHandler::Init(
   const BedpostXData *theta,
   int num_directions,
   const unsigned short int *brain_mask,
-  struct OclPtxHandler::particle_attrs *attrs)
+  struct OclPtxHandler::particle_attrs *attrs,
+  FILE *path_dump_fd)
 {
   context_ = cc;
   cq_ = cq;
   kernel_ = ck;
   first_time_ = 1;
+  path_dump_fd_ = path_dump_fd;
 
   // TODO(jeff): bring this line back to run PTX.
   // WriteSamplesToDevice(f, phi, theta, num_directions, brain_mask);
@@ -337,6 +339,9 @@ void OclPtxHandler::WriteParticle(
   cl_ushort zero = 0;
   assert(offset < 2 * attrs_.particles_per_side);
 
+  if (NULL != path_dump_fd_)
+    fprintf(path_dump_fd_, "%i:%lin\n", offset, data->value);
+
   // Write particle_data
   ret = cq_->enqueueWriteBuffer(
       *gpu_data,
@@ -387,12 +392,14 @@ void OclPtxHandler::ReadStatus(int offset, int count, cl_ushort *ret)
       reinterpret_cast<cl_ushort*>(ret));
 }
 
-void OclPtxHandler::DumpPath(int offset, int count, FILE *fd)
+void OclPtxHandler::DumpPath(int offset, int count)
 {
   cl_ulong *path_buf = new cl_ulong[count * attrs_.num_steps];
-  cl_ushort *step_count_buf = new cl_ulong[count * attrs_.num_steps];
+  cl_ushort *step_count_buf = new cl_ushort[count];
   int ret;
-  int value;
+  cl_ulong value;
+
+  assert(NULL != path_dump_fd_);
 
   // kludge(jeff): The first time this is called by threading::Worker, there
   // is only garbage on the GPU, which we'd like to avoid dumping to file---
@@ -420,8 +427,8 @@ void OclPtxHandler::DumpPath(int offset, int count, FILE *fd)
   ret = cq_->enqueueReadBuffer(
       *gpu_step_count,
       true,
-      offset * attrs_.num_steps * sizeof(cl_ulong),
-      count * attrs_.num_steps * sizeof(cl_ulong),
+      offset * sizeof(cl_ushort),
+      count * sizeof(cl_ushort),
       reinterpret_cast<void*>(step_count_buf));
   if (CL_SUCCESS != ret)
   {
@@ -436,13 +443,15 @@ void OclPtxHandler::DumpPath(int offset, int count, FILE *fd)
     {
       value = path_buf[id * attrs_.num_steps + step];
       // Only dump if this element is before the path's end.
-      if (step <= step_count_buf[id] % attrs_.num_steps)
-        fprintf(fd, "%i:%i\n", id + offset, value);
+      if ((0 == step_count_buf[id] % attrs_.num_steps
+        && 0 != step_count_buf[id])
+        || step < step_count_buf[id] % attrs_.num_steps)
+        fprintf(path_dump_fd_, "%i:%li\n", id + offset, value);
     }
   }
 
   delete path_buf;
-  delete step_count_buf
+  delete step_count_buf;
 }
 
 int OclPtxHandler::particles_per_side()

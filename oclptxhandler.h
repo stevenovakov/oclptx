@@ -40,7 +40,8 @@ class OclPtxHandler{
       const BedpostXData *theta,
       int num_directions,
       const unsigned short int *brain_mask,
-      struct particle_attrs *attrs);
+      struct particle_attrs *attrs,
+      FILE *path_dump_fd);
 
   // TODO(jeff) Kill these two after I check that I do everything.
   void ParticlePathsToFile();
@@ -52,7 +53,7 @@ class OclPtxHandler{
   void WriteParticle(struct particle_data *data, int offset);
   // Read the "completion" buffer back into the vector pointed to by ret.
   void ReadStatus(int offset, int count, cl_ushort *ret);
-  void DumpPath(int offset, int count, FILE *fd);
+  void DumpPath(int offset, int count);
 
   int particles_per_side();
 
@@ -96,6 +97,8 @@ class OclPtxHandler{
   unsigned int particles_mem_size;
   unsigned int particle_uint_mem_size;
   // size (Total Particles)/numDevices * (sizeof(float4))
+
+  FILE *path_dump_fd_;
 
   // Particle Data
   cl::Buffer *gpu_data;  // Type particle_data

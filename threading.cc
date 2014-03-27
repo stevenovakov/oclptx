@@ -13,7 +13,6 @@
 namespace threading
 {
 
-FILE *global_fd;
 
 struct shared_data {
   int chunk_size;  // Amount of space allocated
@@ -118,8 +117,7 @@ void Worker(struct shared_data *sdata, OclPtxHandler *handler, int num_reducers)
 
     // Dump all paths
     handler->DumpPath(inactive_side * handler->particles_per_side(),
-                      handler->particles_per_side(),
-                      global_fd);
+                      handler->particles_per_side());
   }
 }
 
@@ -193,13 +191,6 @@ void RunThreads(
   cl_ushort *status;
   int *particle_offset;
 
-  global_fd = fopen("./path_output", "w");
-  if (NULL == global_fd)
-  {
-    perror("Couldn't open file");
-    exit(1);
-  }
-
   for (int i = 0; i < num_reducers; ++i)
   {
     count = handler->particles_per_side() / num_reducers;
@@ -250,7 +241,6 @@ void RunThreads(
     delete[] sdata[i].chunk;
   }
 
-  fclose(global_fd);
 }
 
 }  // namespace threading

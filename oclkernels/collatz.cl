@@ -26,26 +26,25 @@ __kernel void Collatz(
   int index;
   int glid = get_global_id(0);
 
+  // Signal to the dumping script that no new particle has been placed in this
+  // thread.
+  if (complete[glid])
+    num_steps[glid] = 0;
+
   for (step = 0; step < attrs.num_steps; ++step)
   {
-    index = glid * attrs.num_steps + step;
-    path_output[index] = state[glid].value;
-
     if (state[glid].value & 1)
       state[glid].value = state[glid].value * 3 + 1;
     else
       state[glid].value = state[glid].value >> 1;
 
-    if (4 == state[glid].value ||
-        2 == state[glid].value ||
-        1 == state[glid].value)
+    if (1 == state[glid].value || complete[glid])
       complete[glid] = true;
     else
     {
       complete[glid] = false;
       num_steps[glid] += 1;
     }
-
 
     index = glid * attrs.num_steps + step;
     path_output[index] = state[glid].value;
