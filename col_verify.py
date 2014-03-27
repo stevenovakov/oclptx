@@ -13,7 +13,10 @@ with open("./col_args",'w') as f:
         values.add(r)
 
 # First make call with particle list
-out = subprocess.check_output(["./oclptx"] + [str(v) for v in values])
+subprocess.call(["./oclptx"] + [str(v) for v in values])
+
+with open("./path_output", 'r') as f:
+    out = f.read()
 
 def collatz(n):
     if n % 2:
@@ -22,19 +25,19 @@ def collatz(n):
         return n / 2
 
 streams = {}
-for line in out.decode().split("\n"):
+for line in out.split("\n"):
     if line == '':
         continue
     s, result = [int(x) for x in line.split(":")]
-    # New particle
-    if s not in streams or 2 == streams[s]:
-        assert result in values, "New particle started with invalid value"
+    # New stream
+    if s not in streams or result != collatz(streams[s]):
+        assert result in values, \
+          "Invalid particle %i started on thread %i" % (result, s)
         streams[s] = result
         values.remove(result)
-    # Continued particle
+    # Continued particle.  Either continued collatz or new particle
     else:
-        assert result == collatz(streams[s]), "Incorrect collatz"
-        streams[s] = result
+        streams[s] = result # Collatz
 
 assert 0 == len(values), "Some values left: %s" % repr(values)
 
