@@ -27,6 +27,9 @@ __kernel void Collatz(
 
   for (step = 0; step < attrs.num_steps; ++step)
   {
+    index = glid * attrs.num_steps + step;
+    path_output[index] = state[glid].value;
+
     if (state[glid].value & 1)
       state[glid].value = state[glid].value * 3 + 1;
     else
@@ -38,9 +41,6 @@ __kernel void Collatz(
       complete[glid] = true;
     else
       complete[glid] = false;
-
-    index = glid * attrs.num_steps + step;
-    path_output[index] = state[glid].value;
   }
 }
 
