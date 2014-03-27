@@ -28,6 +28,7 @@ streams = {}
 for line in out.split("\n"):
     if line == '':
         continue
+    line = line.rstrip('n')
     s, result = [int(x) for x in line.split(":")]
     # New stream
     if s not in streams or result != collatz(streams[s]):
