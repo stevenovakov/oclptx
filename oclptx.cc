@@ -111,7 +111,18 @@ int main(int argc, char *argv[] )
     unsigned int n_devices = environment.HowManyDevices();
 
     int enough_mem;
-    enough_mem = environment.AvailableGPUMem(mem_frac); // will pass args later
+    enough_mem = environment.AvailableGPUMem(
+      f_data,
+      static_cast<uint32_t>(1),
+      static_cast<uint32_t>(0),
+      static_cast<uint32_t>(4),
+      false,
+      false,
+      static_cast<uint32_t>(0),
+      true,
+      max_steps,
+      mem_frac
+    ); // will pass args later
 
     if (enough_mem < 0)
     {
@@ -123,10 +134,16 @@ int main(int argc, char *argv[] )
       // and then (this is a naive, "serial" implementation;
       //
 
-      environment.AllocateSamples(  f_data,
-                                  phi_data,
-                                  theta_data,
-                                  brain_mask);
+      environment.AllocateSamples(
+        f_data,
+        phi_data,
+        theta_data,
+        brain_mask,
+        NULL,
+        NULL,
+        NULL
+      );
+
       std::cout<<"\tsamples done\n";
 
       std::cout<<"Using " << n_devices << " Devices\n";
@@ -178,10 +195,7 @@ int main(int argc, char *argv[] )
       for (unsigned int d = 0; d < n_devices; d++)
       {
         handlers.at(d)->Interpolate();
-        std::cout<<"Device " << d << ", interp done\n";
-        //t_end = std::chrono::high_resolution_clock::now();
         handlers.at(d)->PdfSum();
-        std::cout<<"Device " << d << ", pdf done\n";
       }
 
       t_end = std::chrono::high_resolution_clock::now();

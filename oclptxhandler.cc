@@ -88,7 +88,7 @@ OclPtxHandler::OclPtxHandler(
 
   this->env_dat = env;
 
-  this->total_gpu_mem_size = env->total_static_gpu_mem;
+  this->total_gpu_mem_used = this->env_dat->total_static_gpu_mem;
 }
 
 
@@ -186,11 +186,6 @@ void OclPtxHandler::ParticlePathsToFile(std::string path_filename)
   delete[] particle_steps;
 }
 
-unsigned int OclPtxHandler::GpuMemUsed()
-{
-  return this->total_gpu_mem_size;
-}
-
 void OclPtxHandler::GetPdfData( uint32_t* container)
 {
   this->ocl_cq->enqueueReadBuffer(
@@ -203,6 +198,10 @@ void OclPtxHandler::GetPdfData( uint32_t* container)
   this->ocl_cq->finish();
 }
 
+cl_ulong OclPtxHandler::GpuMemUsed()
+{
+  return this->total_gpu_mem_used;
+}
 //*********************************************************************
 //
 // OclPtxHandler Container Initializations
@@ -223,9 +222,6 @@ void OclPtxHandler::WriteInitialPosToDevice(
   this->n_particles = 2*nparticles;
   this->max_steps = maximum_steps;
   this->particle_path_size = maximum_steps + 1;
-
-  uint32_t global_pdf_size =
-    this->env_dat->nx*this->env_dat->ny*this->env_dat->nz;
 
   uint32_t path_mem_size =
     this->section_size*this->particle_path_size*sizeof(float4);
@@ -360,7 +356,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
     NULL
   );
 
-  this->total_gpu_mem_size += path_mem_size + 2*path_steps_mem_size +
+  this->total_gpu_mem_used += path_mem_size + 2*path_steps_mem_size +
     this->env_dat->particle_pdf_mask_mem_size * this->n_particles;
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
@@ -371,13 +367,8 @@ void OclPtxHandler::WriteInitialPosToDevice(
 
 void OclPtxHandler::PrngInit()
 {
-  printf("test: %lu\n", sizeof(cl_ulong8));
-  printf("test2: %u\n", this->section_size);
-
   unsigned int path_rng_mem_size = this->section_size *
     static_cast<unsigned int>(sizeof(cl_ulong8));
-
-  printf("Path rng size: %u \n", path_rng_mem_size);
   
   cl_ulong8 *rng = new cl_ulong8[this->section_size];
 
@@ -408,7 +399,7 @@ void OclPtxHandler::PrngInit()
     NULL
   );
 
-  this->total_gpu_mem_size += path_rng_mem_size;
+  this->total_gpu_mem_used += path_rng_mem_size;
 
   delete[] rng;
 
@@ -457,7 +448,7 @@ void OclPtxHandler::SingleBufferInit()
     NULL
   );
 
-  this->total_gpu_mem_size += interval_mem_size;
+  this->total_gpu_mem_used += interval_mem_size;
 
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
@@ -496,9 +487,9 @@ void OclPtxHandler::Interpolate()
   this->ptx_kernel->setArg(5, this->particle_rng_buffer);
 
   // sample data buffers
-  this->ptx_kernel->setArg(6, *(this->env_dat->f_samples_buffer));
-  this->ptx_kernel->setArg(7, *(this->env_dat->phi_samples_buffer));
-  this->ptx_kernel->setArg(8, *(this->env_dat->theta_samples_buffer));
+  this->ptx_kernel->setArg(6, *(this->env_dat->f_samples_buffers[0]));
+  this->ptx_kernel->setArg(7, *(this->env_dat->phi_samples_buffers[0]));
+  this->ptx_kernel->setArg(8, *(this->env_dat->theta_samples_buffers[0]));
   this->ptx_kernel->setArg(9, *(this->env_dat->brain_mask_buffer));
 
   this->ptx_kernel->setArg(10, this->max_steps);

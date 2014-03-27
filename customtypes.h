@@ -135,10 +135,13 @@ struct EnvironmentData
   bool terminate_mask;
   bool prefdir;
   uint32_t loopcheck_fraction;
+
+  // Interpolation Options
   uint32_t max_steps;
   bool save_paths;
   bool euler_streamline;
 
+  // Particle Containers
   uint32_t section_size;
   uint32_t pdf_entries_per_particle;
   uint32_t global_pdf_size;
@@ -146,29 +149,29 @@ struct EnvironmentData
   //values to use for computation, buffers
   uint32_t interval_size; //2R in Oclptx Data Diagram 2.odg
 
-  cl_uint samples_buffer_size;
+  cl_uint single_sample_mem_size;
   cl_uint particle_paths_mem_size;
   cl_uint particle_uint_mem_size;
   cl_uint particles_prng_mem_size;
   cl_uint mask_mem_size;
+  cl_uint particle_loopcheck_mem_size;
   cl_uint particle_pdf_mask_mem_size;
   cl_uint global_pdf_mem_size;
 
   uint32_t total_static_gpu_mem;
-  uint32_t dynamic_gpu_mem_left;
+  //uint32_t dynamic_gpu_mem_left;
+  uint32_t max_particles_per_batch;
 
   //
-  // TODO (these probably should not be here)
-  // Sample Data Buffers (figure out how to delete properly later
-  // may need to make this a class)
+  // These are allocated/deallocated by OclEnv
   //
 
-  cl::Buffer* f_samples_buffer;
-  cl::Buffer* phi_samples_buffer;
-  cl::Buffer* theta_samples_buffer;
+  cl::Buffer** f_samples_buffers;
+  cl::Buffer** phi_samples_buffers;
+  cl::Buffer** theta_samples_buffers;
   cl::Buffer* brain_mask_buffer;
 
-  std::vector<cl::Buffer*> waypoint_masks;
+  cl::Buffer** waypoint_masks;
   cl::Buffer* exclusion_mask_buffer;
   cl::Buffer* termination_mask_buffer;
 };

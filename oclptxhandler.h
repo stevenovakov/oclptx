@@ -70,7 +70,7 @@ class OclPtxHandler{
 
     bool IsFinished(){ return this->interpolation_complete; };
     
-    unsigned int GpuMemUsed();
+    cl_ulong GpuMemUsed();
 
     void GetPdfData(uint32_t* container);
 
@@ -131,26 +131,14 @@ class OclPtxHandler{
 
     cl::Kernel* ptx_kernel;
     cl::Kernel* sum_kernel;
-    
-    unsigned int total_gpu_mem_size;
 
     //
-    // Environment
+    // Environment (Includes Pointers to BedpostX Data)
     //
 
     EnvironmentData * env_dat;
 
-    //
-    // BedpostX Data
-    //
-
-    // cl::Buffer f_samples_buffer;
-    // cl::Buffer phi_samples_buffer;
-    // cl::Buffer theta_samples_buffer;
-    // cl::Buffer brain_mask_buffer;
-
-    // unsigned int samples_buffer_size;
-    // unsigned int sample_nx, sample_ny, sample_nz, sample_ns;
+    cl_ulong total_gpu_mem_used;
 
     //
     // Output Data
@@ -189,9 +177,8 @@ class OclPtxHandler{
     // size (Total Particles)/numDevices * (sizeof(float4))
 
     //
-    // These are the "double buffer" objects
+    // These are the "single buffer" objects
     //
-
     cl::Buffer compute_index_buffer;
 
     std::vector< unsigned int > particle_indeces_left;
@@ -201,14 +188,6 @@ class OclPtxHandler{
     std::vector< std::vector<unsigned int> > particle_todo;
     // NDRange of current pair of enqueueNDRangeKernel
     unsigned int todo_range;
-
-    // which half of particle_indeces/particle_complete needs to be
-    // interpolated next (either 0, or 1)
-    // TODO: Make sure there are no access conflicts within multithread
-    // scheme (e.g.  go to interpolate second half, but reduction
-    // method accidentally changed target_section to "0" again.
-    unsigned int target_section;
-    // this might need a mutex
 
     bool interpolation_complete;
     // false until there are zero particle paths left to compute.
