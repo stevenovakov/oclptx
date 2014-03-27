@@ -144,36 +144,31 @@ int main(int argc, char *argv[] )
         NULL
       );
 
-      std::cout<<"\tsamples done\n";
-
-      std::cout<<"Using " << n_devices << " Devices\n";
-
       std::vector<OclPtxHandler*> handlers;
 
       for (unsigned int d = 0; d < n_devices; d++)
       {
-        std::cout<<"Device " << d <<"\n";
-
         handlers.push_back(
-          new OclPtxHandler(environment.GetContext(),
-                            environment.GetCq(d),
-                            environment.GetKernel(d),
-                            environment.GetSumKernel(d),
-                            curvature_threshold,
-                            environment.GetEnvData()));
-        std::cout<<"\tinit done\n";
+          new OclPtxHandler(
+            environment.GetContext(),
+            environment.GetCq(d),
+            environment.GetKernel(d),
+            environment.GetSumKernel(d),
+            curvature_threshold,
+            environment.GetEnvData()
+          )
+        );
+
         handlers.back()->WriteInitialPosToDevice(
-                                          initial_positions,
-                                          n_particles,
-                                          max_steps,
-                                          n_devices,
-                                          d);
-        std::cout<<"\tpos done\n";
+          initial_positions,
+          n_particles,
+          max_steps,
+          n_devices,
+          d
+        );
+
         handlers.back()->PrngInit();
-        std::cout<<"\tPrng Done\n";
         handlers.back()->SingleBufferInit();
-        //handler.DoubleBufferInit( n_particles/2, max_steps);
-        std::cout<<"\tdbuff done\n";
       }
 
       for (unsigned int d = 0; d < n_devices; d++)
@@ -183,8 +178,8 @@ int main(int argc, char *argv[] )
 
       for (unsigned int d = 0; d < n_devices; d++)
       {
-        std::cout<<"Device " << d << ", Total GPU Memory Allocated (MB): "<<
-          handlers.at(d)->GpuMemUsed()/1e6 << "\n";
+        printf( "Device %u, Total GPU Memory Allocated (MB): %u\n",
+          d, handlers.at(d)->GpuMemUsed()/1e6);
       }
 
       std::cout<<"Press Any Button To Continue...\n";
