@@ -59,6 +59,8 @@ class OclEnv{
 
     ~OclEnv();
 
+    void Init();
+
     //
     // Container Set/Get
     //

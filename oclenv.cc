@@ -71,7 +71,10 @@ OclEnv::OclEnv(
 {
   this->ocl_routine_name = ocl_routine;
   this->ocl_profiling = false;
+}
 
+void OclEnv::Init()
+{
   this->OclInit();
   this->OclDeviceInfo();
   this->NewCLCommandQueues();
@@ -83,8 +86,6 @@ OclEnv::OclEnv(
 //
 OclEnv::~OclEnv()
 {
-  std::cout<<"~OclPtxHandler\n";
-  // no pointer data elements at the moment...
 }
 
 //*********************************************************************
