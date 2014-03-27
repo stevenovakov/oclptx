@@ -25,8 +25,8 @@ int lb(int x)
 // 54 72 36 12 17 42 53 16 873 14 423
 int main(int argc, char **argv)
 {
-  const int kStepsPerKernel = 3;
-  const int kNumReducers = 1;
+  const int kStepsPerKernel = 10;
+  const int kNumReducers = 2;
 
   if (argc < 2)
   {
@@ -49,22 +49,32 @@ int main(int argc, char **argv)
   env.Init();
 
   struct OclPtxHandler::particle_attrs attrs = {kStepsPerKernel, 0};
+  int num_dev = env.HowManyDevices();
 
   // Create a new oclptxhandler.
-  OclPtxHandler handler;
-  handler.Init(env.GetContext(),
-               env.GetCq(0),
-               env.GetKernel(0),
-               NULL, NULL, NULL, 0, NULL,  // 5 bedpost data values.
-               &attrs);
+  OclPtxHandler *handler = new OclPtxHandler[num_dev];
+  std::thread *gpu_managers[num_dev];
 
-  // Start up the threads.
-  std::thread gpu_manager(
-      threading::RunThreads,
-      &handler,
-      &particles_fifo,
-      kNumReducers);
-  gpu_manager.join();
+  for (int i = 0; i < num_dev; ++i)
+  {
+    handler[i].Init(env.GetContext(),
+                    env.GetCq(i),
+                    env.GetKernel(i),
+                    NULL, NULL, NULL, 0, NULL,  // 5 bedpost data values.
+                    &attrs);
+
+    gpu_managers[i] = new std::thread(
+        threading::RunThreads,
+        &handler[i],
+        &particles_fifo,
+        kNumReducers);
+  }
+
+  for (int i = 0; i < num_dev; ++i)
+  {
+    gpu_managers[i]->join();
+  }
+  delete[] handler;
 
   return 0;
 }
