@@ -104,6 +104,9 @@ class OclPtxHandler{
   cl::Buffer *gpu_path;  // Type ulong
 
   struct particle_attrs attrs_;
+
+  // kludge
+  bool first_time_;
 };
 
 #endif  // OCLPTXHANDLER_H_

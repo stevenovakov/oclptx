@@ -34,6 +34,7 @@ void OclPtxHandler::Init(
   context_ = cc;
   cq_ = cq;
   kernel_ = ck;
+  first_time_ = 1;
 
   // TODO(jeff): bring this line back to run PTX.
   // WriteSamplesToDevice(f, phi, theta, num_directions, brain_mask);
@@ -327,8 +328,6 @@ void OclPtxHandler::WriteParticle(
   cl_ushort zero = 0;
   assert(offset < 2 * attrs_.particles_per_side);
 
-  printf("Write particle %li to offset %i\n", data->value, offset);
-
   // Write particle_data
   ret = cq_->enqueueWriteBuffer(
       *gpu_data,
@@ -371,6 +370,17 @@ void OclPtxHandler::DumpPath(int offset, int count, FILE *fd)
   cl_ulong *buf = new cl_ulong[count * attrs_.num_steps];
   int ret;
   int value;
+
+  // kludge(jeff): The first time this is called by threading::Worker, there
+  // is only garbage on the GPU, which we'd like to avoid dumping to file---
+  // as it makes automatic verification more challenging.  My 5-second kludge
+  // is to see if this is the first time we've been called.  If so, return
+  // without printing anything.
+  if (first_time_)
+  {
+    first_time_ = 0;
+    return;
+  }
 
   ret = cq_->enqueueReadBuffer(
       *gpu_path,
