@@ -39,7 +39,11 @@ __kernel void Collatz(
       state[glid].value = state[glid].value >> 1;
 
     if (1 == state[glid].value || complete[glid])
+    {
       complete[glid] = true;
+      if (0 == step)  // Stop counting steps.
+        num_steps[glid] = 0;
+    }
     else
     {
       complete[glid] = false;
