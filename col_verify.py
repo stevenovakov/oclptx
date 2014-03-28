@@ -31,13 +31,14 @@ for line in out.split("\n"):
     line = line.rstrip('n')
     s, result = [int(x) for x in line.split(":")]
     # New stream
-    if s not in streams or result != collatz(streams[s]):
+    if s not in streams or 2 == streams[s]:
         assert result in values, \
-          "Invalid particle %i started on thread %i" % (result, s)
+            "Invalid particle %i started on thread %i" % (result, s)
         streams[s] = result
         values.remove(result)
     # Continued particle.  Either continued collatz or new particle
     else:
+        assert result == collatz(streams[s]), "Incorrect collatz"
         streams[s] = result # Collatz
 
 assert 0 == len(values), "Some values left: %s" % repr(values)
