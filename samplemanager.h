@@ -69,6 +69,7 @@ class SampleManager
       int aSamp, int aX, int aY, int aZ);
     float const GetfData(int aFiberNum,
       int aSamp, int aX, int aY, int aZ);
+    unsigned short int const GetBrainMask( int aX, int aY, int aZ);
     const NEWIMAGE::volume<short int>* GetBrainMask();
     const unsigned short int* GetBrainMaskToArray();
 
@@ -79,13 +80,9 @@ class SampleManager
 
     // Getters: Randomly seeded particles (uses midpoint
     //  of _brainMask if no seedfile is specified)
-    std::vector<float4> const GetSeedParticles()
+    std::vector<float4> * const GetSeedParticles()
     {
-      return _seedParticles;
-    }    
-    std::vector<int4> const GetSeedElem()
-    {
-      return _rootVertices;
+      return &_seedParticles;
     }
 
     // If you use these getters, you must access data from\
@@ -123,9 +120,8 @@ class SampleManager
     //Statics
     static SampleManager* _manager;
     oclptxOptions& _oclptxOptions;
-    //Particles
+    //Seed Particles
     std::vector<float4> _seedParticles;
-    std::vector<int4> _rootVertices;
     //BedpostData
     BedpostXData _thetaData;
     BedpostXData _phiData;

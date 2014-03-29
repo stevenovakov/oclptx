@@ -51,12 +51,10 @@
 //
 //*********************************************************************
 
-void SimpleInterpolationTest( cl::Context * ocl_context,
-                              cl::CommandQueue * cq,
-                              cl::Kernel * test_kernel
-                            );
-
-std::string DetermineKernel(); //args undetermined yet
+std::string GenerateFile(std::string suffix);
+void WriteToPdf( std::vector<uint32_t>* global_pdf, uint32_t* device_pdf);
+void PdfToFile(std::string pdf_filename, std::vector<uint32_t>* global_pdf,
+  uint32_t nx, uint32_t ny, uint32_t nz);
 
 //*********************************************************************
 //
@@ -79,6 +77,8 @@ int main(int argc, char *argv[] )
                           //environment.GetKernel(0));
 
   // Sample Manager
+  auto t_end = std::chrono::high_resolution_clock::now();
+  auto t_start = std::chrono::high_resolution_clock::now();
 
   SampleManager& s_manager = SampleManager::GetInstance();
   if(&s_manager == NULL)
@@ -87,80 +87,163 @@ int main(int argc, char *argv[] )
   }
   else
   {
-	  //int countAll = 0;
-	  //int countNonZero = 0;
-
     s_manager.ParseCommandLine(argc, argv);
 
     const BedpostXData* f_data = s_manager.GetFDataPtr();
     const BedpostXData* theta_data = s_manager.GetThetaDataPtr();
     const BedpostXData* phi_data = s_manager.GetPhiDataPtr();
-    
+
     unsigned int n_particles = s_manager.GetNumParticles();
     unsigned int max_steps = s_manager.GetNumMaxSteps();
-    
+
+    // do not calld delete[] on
     const float4* initial_positions =
-      s_manager.GetSeedParticles().data();
-    const int4* initial_elem = s_manager.GetSeedElem().data();
-
-    //for(unsigned int t = 1; t < thetaData->ns; t++)
-    //{
-      //for (unsigned int x = 0; x<thetaData->nx; x++)
-      //{
-        //for (unsigned int y=0; y<thetaData->ny; y++)
-        //{
-          //for (unsigned int z=0; z<thetaData->nz; z++)
-          //{
-            //float data = s_manager.GetThetaData(0,t,x,y,z);
-            //countAll++;
-            //if(data != 0.0f)
-            //countNonZero++;
-          //}
-        //}
-      //}
-    //}
-
-    // Access this array like so for a given x,y,z:
-    // seedMask[z*seedMaskVol.xsize()*seedMaskVol.ysize() +
-    //   y*seedMaskVol.zsize() + x]
+      s_manager.GetSeedParticles()->data();
+      
     const unsigned short int* brain_mask =
       s_manager.GetBrainMaskToArray();
-
-    //cout<<"Count of All Data = "<<countAll<<endl;
-    //cout<<"Count of Non Zero Data = "<<countNonZero<<endl;
-
-    // somwhere in here, this should initialize, based on s_manager
-    // actions:
-    //
-    OclEnv environment("basic");
-    unsigned int n_devices = environment.HowManyDevices();
-    //
-    // and then (this is a naive, "serial" implementation;
-    //
-
-    OclPtxHandler handler(environment.GetContext(),
-                          environment.GetCq(0),
-                          environment.GetKernel(0));                          
     
+    // TODO get curv thresh from sample manager
+    float curvature_threshold = 0.2;
+    float mem_frac = 1.0;
       
-    handler.WriteSamplesToDevice( f_data,
-                                  phi_data,
-                                  theta_data,
-                                  static_cast<unsigned int>(1),
-                                  brain_mask);
-    handler.WriteInitialPosToDevice(  initial_positions,
-                                      initial_elem,
-                                      n_particles,
-                                      max_steps,
-                                      n_devices,
-                                      static_cast<unsigned int>(0));
-    handler.DoubleBufferInit( n_particles/2, max_steps);
+    OclEnv environment("standard");
+    unsigned int n_devices = environment.HowManyDevices();
 
-    handler.Interpolate();
-    handler.Reduce();
-    handler.Interpolate();
+    int enough_mem;
+    enough_mem = environment.AvailableGPUMem(
+      f_data,
+      static_cast<uint32_t>(1),
+      static_cast<uint32_t>(0),
+      static_cast<uint32_t>(4),
+      false,
+      false,
+      static_cast<uint32_t>(0),
+      true,
+      max_steps,
+      mem_frac
+    ); // will pass args later
 
-    handler.ParticlePathsToFile();
+    if (enough_mem < 0)
+    {
+      printf("Insufficient GPU Memory: Terminating Program\n\n");
+    }
+    else
+    {
+      //
+      // and then (this is a naive, "serial" implementation;
+      //
+
+      environment.AllocateSamples(
+        f_data,
+        phi_data,
+        theta_data,
+        brain_mask,
+        NULL,
+        NULL,
+        NULL
+      );
+
+      std::vector<OclPtxHandler*> handlers;
+
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        handlers.push_back(
+          new OclPtxHandler(
+            environment.GetContext(),
+            environment.GetCq(d),
+            environment.GetKernel(d),
+            environment.GetSumKernel(d),
+            curvature_threshold,
+            environment.GetEnvData()
+          )
+        );
+
+        handlers.back()->WriteInitialPosToDevice(
+          initial_positions,
+          n_particles,
+          max_steps,
+          n_devices,
+          d
+        );
+
+        handlers.back()->PrngInit();
+        handlers.back()->SingleBufferInit();
+      }
+
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        handlers.at(d)->BlockCq();
+      }
+
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        printf( "Device %u, Total GPU Memory Allocated (MB): %u\n",
+          d, handlers.at(d)->GpuMemUsed()/1e6);
+      }
+
+      std::cout<<"Press Any Button To Continue...\n";
+      std::cin.get();
+
+      t_start = std::chrono::high_resolution_clock::now();
+
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        handlers.at(d)->Interpolate();
+        handlers.at(d)->PdfSum();
+      }
+
+      t_end = std::chrono::high_resolution_clock::now();
+      std::cout<< "Total Tracking Time (ns): " <<
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+            t_end-t_start).count() << std::endl;
+
+      std::string path_filename = GenerateFile("_PATHS.dat");
+      std::string pdf_filename = GenerateFile("_PDF.dat");
+
+      FILE * path_file;
+      path_file = fopen(path_filename.c_str(), "wb");
+      fprintf(path_file, "[");
+      fclose(path_file);
+
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        handlers.at(d)->ParticlePathsToFile(path_filename);
+
+        if( d < n_devices - 1)
+        {
+          path_file = fopen(path_filename.c_str(), "ab");
+          fprintf(path_file, ",\n");
+          fclose(path_file);
+        }
+      }
+
+      path_file = fopen(path_filename.c_str(), "ab");
+      fprintf(path_file, "]");
+      fclose(path_file);
+
+      EnvironmentData * env_data = environment.GetEnvData();
+
+      std::vector<uint32_t> global_pdf(env_data->global_pdf_size, 0);
+      uint32_t* device_pdf = new uint32_t[env_data->global_pdf_size];
+
+      printf("Summing PDF(s) from all Devices...\n");
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        handlers.at(d)->GetPdfData(device_pdf);
+        WriteToPdf(&global_pdf, device_pdf);
+      }
+      delete[] device_pdf;
+
+      printf("Writing PDF Data to %s\n", pdf_filename.c_str());
+      PdfToFile(pdf_filename, &global_pdf,
+        env_data->nx, env_data->ny, env_data->nz);
+
+      for (unsigned int d = 0; d < n_devices; d++)
+      {
+        delete handlers.at(d);
+      }
+    }
 
     delete[] brain_mask;
   }
@@ -174,106 +257,65 @@ int main(int argc, char *argv[] )
 // Assorted Functions
 //
 //*********************************************************************
-std::string DetermineKernel()
+std::string GenerateFile(std::string suffix)
 {
-  return std::string("interptest");
+  std::ostringstream convert(std::ostringstream::ate);
+  std::string path_filename;
+
+  time_t t = time(0);
+  struct tm * now = localtime(&t);
+
+  convert << "OclPtx Results/"<< now->tm_yday << "-" <<
+    static_cast<int>(now->tm_year) + 1900 << "_"<< now->tm_hour <<
+      ":" << now->tm_min << ":" << now->tm_sec;
+
+  path_filename = convert.str() + suffix;
+
+  return path_filename;
 }
 
-void SimpleInterpolationTest( cl::Context* ocl_context,
-                              cl::CommandQueue* cq,
-                              cl::Kernel* test_kernel)
+void WriteToPdf( std::vector<uint32_t>* global_pdf, uint32_t* device_pdf)
 {
-  //*******************************************************************
-  //
-  //  TEST ROUTINE
-  //
-  //*******************************************************************
-
-  auto t_end = std::chrono::high_resolution_clock::now();
-  auto t_start = std::chrono::high_resolution_clock::now();
-
-  unsigned int XN = 20;
-  unsigned int YN = 20;
-  unsigned int ZN = 20;
-
-  unsigned int nseeds = 500;
-  unsigned int nsteps = 200;
-
-  std::cout<<"\n\nInterpolation Test\n"<<"\n";
-  std::cout<<"\tSeeds :" << nseeds << " Steps:" << nsteps <<"\n";
-  std::cout<<"\tXN: " << XN << " YN: " << YN << " ZN: " << ZN <<"\n";
-  std::cout<<"\n\n";
-
-  float3 mins;
-  mins.x = 8.0;
-  mins.y = 8.0;
-  mins.z = 0.0;
-  float3 maxs;
-  maxs.x = 12.0;
-  maxs.y = 12.0;
-  maxs.z = 1.0;
-
-  float4 min_bounds;
-  min_bounds.x = 0.0;
-  min_bounds.y = 0.0;
-  min_bounds.z = 0.0;
-  min_bounds.t = 0.0;
-
-  float4 max_bounds;
-  max_bounds.x = 20.0;
-  max_bounds.y = 20.0;
-  max_bounds.z = 20.0;
-  max_bounds.t = 0.0;
-
-  float dr = 0.1;
-
-  FloatVolume voxel_space = CreateVoxelSpace( XN, YN, ZN,
-    min_bounds, max_bounds);
-
-  float3 setpts;
-  setpts.z = max_bounds.z - min_bounds.z;
-  setpts.y = (max_bounds.y + min_bounds.y)/2.0;
-  setpts.x = (max_bounds.x + min_bounds.x)/2.0;
-
-  FloatVolume flow_space = CreateFlowSpace( voxel_space, dr, setpts);
-  std::vector<unsigned int> seed_elem = RandSeedElem(
-    nseeds,
-    mins,
-    maxs,
-    voxel_space
-  );
-
-  std::vector<float4> seed_space = RandSeedPoints(  nseeds,
-                                                    voxel_space,
-                                                    seed_elem
-                                                  );
-
-  VolumeToFile(voxel_space, flow_space);
-
-  t_start = std::chrono::high_resolution_clock::now();
-
-  std::vector<float4> path_vector =
-    InterpolationTestRoutine(   voxel_space,
-                                flow_space,
-                                seed_space,
-                                seed_elem,
-                                nseeds,
-                                nsteps,
-                                dr,
-                                min_bounds,
-                                max_bounds,
-                                ocl_context,
-                                cq,
-                                test_kernel
-  );
-
-  t_end = std::chrono::high_resolution_clock::now();
-  std::cout<< "Interpolation Test Time:" <<
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-        t_end-t_start).count() << std::endl;
-
-  PathsToFile(  path_vector,
-                nseeds,
-                nsteps
-  );
+  for (uint32_t i = 0; i < global_pdf->size(); i++)
+    global_pdf->at(i) += device_pdf[i];
 }
+
+void PdfToFile(std::string pdf_filename, std::vector<uint32_t>*global_pdf,
+  uint32_t nx, uint32_t ny, uint32_t nz)
+{
+  FILE * pdf_file;
+  pdf_file = fopen(pdf_filename.c_str(), "wb");
+  fprintf(pdf_file, "[");
+
+  uint32_t index = 0;
+
+  for (uint32_t k = 0; k < nz; k++)
+  {
+    fprintf(pdf_file, "[");
+    for (uint32_t j = 0; j < ny; j++)
+    {
+      fprintf(pdf_file, "[");
+      for (uint32_t i = 0; i < nx; i++)
+      {
+        index = i*(ny*nz) + j*(nz) + k;
+        fprintf(pdf_file, "%u", global_pdf->at(index));
+
+        if (i < nx - 1)
+          fprintf(pdf_file, ",");
+      }
+      fprintf(pdf_file, "]");
+
+      if (j < ny - 1)
+        fprintf(pdf_file, ",");
+    }
+    fprintf(pdf_file, "]");
+
+    if (k < nz - 1)
+      fprintf(pdf_file, ",");
+  }
+
+  fprintf(pdf_file, "]");
+  fclose(pdf_file);
+}
+
+//EOF

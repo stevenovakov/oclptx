@@ -72,6 +72,9 @@ class OclEnv{
     
     cl::CommandQueue * GetCq(unsigned int device_num);
     cl::Kernel * GetKernel(unsigned int kernel_num);
+    cl::Kernel * GetSumKernel(unsigned int kernel_num);
+
+    EnvironmentData * GetEnvData();
     // TODO:
     // not sure if better to generate new cl::kernel  object for
     // every oclptxhandler object, or if can just point to this->kernels
@@ -88,9 +91,45 @@ class OclEnv{
 
     void NewCLCommandQueues();
 
-    cl::Program CreateProgram();
+    void CreateKernels(
+      bool two_dir = false,
+      bool three_dir = false,
+      bool waypoints = false,
+      bool termination = false,
+      bool exclusion = false,
+      bool euler_stream = false
+    );
 
     std::string OclErrorStrings(cl_int error);
+
+    //
+    // Resource Allocation
+    //
+
+    int AvailableGPUMem(
+      const BedpostXData* f_data,
+      uint32_t n_bpx_dirs,
+      uint32_t num_waypoint_masks,
+      uint32_t loopcheck_fraction,
+      bool exclusion_mask,
+      bool termination_mask,
+      uint32_t n_waypoints,
+      bool save_particle_paths,
+      uint32_t max_steps,
+      float mem_fraction //also pass oclptxoptions here
+    );
+
+    void AllocateSamples(
+      const BedpostXData* f_data,
+      const BedpostXData* phi_data,
+      const BedpostXData* theta_data,
+      const unsigned short int* brain_mask,
+      const unsigned short int* exclusion_mask,
+      const unsigned short int* termination_mask,
+      const unsigned short int** waypoint_masks
+    );
+
+    //void ProcessOptions( oclptxOptions* options);
 
   private:
     //
@@ -106,11 +145,14 @@ class OclEnv{
     //std::vector<MutexWrapper> ocl_device_queue_mutexs;
 
     std::vector<cl::Kernel> ocl_kernel_set;
+    std::vector<cl::Kernel> sum_kernel_set;
     //Every compiled kernel is stored here.
 
     std::string ocl_routine_name;
 
     bool ocl_profiling;
+
+    EnvironmentData env_data;
 };
 
 #endif

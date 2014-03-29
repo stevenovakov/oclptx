@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <condition_variable>
+#include <thread>
 
 #include "fifo.h"
 #include "oclptxhandler.h"

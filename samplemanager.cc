@@ -55,30 +55,30 @@ void SampleManager::LoadBedpostDataHelper(
   const NEWIMAGE::volume<float>& aMask,
   const int aFiberNum  )
 {
-    NEWIMAGE::volume4D<float> loadedVolume4DTheta;
-    NEWIMAGE::volume4D<float> loadedVolume4DPhi;
-    NEWIMAGE::volume4D<float> loadedVolume4Df;
+  NEWIMAGE::volume4D<float> loadedVolume4DTheta;
+  NEWIMAGE::volume4D<float> loadedVolume4DPhi;
+  NEWIMAGE::volume4D<float> loadedVolume4Df;
 
-    //Load Theta/Phi/f samples
-    NEWIMAGE::read_volume4D(loadedVolume4DTheta, aThetaSampleName);
-    NEWIMAGE::read_volume4D(loadedVolume4DPhi, aPhiSampleName);
-    NEWIMAGE::read_volume4D(loadedVolume4Df, afSampleName);
+  //Load Theta/Phi/f samples
+  NEWIMAGE::read_volume4D(loadedVolume4DTheta, aThetaSampleName);
+  NEWIMAGE::read_volume4D(loadedVolume4DPhi, aPhiSampleName);
+  NEWIMAGE::read_volume4D(loadedVolume4Df, afSampleName);
 
-    if(aMask.xsize() > 0)
-    {
-        //_thetaSamples.push_back(loadedVolume4DTheta.matrix(aMask));
-        //_phiSamples.push_back(loadedVolume4DPhi.matrix(aMask));
-        //_fSamples.push_back(loadedVolume4Df.matrix(aMask));
-    }
-    else
-    {
-        PopulateMemberParameters(loadedVolume4DTheta,
-          _thetaData, loadedVolume4DTheta[0], aFiberNum);
-        PopulateMemberParameters(loadedVolume4DPhi,
-          _phiData, loadedVolume4DPhi[0], aFiberNum);
-        PopulateMemberParameters(loadedVolume4Df,
-          _fData, loadedVolume4Df[0], aFiberNum);
-    }
+  if(aMask.xsize() > 0)
+  {
+      //_thetaSamples.push_back(loadedVolume4DTheta.matrix(aMask));
+      //_phiSamples.push_back(loadedVolume4DPhi.matrix(aMask));
+      //_fSamples.push_back(loadedVolume4Df.matrix(aMask));
+  }
+  else
+  {
+      PopulateMemberParameters(loadedVolume4DTheta,
+        _thetaData, loadedVolume4DTheta[0], aFiberNum);
+      PopulateMemberParameters(loadedVolume4DPhi,
+        _phiData, loadedVolume4DPhi[0], aFiberNum);
+      PopulateMemberParameters(loadedVolume4Df,
+        _fData, loadedVolume4Df[0], aFiberNum);
+  }
 }
 
 void SampleManager::PopulateMemberParameters(
@@ -88,38 +88,37 @@ void SampleManager::PopulateMemberParameters(
   const int aFiberNum)
 {
 
-    const int ns = aLoadedData.tsize();
-    const int nx = aLoadedData.xsize();
-    const int ny = aLoadedData.ysize();
-    const int nz = aLoadedData.zsize();
+  const int ns = aLoadedData.tsize();
+  const int nx = aLoadedData.xsize();
+  const int ny = aLoadedData.ysize();
+  const int nz = aLoadedData.zsize();
 
-    aTargetContainer.data.push_back( new float[ns*nx*ny*nz] );
-    aTargetContainer.nx = nx;
-    aTargetContainer.ny = ny;
-    aTargetContainer.nz = nz;
-    aTargetContainer.ns = ns;
+  aTargetContainer.data.push_back( new float[ns*nx*ny*nz] );
+  aTargetContainer.nx = nx;
+  aTargetContainer.ny = ny;
+  aTargetContainer.nz = nz;
+  aTargetContainer.ns = ns;
 
-    int xoff = aLoadedData[0].minx() - aMaskParams.minx();
-    int yoff = aLoadedData[0].miny() - aMaskParams.miny();
-    int zoff = aLoadedData[0].minz() - aMaskParams.minz();
-    for (int z = aMaskParams.minz(); z <= aMaskParams.maxz(); z++)
+  int xoff = aLoadedData[0].minx() - aMaskParams.minx();
+  int yoff = aLoadedData[0].miny() - aMaskParams.miny();
+  int zoff = aLoadedData[0].minz() - aMaskParams.minz();
+
+  for (int z = aMaskParams.minz(); z <= aMaskParams.maxz(); z++)
+  {
+    for (int y = aMaskParams.miny(); y <= aMaskParams.maxy(); y++)
     {
-      for (int y = aMaskParams.miny(); y <= aMaskParams.maxy(); y++)
+      for (int x = aMaskParams.minx(); x <= aMaskParams.maxx(); x++)
       {
-        for (int x = aMaskParams.minx(); x <= aMaskParams.maxx(); x++)
+
+        for (int t = aLoadedData.mint();
+          t <= aLoadedData.maxt(); t++)
         {
-            if (aMaskParams(x,y,z) > 0)
-            {
-                for (int t = aLoadedData.mint();
-                  t <= aLoadedData.maxt(); t++)
-                {
-                    aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
-                      z*nx*ny + y*nx + x] =
-                        aLoadedData[t](x+xoff,y+yoff,z+zoff);
-                }
-            }
+            aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
+              x*nz*ny + y*nz + z] =
+                aLoadedData[t](x+xoff,y+yoff,z+zoff);
         }
       }
+    }
   }
 }
 
@@ -240,15 +239,17 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
    if (seeds.Nrows() == 0)
    {
       seed.t = 1.0;
-      seed.x = floor((_brainMask.xdim())/2.0);
-      seed.y = floor((_brainMask.ydim())/2.0);
-      seed.z = floor((_brainMask.zdim())/2.0);
-      cout << "Seeded at "<< "x = " << seed.x << " y= " <<
+      seed.x = floor((_brainMask.xsize())/2.0);
+      seed.y = floor((_brainMask.ysize())/2.0);
+      seed.z = floor((_brainMask.zsize())/2.0);
+      std::cout << "Seeded at "<< "x = " << seed.x << " y= " <<
         seed.y<< " z = "<< seed.z<<endl;
       GenerateSeedParticlesHelper(seed,aSampleVoxel);
    }
    else
    {
+      std::cout<<"File included\n";
+      _nParticles = seeds.Nrows();
       if (seeds.Ncols()!=3 && seeds.Nrows()==3)
       {
          seeds=seeds.t();
@@ -259,7 +260,8 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
          seed.x = seeds(t,1);
          seed.y = seeds(t,2);
          seed.z = seeds(t,3);
-         GenerateSeedParticlesHelper(seed, aSampleVoxel);
+         _seedParticles.push_back(seed);
+         //GenerateSeedParticlesHelper(seed, aSampleVoxel);
       }
    }
 }
@@ -274,6 +276,10 @@ void SampleManager::GenerateSeedParticlesHelper(
     {
       float dx,dy,dz;
       float radSq = aSampleVoxel*aSampleVoxel;
+      
+      // rand not seeded properly, on purpose(want the same data set)
+      // seed it with sys clock later.
+      
       while(true)
       {
         dx=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
@@ -289,30 +295,6 @@ void SampleManager::GenerateSeedParticlesHelper(
       randomParticle.z += dz / _brainMask.zdim();
     }
     _seedParticles.push_back(randomParticle);
-
-    //Determining the root vertex
-    int4 rootVertex;
-    rootVertex.t = aSeed.t;
-    rootVertex.x = aSeed.x;
-    rootVertex.y = aSeed.y;
-    rootVertex.z = aSeed.z;
-    if(randomParticle.x < rootVertex.x)
-    {
-      rootVertex.x = floor(randomParticle.x);
-    }
-    if (randomParticle.y < rootVertex.y)
-    {
-      rootVertex.y = floor(randomParticle.y);
-    }
-    if (randomParticle.z < rootVertex.z)
-    {
-      rootVertex.z = floor(randomParticle.z);
-    }
-    _rootVertices.push_back(rootVertex);
-   // cout<< " t = "<<randomParticle.t<< " x= "<< randomParticle.x <<
-   //   " y= " << randomParticle.y << " z= " << randomParticle.z<< endl;
-   // cout<< " t = "<<rootVertex.t<< " x= "<< rootVertex.x << " y= " <<
-   //   rootVertex.y << " z= " << rootVertex.z<< endl;
    }
 }
 
@@ -332,6 +314,12 @@ const unsigned short int* SampleManager::GetBrainMaskToArray()
     const int sizeX = _brainMask.xsize();
     const int sizeY = _brainMask.ysize();
     const int sizeZ = _brainMask.zsize();
+    std::cout << "BrainMask Size "<< "x = " << _brainMask.xsize()<< " y= " <<
+      _brainMask.ysize()<< " z = "<< _brainMask.zsize()<<endl;
+    std::cout << "BrainMask Min "<< "x = " << _brainMask.minx()<< " y= " <<
+      _brainMask.miny()<< " z = "<< _brainMask.minz()<<endl;
+    std::cout << "BrainMask Max "<< "x = " << _brainMask.maxx()<< " y= " <<
+      _brainMask.maxy()<< " z = "<< _brainMask.maxz()<<endl;
 
     unsigned short int* target =
       new unsigned short int[sizeX * sizeY * sizeZ];
@@ -342,7 +330,7 @@ const unsigned short int* SampleManager::GetBrainMaskToArray()
       {
         for (int x = minX; x <= maxX; x++)
         {
-              target[z*sizeX*sizeY + y*sizeX + x] = _brainMask(x,y,z);
+              target[x*sizeY*sizeZ + y*sizeZ + z] = _brainMask(x,y,z);
         }
       }
     }
@@ -358,7 +346,7 @@ float const SampleManager::GetThetaData(
     int ny = _thetaData.ny;
     int nz = _thetaData.nz;
     return _thetaData.data.at(aFiberNum)[(aSamp)*(nx*ny*nz) +
-      (aZ)*(nx*ny) + (aY)*nx + (aX)];
+      (aX)*(nz*ny) + (aY)*nz + (aZ)];
   }
   return 0.0f;
 }
@@ -372,7 +360,7 @@ float const SampleManager::GetPhiData(
     int ny = _phiData.ny;
     int nz = _phiData.nz;
     return _phiData.data.at(aFiberNum)[(aSamp)*(nx*ny*nz) +
-      (aZ)*(nx*ny) + (aY)*nx + (aX)];
+      (aX)*(nz*ny) + (aY)*nz + (aZ)];
   }
   return 0.0f;
 }
@@ -386,9 +374,15 @@ float const SampleManager::GetfData(int aFiberNum,
     int ny = _fData.ny;
     int nz = _fData.nz;
     return _fData.data.at(aFiberNum)[(aSamp)*(nx*ny*nz) +
-      (aZ)*(nx*ny) + (aY)*nx + (aX)];
+      (aX)*(nz*ny) + (aY)*nz + (aZ)];
   }
   return 0.0f;
+}
+
+unsigned short int const SampleManager::GetBrainMask(
+  int aX, int aY, int aZ)
+{
+  return _brainMask(aX, aY, aZ);
 }
 
 const BedpostXData* SampleManager::GetThetaDataPtr()

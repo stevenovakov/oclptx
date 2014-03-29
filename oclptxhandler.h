@@ -7,7 +7,6 @@
 #ifndef OCLPTXHANDLER_H_
 #define OCLPTXHANDLER_H_
 
-#define __CL_ENABLE_EXCEPTIONS
 #ifdef __APPLE__
 #include <OpenCL/opencl.hpp>
 #else
@@ -20,98 +19,76 @@ class OclPtxHandler{
  public:
   struct particle_data
   {
-    cl_ulong value;
-  } __attribute__((aligned(8)));
+    cl_ulong8 rng;
+    cl_float4 position;
+  } __attribute__((aligned(64)));
 
   struct particle_attrs
   {
-    cl_int num_steps;
+    cl_int steps_per_kernel;
+    cl_int max_steps;
     cl_int particles_per_side;
+    cl_uint sample_nx;
+    cl_uint sample_ny;
+    cl_uint sample_nz;
+    cl_uint num_samples;
+    cl_float curvature_threshold;
+    cl_uint num_waypoint_masks;
   } __attribute__((aligned(8)));
 
   OclPtxHandler() {}
-  ~OclPtxHandler();
   void Init(
       cl::Context *cc,
       cl::CommandQueue *cq,
-      cl::Kernel *ck,
-      const BedpostXData *f,
-      const BedpostXData *phi,
-      const BedpostXData *theta,
-      int num_directions,
-      const unsigned short int *brain_mask,
+      cl::Kernel* ptx_kernel,
+      cl::Kernel* sum_kernel,
       struct particle_attrs *attrs,
-      FILE *path_dump_fd);
-
-  // TODO(jeff) Kill these two after I check that I do everything.
-  void ParticlePathsToFile();
-  void Interpolate();
-
-  // Run Kernel asyncronously
-  void RunKernel(int side);
-  // Write a single particle
-  void WriteParticle(struct particle_data *data, int offset);
-  // Read the "completion" buffer back into the vector pointed to by ret.
-  void ReadStatus(int offset, int count, cl_ushort *ret);
-  void DumpPath(int offset, int count);
+      FILE *path_dump_fd,
+      EnvironmentData *env_dat);
+  ~OclPtxHandler();
 
   int particles_per_side();
 
+  // Write a single particle
+  void WriteParticle(struct particle_data *data, int offset);
+  // Run Kernel asyncronously
+  void RunKernel(int side);
+  // Read the "completion" buffer back into the vector pointed to by ret.
+  void ReadStatus(int offset, int count, cl_ushort *ret);
+  // Dump path to file.
+  void DumpPath(int offset, int count);
+
  private:
-  // Init helpers
-  void WriteSamplesToDevice(
-      const BedpostXData* f_data,
-      const BedpostXData* phi_data,
-      const BedpostXData* theta_data,
-      int num_directions,
-      const unsigned short int* brain_mask);
   void InitParticles(struct particle_attrs *attrs);
+  void GetPdfData(cl_int* container);
+  void PdfSum();
+
+  struct particle_attrs attrs_;
 
   // OpenCL Interface
   cl::Context* context_;
   cl::CommandQueue* cq_;
-  cl::Kernel* kernel_;
-
-  // BedpostX Data
-  cl::Buffer f_samples_buffer;
-  cl::Buffer phi_samples_buffer;
-  cl::Buffer theta_samples_buffer;
-  cl::Buffer brain_mask_buffer;
-
-  unsigned int samples_buffer_size;
-  unsigned int sample_nx, sample_ny, sample_nz, sample_ns;
-
-  // Output Data
-  unsigned int n_particles;
-  unsigned int max_steps;
-
-  unsigned int section_size;
-  unsigned int num_steps;
-  unsigned int particles_size;
-
-  cl::Buffer particle_paths_buffer;
-  cl::Buffer particle_steps_taken_buffer;
-  cl::Buffer particle_elem_buffer;
-  cl::Buffer particle_done_buffer;
-
-  unsigned int particles_mem_size;
-  unsigned int particle_uint_mem_size;
-  // size (Total Particles)/numDevices * (sizeof(float4))
-
-  FILE *path_dump_fd_;
+  cl::Kernel* ptx_kernel_;
+  cl::Kernel* sum_kernel_;
 
   // Particle Data
-  cl::Buffer *gpu_data;  // Type particle_data
-  cl::Buffer *gpu_complete;  // Type ushort array
+  cl::Buffer *gpu_data_;  // Type particle_data
+  cl::Buffer *gpu_complete_;  // Type ushort array
+  cl::Buffer *gpu_local_pdf_;
+  cl::Buffer *gpu_global_pdf_;
 
   // Debug Data
-  cl::Buffer *gpu_path;  // Type ulong
-  cl::Buffer *gpu_step_count; // Type ushort
+  cl::Buffer *gpu_path_;  // Type ulong
+  cl::Buffer *gpu_step_count_; // Type ushort
 
-  struct particle_attrs attrs_;
-
-  // kludge
+  FILE *path_dump_fd_;
   bool first_time_;
+
+  // TODO: Steve's
+  EnvironmentData * env_dat_;
+
+  cl_ulong GpuMemUsed();
+  cl_ulong total_gpu_mem_used;
 };
 
 #endif  // OCLPTXHANDLER_H_

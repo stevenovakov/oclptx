@@ -18,9 +18,13 @@ struct particle_attrs
 __kernel void Collatz(
   struct particle_attrs attrs,  /* RO */
   __global struct particle_data *state,  /* RW */
-  __global ushort *complete,
-  __global ushort *num_steps,
+
+  // Debugging info
   __global ulong *path_output)
+  __global ushort *num_steps,
+
+  // Output
+  __global ushort *complete,
 {
   int step;
   int index;

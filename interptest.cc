@@ -67,6 +67,10 @@ void VolumeToFile(IntVolume ivol, FloatVolume fvol);
 void PathsToFile(std::vector<float4> path_vector,
   unsigned int n_seeds, unsigned int n_steps);
 
+void SimpleInterpolationTest( cl::Context* ocl_context,
+                              cl::CommandQueue* cq,
+                              cl::Kernel* test_kernel);
+
 std::vector<float4> InterpolationTestRoutine
 (
   FloatVolume voxel_space,
@@ -557,5 +561,103 @@ std::vector<float4> InterpolationTestRoutine
   return return_container;
 }
 
+
+//*******************************************************************
+//
+//  TEST ROUTINE (s)
+//
+//*******************************************************************
+void SimpleInterpolationTest( cl::Context* ocl_context,
+                              cl::CommandQueue* cq,
+                              cl::Kernel* test_kernel)
+{
+  auto t_end = std::chrono::high_resolution_clock::now();
+  auto t_start = std::chrono::high_resolution_clock::now();
+
+  unsigned int XN = 20;
+  unsigned int YN = 20;
+  unsigned int ZN = 20;
+
+  unsigned int nseeds = 500;
+  unsigned int nsteps = 200;
+
+  std::cout<<"\n\nInterpolation Test\n"<<"\n";
+  std::cout<<"\tSeeds :" << nseeds << " Steps:" << nsteps <<"\n";
+  std::cout<<"\tXN: " << XN << " YN: " << YN << " ZN: " << ZN <<"\n";
+  std::cout<<"\n\n";
+
+  float3 mins;
+  mins.x = 8.0;
+  mins.y = 8.0;
+  mins.z = 0.0;
+  float3 maxs;
+  maxs.x = 12.0;
+  maxs.y = 12.0;
+  maxs.z = 1.0;
+
+  float4 min_bounds;
+  min_bounds.x = 0.0;
+  min_bounds.y = 0.0;
+  min_bounds.z = 0.0;
+  min_bounds.t = 0.0;
+
+  float4 max_bounds;
+  max_bounds.x = 20.0;
+  max_bounds.y = 20.0;
+  max_bounds.z = 20.0;
+  max_bounds.t = 0.0;
+
+  float dr = 0.1;
+
+  FloatVolume voxel_space = CreateVoxelSpace( XN, YN, ZN,
+    min_bounds, max_bounds);
+
+  float3 setpts;
+  setpts.z = max_bounds.z - min_bounds.z;
+  setpts.y = (max_bounds.y + min_bounds.y)/2.0;
+  setpts.x = (max_bounds.x + min_bounds.x)/2.0;
+
+  FloatVolume flow_space = CreateFlowSpace( voxel_space, dr, setpts);
+  std::vector<unsigned int> seed_elem = RandSeedElem(
+    nseeds,
+    mins,
+    maxs,
+    voxel_space
+  );
+
+  std::vector<float4> seed_space = RandSeedPoints(  nseeds,
+                                                    voxel_space,
+                                                    seed_elem
+                                                  );
+
+  VolumeToFile(voxel_space, flow_space);
+
+  t_start = std::chrono::high_resolution_clock::now();
+
+  std::vector<float4> path_vector =
+    InterpolationTestRoutine(   voxel_space,
+                                flow_space,
+                                seed_space,
+                                seed_elem,
+                                nseeds,
+                                nsteps,
+                                dr,
+                                min_bounds,
+                                max_bounds,
+                                ocl_context,
+                                cq,
+                                test_kernel
+  );
+
+  t_end = std::chrono::high_resolution_clock::now();
+  std::cout<< "Interpolation Test Time:" <<
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+        t_end-t_start).count() << std::endl;
+
+  PathsToFile(  path_vector,
+                nseeds,
+                nsteps
+  );
+}
 
 // EOF

@@ -29,16 +29,6 @@
  *
  */
 
-/*
- * OCL KERNEL COMPILATION - APPEND ORDER
- *
- * Append parsed files in this order in one container
- * before compiling kernel for runtime:
- *
- *      prngmethods.cl
- *      interptest.cl
- *
- */
 
 // maybe 'better' to declare inline function instead of macro
 //#define CIRCTOCART(invec, xyz){\
@@ -156,19 +146,7 @@ __kernel void InterpolateTestKernel(
               min_bounds.s2 - temp_pos.z > 0.0 )
     {
       break;
-    }
-    
-    // TODO STEVE: this raises a build error, figure out why
-    //bounds_test = 
-      //(int) (((max_bounds.s0 - temp_pos.x) & 0x10000000)>>31 + 
-        //((temp_pos.x - min_bounds.s0) & 0x10000000)>>31 + 
-          //((max_bounds.s1 - temp_pos.y) & 0x10000000)>>31 + 
-            //((temp_pos.y - min_bounds.s1) & 0x10000000)>>31 + 
-              //((max_bounds.s2 - temp_pos.z) & 0x10000000)>>31 +
-                //((temp_pos.z - min_bounds.s2) & 0x10000000)>>31);
-                
-    //if (bounds_test > 0)
-      //break;       
+    }     
 
     d_elem_x = 0;
     d_elem_y = 0;

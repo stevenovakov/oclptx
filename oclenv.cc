@@ -29,17 +29,15 @@
  *
  */
 
-
-
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <vector>
+#include <cmath>
 //#include <mutex>
 //#include <thread>
 
 
-#define __CL_ENABLE_EXCEPTIONS
+//#define __CL_ENABLE_EXCEPTIONS
 // adds exception support from CL libraries
 // define before CL headers inclusion
 
@@ -52,9 +50,9 @@
 #include "oclenv.h"
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-static const std::string slash="\\";
+  static const std::string slash="\\";
 #else
-static const std::string slash="/";
+  static const std::string slash="/";
 #endif
 
 //*********************************************************************
@@ -78,7 +76,15 @@ void OclEnv::Init()
   this->OclInit();
   this->OclDeviceInfo();
   this->NewCLCommandQueues();
-  this->CreateProgram();
+  this->CreateKernels();
+
+  this->env_data.f_samples_buffers = NULL;
+  this->env_data.phi_samples_buffers = NULL;
+  this->env_data.theta_samples_buffers = NULL;
+  this->env_data.brain_mask_buffer = NULL;
+  this->env_data.exclusion_mask_buffer = NULL;
+  this->env_data.termination_mask_buffer = NULL;
+  this->env_data.waypoint_masks = NULL;
 }
 
 //
@@ -86,6 +92,36 @@ void OclEnv::Init()
 //
 OclEnv::~OclEnv()
 {
+  std::cout<<"~OclEnv\n";
+  uint32_t n_dirs = this->env_data.bpx_dirs;
+
+  if (this->env_data.f_samples_buffers != NULL)
+  {
+    for (uint32_t s = 0; s < n_dirs; s++)
+    {
+      delete this->env_data.f_samples_buffers[s];
+      delete this->env_data.phi_samples_buffers[s];
+      delete this->env_data.theta_samples_buffers[s];
+    }
+    
+    delete[] this->env_data.f_samples_buffers;
+    delete[] this->env_data.phi_samples_buffers;
+    delete[] this->env_data.theta_samples_buffers;
+  }
+
+  delete this->env_data.brain_mask_buffer;
+  
+  if (this->env_data.exclusion_mask_buffer != NULL)
+    delete this->env_data.exclusion_mask_buffer;
+  if (this->env_data.termination_mask_buffer != NULL)
+    delete this->env_data.termination_mask_buffer;
+  if (this->env_data.waypoint_masks != NULL)
+  {
+    for (uint32_t w = 0; w < this->env_data.n_waypts; w ++)
+      delete this->env_data.waypoint_masks[w];
+
+    delete[] this->env_data.waypoint_masks;
+  }
 }
 
 //*********************************************************************
@@ -109,10 +145,20 @@ cl::Kernel * OclEnv::GetKernel(unsigned int kernel_num)
   return &(this->ocl_kernel_set.at(kernel_num));
 }
 
+cl::Kernel * OclEnv::GetSumKernel(unsigned int kernel_num)
+{
+  return &(this->sum_kernel_set.at(kernel_num));
+}
+
 void OclEnv::SetOclRoutine(std::string new_routine)
 {
   this->ocl_routine_name = new_routine;
-  this->CreateProgram();
+  this->CreateKernels();
+}
+
+EnvironmentData * OclEnv::GetEnvData()
+{
+  return &(this->env_data);
 }
 
 
@@ -224,143 +270,163 @@ void OclEnv::NewCLCommandQueues()
 //
 //
 //
-cl::Program OclEnv::CreateProgram()
+void OclEnv::CreateKernels(
+  bool two_dir,
+  bool three_dir,
+  bool waypoints,
+  bool termination,
+  bool exclusion,
+  bool euler_stream
+)
 {
   this->ocl_kernel_set.clear();
+  this->sum_kernel_set.clear();
+
+  cl_int err;
 
   // Read Source
-
-  std::string line_str, kernel_source;
-
-  std::ifstream source_file;
-
-  std::vector<std::string> source_list;
-  std::vector<std::string>::iterator sit;
-  
   std::string fold = "oclkernels";
 
-  if (this->ocl_routine_name == "oclptx")
+  std::string interp_kernel_source;
+  std::string sum_kernel_source = fold + slash + "summing.cl";
+  std::string define_list =  "-I ./oclkernels -D PRNG";
+
+  if (this->ocl_routine_name == "standard")
   {
-    source_list.push_back(fold + slash + "prngmethods.cl");
-    source_list.push_back(fold + slash + "interpolate.cl");
+    interp_kernel_source = fold + slash + "interpolate.cl";
   }
   else if (this->ocl_routine_name == "rng_test")
   {
-    source_list.push_back(fold + slash + "rng_test.cl");
+    interp_kernel_source = fold + slash + "rng_test.cl";
   }
   else if (this->ocl_routine_name == "collatz")
   {
-    source_list.push_back(fold + slash + "collatz.cl");
+    interp_kernel_source = fold + slash + "collatz.cl";
   }
   else if (this->ocl_routine_name == "interptest")
   {
     //source_list.push_back("prngmethods.cl");
-    source_list.push_back(fold + slash + "interptest.cl");
+    interp_kernel_source = fold + slash + "interptest.cl";
   }
   else if (this->ocl_routine_name == "basic")
   {
-    source_list.push_back(fold + slash + "basic.cl");
+    interp_kernel_source = fold + slash + "basic.cl";
   }
 
-  for (sit = source_list.begin(); sit != source_list.end(); ++sit)
-  {
-    line_str = *sit;
-    source_file.open(line_str.c_str());
+  if (two_dir)
+    define_list += " -D TWO_DIR";
+  if (three_dir)
+    define_list += " -D THREE_DIR";
+  if (waypoints)
+    define_list += " -D WAYPOINTS";
+  if (termination)
+    define_list += " -D TERMINATION";
+  if (exclusion)
+    define_list += " -D EXCLUSION";
+  if (euler_stream)
+    define_list += " -D EULER_STREAMLINE";
 
-    std::getline(source_file, line_str);
+  std::ifstream main_stream(interp_kernel_source);
+  std::string main_code(  (std::istreambuf_iterator<char>(main_stream) ),
+                            (std::istreambuf_iterator<char>()));
 
-    while(source_file){
-
-      kernel_source += line_str + "\n";
-
-      std::getline(source_file, line_str);
-    }
-    source_file.close();
-  }
-  //TODO
-  // no else  because we will check for routine_name at init
-  //
-
+  std::ifstream sum_stream(sum_kernel_source);
+  std::string sum_code(  (std::istreambuf_iterator<char>(sum_stream) ),
+                            (std::istreambuf_iterator<char>()));
   //
   // Build Program files here
   //
 
-  //std::cout<<kernel_source;
-
-
-  cl::Program::Sources prog_source(
+  cl::Program::Sources main_source(
     1,
-    std::make_pair(kernel_source.c_str(), kernel_source.length())
+    std::make_pair(main_code.c_str(), main_code.length())
   );
 
-  cl::Program ocl_program(this->ocl_context, prog_source);
+  cl::Program::Sources sum_source(
+    1,
+    std::make_pair(sum_code.c_str(), sum_code.length())
+  );
 
-  try
+  cl::Program main_program(this->ocl_context, main_source);
+
+  err = main_program.build(this->ocl_devices, define_list.c_str());
+
+  if( this->OclErrorStrings(err) != "CL_SUCCESS")
   {
-    ocl_program.build(this->ocl_devices, "-I ./oclkernels");
+    std::cout<<"ERROR: " <<
+      " ( " << this->OclErrorStrings(err) << ")\n";
+
+    std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
+
+    std::cout<<"BUILD OPTIONS: \n" <<
+      main_program.getBuildInfo<CL_PROGRAM_BUILD_OPTIONS>(*dit) <<
+       "\n";
+    std::cout<<"BUILD LOG: \n" <<
+      main_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*dit) <<"\n";
+
+    exit(EXIT_FAILURE);
   }
-  catch(cl::Error err){
 
-    // TODO
-    //  dump all error logging to logfile
-    //  maybe differentiate b/w regular errors and cl errors
+  cl::Program sum_program(this->ocl_context, sum_source);
 
-    if( this->OclErrorStrings(err.err()) != "CL_SUCCESS")
-    {
-      std::cout<<"ERROR: " << err.what() <<
-        " ( " << this->OclErrorStrings(err.err()) << ")\n";
+  err = sum_program.build(this->ocl_devices, "-I ./oclkernels");
 
-      for(std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
-        dit != this->ocl_devices.end(); dit++)
-      {
+  if( this->OclErrorStrings(err) != "CL_SUCCESS")
+  {
+    std::cout<<"ERROR: " <<
+      " ( " << this->OclErrorStrings(err) << ")\n";
 
-        std::cout<<"BUILD OPTIONS: \n" <<
-          ocl_program.getBuildInfo<CL_PROGRAM_BUILD_OPTIONS>(*dit) <<
-           "\n";
-        std::cout<<"BUILD LOG: \n" <<
-          ocl_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*dit) <<"\n";
-      }
-    }
+    std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
+
+    std::cout<<"BUILD OPTIONS: \n" <<
+      sum_program.getBuildInfo<CL_PROGRAM_BUILD_OPTIONS>(*dit) <<
+       "\n";
+    std::cout<<"BUILD LOG: \n" <<
+      sum_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*dit) <<"\n";
+
+    exit(EXIT_FAILURE);
   }
+  
 
   //
   // Compile Kernels from Program
   //
   for( unsigned int k = 0; k < this->ocl_devices.size(); k++)
   {
-    if (this->ocl_routine_name == "oclptx" )
+    if (this->ocl_routine_name == "standard" )
     {
-      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
-                                                "OclPtxKernel",
-                                                NULL ));
+      this->ocl_kernel_set.push_back(cl::Kernel(main_program,
+                                                "OclPtxInterpolate",
+                                                NULL));
+      this->sum_kernel_set.push_back(cl::Kernel(sum_program,
+                                                "PdfSum",
+                                                NULL));
     }
     else if (this->ocl_routine_name == "rng_test")
     {
-      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
+      this->ocl_kernel_set.push_back(cl::Kernel(main_program,
                                                 "RngTest",
                                                 NULL));
     }
     else if (this->ocl_routine_name == "collatz")
     {
-      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
+      this->ocl_kernel_set.push_back(cl::Kernel(main_program,
                                                 "Collatz",
                                                 NULL));
     }
     else if (this->ocl_routine_name == "interptest" )
     {
-      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
+      this->ocl_kernel_set.push_back(cl::Kernel(main_program,
                                                 "InterpolateTestKernel",
                                                 NULL));
     }
     else if (this->ocl_routine_name == "basic" )
     {
-      this->ocl_kernel_set.push_back(cl::Kernel(ocl_program,
+      this->ocl_kernel_set.push_back(cl::Kernel(main_program,
                                                 "BasicInterpolate",
                                                 NULL));
     }
   }
-
-  return ocl_program;
 }
 
 
@@ -440,5 +506,284 @@ std::string OclEnv::OclErrorStrings(cl_int error)
   return cl_error_string[ -1*error];
 }
 
+//*********************************************************************
+//
+// Resource Allocation
+//
+//*********************************************************************
+
+// TODO @STEVE
+// Right now I've just kluged together AllocateSamples, but really
+// AvailableGPUMem should run more thoroughly and calculate a lot of the vallues
+// currently bneing calculated in AllocateSamples
+//
+int OclEnv::AvailableGPUMem(
+  const BedpostXData* f_data,
+  uint32_t n_bpx_dirs,
+  uint32_t num_waypoint_masks,
+  uint32_t loopcheck_fraction,
+  bool exclusion_mask,
+  bool termination_mask,
+  uint32_t n_waypoints,
+  bool save_particle_paths,
+  uint32_t m_steps,
+  float mem_fraction //also pass oclptxoptions here
+)
+{
+  // ***********************************************
+  //  Hardware Parameters
+  // ***********************************************
+  cl_ulong max_buff_size;
+  cl_ulong gl_mem_size;
+  cl_ulong useful_gl_mem_size;
+  cl_ulong dynamic_mem_left;
+  cl_ulong dynamic_mem_per_particle = 0;
+  uint32_t r_particles;
+
+  std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
+
+  dit->getInfo(CL_DEVICE_MAX_MEM_ALLOC_SIZE, &max_buff_size);
+  this->env_data.max_buffer_size = max_buff_size;
+
+  dit->getInfo(CL_DEVICE_GLOBAL_MEM_SIZE, &gl_mem_size);
+  this->env_data.global_mem_size = gl_mem_size;
+
+  useful_gl_mem_size = std::floor(gl_mem_size * mem_fraction);
+
+  // ***********************************************
+  //  BPX Sample Parameters + Masks
+  // ***********************************************
+
+  this->env_data.bpx_dirs = n_bpx_dirs;
+  this->env_data.nx = f_data->nx;
+  this->env_data.ny = f_data->ny;
+  this->env_data.nz = f_data->nz;
+  this->env_data.ns = f_data->ns;
+
+  cl_uint single_direction_size =
+    f_data->nx * f_data->ny * f_data->nz;
+
+  cl_uint single_pdf_mask_size = (single_direction_size / 32)  +
+    ((single_direction_size%32 > 0)? 1 : 0);
+
+  cl_uint brain_mem_size =
+    single_direction_size * sizeof(unsigned short int);
+
+  this->env_data.mask_mem_size = brain_mem_size;
+
+  cl_uint single_direction_mem_size =
+    single_direction_size*f_data->ns*sizeof(float);
+
+  this->env_data.single_sample_mem_size = single_direction_mem_size;
+
+  cl_uint total_mem_size = 3*single_direction_mem_size * n_bpx_dirs +
+    brain_mem_size*(1 + n_waypoints);
+
+  if (exclusion_mask)
+    total_mem_size += brain_mem_size;
+  if (termination_mask)
+    total_mem_size += brain_mem_size;
+
+  this->env_data.global_pdf_size = single_pdf_mask_size * 32;
+  this->env_data.global_pdf_mem_size =
+    this->env_data.global_pdf_size * sizeof(uint32_t);
+
+  this->env_data.total_static_gpu_mem =
+    total_mem_size + this->env_data.global_pdf_mem_size;
+
+  dynamic_mem_left = useful_gl_mem_size - this->env_data.total_static_gpu_mem;
+
+  // ***********************************************
+  //  Dynamic Particle Containers/Parameters
+  // ***********************************************
+
+  this->env_data.particle_pdf_mask_mem_size =
+    single_pdf_mask_size * sizeof(uint32_t);
+  this->env_data.pdf_entries_per_particle = single_pdf_mask_size;
+
+  dynamic_mem_per_particle += this->env_data.particle_pdf_mask_mem_size;
+  
+  // Loopcheck
+  uint32_t loopcheck_x = (f_data->nx / loopcheck_fraction) +
+    ((f_data->nx %loopcheck_fraction > 0)? 1 : 0);
+  uint32_t loopcheck_y = (f_data->ny / loopcheck_fraction) +
+    ((f_data->ny %loopcheck_fraction > 0)? 1 : 0);
+  uint32_t loopcheck_z = (f_data->nz / loopcheck_fraction) +
+    ((f_data->nz %loopcheck_fraction > 0)? 1 : 0);
+
+  cl_uint single_loopcheck_size = loopcheck_x * loopcheck_y * loopcheck_z;
+  cl_uint single_loopcheck_mask_size = (single_loopcheck_size / 32)  +
+    ((single_loopcheck_size%32 > 0)? 1 : 0);
+
+  this->env_data.particle_loopcheck_mem_size = single_loopcheck_mask_size * 32;
+
+  dynamic_mem_per_particle += this->env_data.particle_loopcheck_mem_size;
+
+  // particle_done, steps_taken
+  dynamic_mem_per_particle += 2 * sizeof(uint32_t);
+
+  // rng
+
+  dynamic_mem_per_particle += sizeof(cl_ulong8);
+
+  // paths?
+  this->env_data.max_steps = m_steps;
+  this->env_data.save_paths = save_particle_paths;
+
+  if (save_particle_paths)
+  {
+    dynamic_mem_per_particle += m_steps * sizeof(float4);
+  }
+
+  // Compute Max Particles per Batch:
+  r_particles = (dynamic_mem_left/dynamic_mem_per_particle) /2;
+  this->env_data.max_particles_per_batch = r_particles;
+
+  printf("/**************************************************\n");
+  printf("\tOCLENV::AVAILABLEGPUMEM\n");
+  printf("/**************************************************\n\n");
+  printf("Voxel Dims (x,y,z): %u, %u, %u\n", f_data->nx, f_data->ny, f_data->nz);
+  printf("Num Samples: %u\n", f_data->ns);
+  printf("Single Dir Sample Mem Size: %u (B), %.4f (MB), \n",
+  single_direction_mem_size, single_direction_mem_size/1e6);
+  printf("Num_directions: %u \n", n_bpx_dirs);
+  printf("Total GPU Device Memory: %.4f (MB) \n", gl_mem_size/1e6);
+  printf("Total USEFUL GPU Device Memory: %.4f (MB) \n", useful_gl_mem_size/1e6);
+  printf("Total Static Data Memory Requirement: %.4f (MB) \n",
+    this->env_data.total_static_gpu_mem/1e6);
+  printf("Remaining GPU Device Memory: %.4f (MB) \n", dynamic_mem_left/1e6);
+  printf("Dynamic GPU Memory per Particle: %.4f (kB)\n",
+    dynamic_mem_per_particle/1e3);
+  printf("Maximum Number of Particles per Batch: %u\n", r_particles);
+  printf("Total Dynamic Data Memory Requirement: %.4f (MB)\n\n",
+    2*r_particles*dynamic_mem_per_particle/1e6);
+
+  // 100 is an arbitrary minimum, have user selectable minimum?
+  if (r_particles > 100)
+    return 1;
+  else
+    return -1;
+}
+
+
+void OclEnv::AllocateSamples(
+  const BedpostXData* f_data,
+  const BedpostXData* phi_data,
+  const BedpostXData* theta_data,
+  const unsigned short int* brain_mask,
+  const unsigned short int* exclusion_mask,
+  const unsigned short int* termination_mask,
+  const unsigned short int** waypoint_masks
+)
+{
+  uint32_t n_dirs = this->env_data.bpx_dirs;
+
+  this->env_data.f_samples_buffers = new cl::Buffer*[n_dirs];
+  this->env_data.phi_samples_buffers = new cl::Buffer*[n_dirs];
+  this->env_data.theta_samples_buffers = new cl::Buffer*[n_dirs];
+
+  for (uint32_t s = 0; s < n_dirs; s++)
+  {
+    this->env_data.f_samples_buffers[s] = new
+      cl::Buffer(
+        this->ocl_context,
+        CL_MEM_READ_ONLY,
+        this->env_data.single_sample_mem_size,
+        NULL,
+        NULL
+      );
+
+    this->env_data.theta_samples_buffers[s] = new
+      cl::Buffer(
+        this->ocl_context,
+        CL_MEM_READ_ONLY,
+        this->env_data.single_sample_mem_size,
+        NULL,
+        NULL
+      );
+
+    this->env_data.phi_samples_buffers[s] = new
+      cl::Buffer(
+        this->ocl_context,
+        CL_MEM_READ_ONLY,
+        this->env_data.single_sample_mem_size,
+        NULL,
+        NULL
+      );
+  }
+
+  this->env_data.brain_mask_buffer = new
+    cl::Buffer(
+      this->ocl_context,
+      CL_MEM_READ_ONLY,
+      this->env_data.mask_mem_size,
+      NULL,
+      NULL
+    );
+
+    //
+    // TODO @STEVE
+    // I should instantiate/write globalpdf here, it has to go to each
+    // device anyways...
+    //
+    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+    {
+      for (uint32_t s = 0; s < n_dirs; s++)
+      {
+        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+          *(this->env_data.f_samples_buffers[s]),
+          CL_FALSE,
+          static_cast<unsigned int>(0),
+          this->env_data.single_sample_mem_size,
+          f_data->data.at(s),
+          NULL,
+          NULL
+        );
+
+        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+          *(this->env_data.theta_samples_buffers[s]),
+          CL_FALSE,
+          static_cast<unsigned int>(0),
+          this->env_data.single_sample_mem_size,
+          theta_data->data.at(s),
+          NULL,
+          NULL
+        );
+
+        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+          *(this->env_data.phi_samples_buffers[s]),
+          CL_FALSE,
+          static_cast<unsigned int>(0),
+          this->env_data.single_sample_mem_size,
+          phi_data->data.at(s),
+          NULL,
+          NULL
+        );
+      }
+
+      this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        *(this->env_data.brain_mask_buffer),
+        CL_FALSE,
+        static_cast<unsigned int>(0),
+        this->env_data.mask_mem_size,
+        const_cast<unsigned short int*>(brain_mask),
+        NULL,
+        NULL
+      );
+
+      this->ocl_device_queues.at(d).flush();
+    }
+
+    // can maybe move this to oclptxhandler, for slight performance improvement
+    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+    {
+      this->ocl_device_queues.at(d).finish();
+    }
+}
+
+// void OclEnv::ProcessOptions( oclptxOptions* options)
+// {
+
+// }
 
 //EOF

@@ -1,4 +1,8 @@
-// Copyright 2014 Jeff Taylor
+/* Copyright 2014
+ *  Afshin Haidari
+ *  Steve Novakov
+ *  Jeff Taylor
+ */
 
 #include <unistd.h>
 #include <cassert>
@@ -7,6 +11,7 @@
 #include "fifo.h"
 #include "oclenv.h"
 #include "oclptxhandler.h"
+#include "samplemanager.h"
 #include "threading.h"
 
 // log base 2
@@ -22,32 +27,43 @@ int lb(int x)
   return r;
 }
 
-// 54 72 36 12 17 42 53 16 873 14 423
+cl_ulong8 rng_zero = {0,};
+
 int main(int argc, char **argv)
 {
   const int kStepsPerKernel = 10;
   const int kNumReducers = 2;
   FILE *global_fd;
 
-  if (argc < 2)
-  {
-    fprintf(stderr, "Usage: %s <collatz numbers>.\n", argv[0]);
-    return -1;
-  }
-
   // Add the particles to our list
   Fifo<struct OclPtxHandler::particle_data> particles_fifo(lb(argc-1)+1);
   struct OclPtxHandler::particle_data *data;
-  for (int i = 1; i < argc; ++i)
-  {
-    data = new OclPtxHandler::particle_data;
-    *data = {(uint64_t) atoi(argv[i])};
-    particles_fifo.PushOrDie(data);
-  }
+
+  data = new OclPtxHandler::particle_data;
+  cl_float4 value = {51., 51., 30., 0};
+  *data = {rng_zero, value};
+  particles_fifo.PushOrDie(data);
 
   // Create our oclenv
-  OclEnv env("collatz");
+  OclEnv env("standard");
   env.Init();
+
+  // Startup the samplemanager
+  SampleManager *sample_manager = &SampleManager::GetInstance();
+  sample_manager->ParseCommandLine(argc, argv);
+
+  env.AvailableGPUMem(
+    sample_manager->GetFDataPtr(),
+    1, 0, 4, false, false, 0, true, kStepsPerKernel, 1.0);
+  env.AllocateSamples(
+    sample_manager->GetFDataPtr(),
+    sample_manager->GetPhiDataPtr(),
+    sample_manager->GetThetaDataPtr(),
+    sample_manager->GetBrainMaskToArray(),
+    NULL,
+    NULL,
+    NULL
+  );
 
   global_fd = fopen("./path_output", "w");
   if (NULL == global_fd)
@@ -56,7 +72,17 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  struct OclPtxHandler::particle_attrs attrs = {kStepsPerKernel, 0};
+  struct OclPtxHandler::particle_attrs attrs = {
+    kStepsPerKernel, 
+    10, // max_steps
+    0, // Particles per side not determined here.
+    env.GetEnvData()->nx,
+    env.GetEnvData()->ny,
+    env.GetEnvData()->nz,
+    0, // num_samples
+    0.2, // curvature threshold
+    0
+    }; // num waymasks.
   int num_dev = env.HowManyDevices();
 
   // Create a new oclptxhandler.
@@ -68,9 +94,10 @@ int main(int argc, char **argv)
     handler[i].Init(env.GetContext(),
                     env.GetCq(i),
                     env.GetKernel(i),
-                    NULL, NULL, NULL, 0, NULL,  // 5 bedpost data values.
+                    env.GetSumKernel(i),
                     &attrs,
-                    global_fd);
+                    global_fd,
+                    env.GetEnvData());
 
     gpu_managers[i] = new std::thread(
         threading::RunThreads,
