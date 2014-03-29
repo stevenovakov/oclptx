@@ -50,7 +50,7 @@ class SampleManager
     // CLI Example: ./oclptx -s bedpostXdata/merged --simple
     //  --sampvox=2 -m bedpostXdata/nodif_brain_mask.nii.gz
     //    -x bedpostXdata/seedFile
-    // 
+    //
     // --simple = loading basic data form. Other types have not been
     // implemented (MANDATORY)
     // --sampvox = Sample random points within x mm sphere seed
@@ -79,7 +79,7 @@ class SampleManager
     const std::vector<unsigned short int*> GetWayMasksToVector();
 
 
-    // Getters: 
+    // Getters:
     // Counts (Particles Default = 5000, Steps Default = 2000)
     int const GetNumParticles() {return _nParticles;}
     int const GetNumMaxSteps() {return _nMaxSteps;}
@@ -127,6 +127,7 @@ class SampleManager
       float4 aSeed, float aSampleVoxel);
     std::string IntTostring(const int& value);
     unsigned short int* GetMaskToArray(NEWIMAGE::volume<short int> aMask);
+    void BoundAngles();
 
     //Statics
     static SampleManager* _manager;

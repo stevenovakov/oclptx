@@ -653,6 +653,10 @@ int OclEnv::AvailableGPUMem(
   printf("Total Dynamic Data Memory Requirement: %.4f (MB)\n\n",
     2*r_particles*dynamic_mem_per_particle/1e6);
 
+  if (single_direction_mem_size > max_buff_size)
+    printf("WARNING: BPX DATA > MAX BUFFER SIZE: %.4f (MB) vs %.4f (MB)\n",
+      single_direction_mem_size/1e6, max_buff_size/1e6);
+
   // 100 is an arbitrary minimum, have user selectable minimum?
   if (r_particles > 100)
     return 1;

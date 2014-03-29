@@ -109,6 +109,18 @@ int main(int argc, char *argv[] )
       s_manager.GetTerminationMaskToArray();
     std::vector<unsigned short int*> way_masks =
       s_manager.GetWayMasksToVector();
+
+    for (uint32_t i = 0; i < f_data->nx; i++)
+    {
+      for (uint32_t j = 0; j < f_data->ny; j++)
+      {
+        if (s_manager.GetfData(0,0,i,j,0) > 0.0)
+          printf("%f, %f, %f\n",
+          s_manager.GetfData(0,0,i, j, 0),
+          s_manager.GetPhiData(0,0,i, j, 0),
+          s_manager.GetThetaData(0,0,i, j, 0));
+      }
+    }
     
     // TODO get curv thresh from sample manager
     float curvature_threshold = 0.2;
