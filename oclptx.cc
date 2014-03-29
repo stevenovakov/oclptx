@@ -102,6 +102,11 @@ int main(int argc, char *argv[] )
       
     const unsigned short int* brain_mask =
       s_manager.GetBrainMaskToArray();
+
+    const unsinged short int* exclusion_mask =
+      s_manager.GetExclusionMaskToArray();
+    const unsinged short int* termination_mask =
+      s_manager.GetTerminationMaskToArray();
     
     // TODO get curv thresh from sample manager
     float curvature_threshold = 0.2;
@@ -119,7 +124,7 @@ int main(int argc, char *argv[] )
       false,
       false,
       static_cast<uint32_t>(0),
-      true,
+      s_manager.GetShowPaths(),
       max_steps,
       mem_frac
     ); // will pass args later

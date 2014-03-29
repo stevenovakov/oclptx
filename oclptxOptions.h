@@ -91,6 +91,7 @@ class oclptxOptions {
   Option<std::string>           outfile;
   Option<std::string>           logdir;
   Option<bool>             forcedir;
+  Option<bool>             showPaths;
 
   Option<std::string>           maskfile;
   Option<std::string>           seedfile;
@@ -195,8 +196,9 @@ inline oclptxOptions::oclptxOptions():
    forcedir(std::string("--forcedir"), false,
       std::string("Use the actual directory name given - i.e. don't add + to make a new directory\n\n"),
       false, no_argument),
-
-   //AFSHIN TODO: Look at these.
+  showPaths(std::string("--showpaths"), false,
+      std::string("Set this flag to log the paths in a seperate file\n\n"),
+      false, no_argument),
    maskfile(std::string("-m,--mask"),"",
       std::string("Bet binary mask file in diffusion space"),
       true, requires_argument),
@@ -225,11 +227,10 @@ inline oclptxOptions::oclptxOptions():
    s2tastext(std::string("--s2tastext"), false,
        std::string("Output seed-to-target counts as a text file (default in simple mode)\n\n"),
        false, no_argument),
-
-
    targetfile(std::string("--targetmasks"),"",
         std::string("File containing a list of target masks - for seeds_to_targets classification"),
         false, requires_argument),
+        
    waypoints(std::string("--waypoints"), std::string(""),
        std::string("Waypoint mask or ascii list of waypoint masks - only keep paths going through ALL the masks"),
        false, requires_argument),
@@ -239,6 +240,7 @@ inline oclptxOptions::oclptxOptions():
    wayorder(std::string("--wayorder"),false,
       std::string("Reject streamlines that do not hit waypoints in given order. Only valid if waycond=AND"),
       false,no_argument),
+      
    onewaycondition(std::string("--onewaycondition"),false,
       std::string("Apply waypoint conditions to each half tract separately"),
       false, no_argument),
@@ -318,6 +320,7 @@ inline oclptxOptions::oclptxOptions():
    loopcheck(std::string("-l,--loopcheck"), false,
        std::string("Perform loopchecks on paths - slower, but allows lower curvature threshold"),
        false, no_argument),
+       
    usef(std::string("-f,--usef"), false,
    std::string("Use anisotropy to constrain tracking"),
    false, no_argument),
@@ -381,6 +384,7 @@ inline oclptxOptions::oclptxOptions():
        options.add(outfile);
        options.add(logdir);
        options.add(forcedir);
+       options.add(showPaths);
 
        options.add(maskfile);
        options.add(seedfile);
