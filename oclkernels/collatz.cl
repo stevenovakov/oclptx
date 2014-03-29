@@ -49,10 +49,7 @@ __kernel void Collatz(
         num_steps[glid] = 0;
     }
     else
-    {
-      complete[glid] = false;
       num_steps[glid] += 1;
-    }
 
     index = glid * attrs.num_steps + step;
     path_output[index] = state[glid].value;
