@@ -113,7 +113,7 @@ class OclEnv{
       bool termination_mask,
       uint32_t n_waypoints,
       bool save_particle_paths,
-      uint32_t max_steps,
+      uint32_t m_steps,
       float mem_fraction //also pass oclptxoptions here
     );
 
