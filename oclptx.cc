@@ -103,10 +103,12 @@ int main(int argc, char *argv[] )
     const unsigned short int* brain_mask =
       s_manager.GetBrainMaskToArray();
 
-    const unsinged short int* exclusion_mask =
+    const unsigned short int* exclusion_mask =
       s_manager.GetExclusionMaskToArray();
-    const unsinged short int* termination_mask =
+    const unsigned short int* termination_mask =
       s_manager.GetTerminationMaskToArray();
+    std::vector<unsigned short int*> way_masks =
+      s_manager.GetWayMasksToVector();
     
     // TODO get curv thresh from sample manager
     float curvature_threshold = 0.2;
@@ -183,7 +185,7 @@ int main(int argc, char *argv[] )
 
       for (unsigned int d = 0; d < n_devices; d++)
       {
-        printf( "Device %u, Total GPU Memory Allocated (MB): %u\n",
+        printf( "Device %u, Total GPU Memory Allocated (MB): %.4f\n",
           d, handlers.at(d)->GpuMemUsed()/1e6);
       }
 
