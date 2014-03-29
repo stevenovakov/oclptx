@@ -50,7 +50,7 @@ class SampleManager
     // CLI Example: ./oclptx -s bedpostXdata/merged --simple
     //  --sampvox=2 -m bedpostXdata/nodif_brain_mask.nii.gz
     //    -x bedpostXdata/seedFile
-    //
+    // 
     // --simple = loading basic data form. Other types have not been
     // implemented (MANDATORY)
     // --sampvox = Sample random points within x mm sphere seed
@@ -59,7 +59,7 @@ class SampleManager
     // -x = Seedmask file (OPTIONAL). If no seedmask file is
     // specified, the program will seed using a single point:
     // the midpoint of the brainmask data.
-    //
+    // TODO: Update with documentation required for Waymasks
     void ParseCommandLine(int argc, char** argv);
 
     //Getters: Data
@@ -72,8 +72,14 @@ class SampleManager
     unsigned short int const GetBrainMask( int aX, int aY, int aZ);
     const NEWIMAGE::volume<short int>* GetBrainMask();
     const unsigned short int* GetBrainMaskToArray();
+    const NEWIMAGE::volume<short int>* GetExclusionMask();
+    const unsigned short int* GetExclusionMaskToArray();
+    const NEWIMAGE::volume<short int>* GetTerminationMask();
+    const unsigned short int* GetTerminationMaskToArray();
+    const std::vector<unsigned short int*> GetWayMasksToVector();
 
-    // Getters:
+
+    // Getters: 
     // Counts (Particles Default = 5000, Steps Default = 2000)
     int const GetNumParticles() {return _nParticles;}
     int const GetNumMaxSteps() {return _nMaxSteps;}
@@ -96,6 +102,10 @@ class SampleManager
     const BedpostXData* GetThetaDataPtr();
     const BedpostXData* GetPhiDataPtr();
     const BedpostXData* GetFDataPtr();
+    
+    //OclptxOptions and custom options
+    const oclptxOptions& GetOclptxOptions(){return _oclptxOptions;}
+    const bool GetShowPaths(){return _showPaths;}
 
   private:
     SampleManager();
@@ -116,6 +126,7 @@ class SampleManager
     void GenerateSeedParticlesHelper(
       float4 aSeed, float aSampleVoxel);
     std::string IntTostring(const int& value);
+    unsigned short int* GetMaskToArray(NEWIMAGE::volume<short int> aMask);
 
     //Statics
     static SampleManager* _manager;
@@ -127,6 +138,11 @@ class SampleManager
     BedpostXData _phiData;
     BedpostXData _fData;
     NEWIMAGE::volume<short int> _brainMask;
+    NEWIMAGE::volume<short int> _exclusionMask;
+    NEWIMAGE::volume<short int> _terminationMask;
+    std::vector<NEWIMAGE::volume<short int>> _wayMasks;
+    //Path Logging
+    bool _showPaths;
     //Input Constants
     int _nParticles; //Default 5000
     int _nMaxSteps; //Default 2000

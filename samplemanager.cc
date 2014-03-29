@@ -55,30 +55,30 @@ void SampleManager::LoadBedpostDataHelper(
   const NEWIMAGE::volume<float>& aMask,
   const int aFiberNum  )
 {
-  NEWIMAGE::volume4D<float> loadedVolume4DTheta;
-  NEWIMAGE::volume4D<float> loadedVolume4DPhi;
-  NEWIMAGE::volume4D<float> loadedVolume4Df;
+    NEWIMAGE::volume4D<float> loadedVolume4DTheta;
+    NEWIMAGE::volume4D<float> loadedVolume4DPhi;
+    NEWIMAGE::volume4D<float> loadedVolume4Df;
 
-  //Load Theta/Phi/f samples
-  NEWIMAGE::read_volume4D(loadedVolume4DTheta, aThetaSampleName);
-  NEWIMAGE::read_volume4D(loadedVolume4DPhi, aPhiSampleName);
-  NEWIMAGE::read_volume4D(loadedVolume4Df, afSampleName);
+    //Load Theta/Phi/f samples
+    NEWIMAGE::read_volume4D(loadedVolume4DTheta, aThetaSampleName);
+    NEWIMAGE::read_volume4D(loadedVolume4DPhi, aPhiSampleName);
+    NEWIMAGE::read_volume4D(loadedVolume4Df, afSampleName);
 
-  if(aMask.xsize() > 0)
-  {
-      //_thetaSamples.push_back(loadedVolume4DTheta.matrix(aMask));
-      //_phiSamples.push_back(loadedVolume4DPhi.matrix(aMask));
-      //_fSamples.push_back(loadedVolume4Df.matrix(aMask));
-  }
-  else
-  {
-      PopulateMemberParameters(loadedVolume4DTheta,
-        _thetaData, loadedVolume4DTheta[0], aFiberNum);
-      PopulateMemberParameters(loadedVolume4DPhi,
-        _phiData, loadedVolume4DPhi[0], aFiberNum);
-      PopulateMemberParameters(loadedVolume4Df,
-        _fData, loadedVolume4Df[0], aFiberNum);
-  }
+    if(aMask.xsize() > 0)
+    {
+        //_thetaSamples.push_back(loadedVolume4DTheta.matrix(aMask));
+        //_phiSamples.push_back(loadedVolume4DPhi.matrix(aMask));
+        //_fSamples.push_back(loadedVolume4Df.matrix(aMask));
+    }
+    else
+    {
+        PopulateMemberParameters(loadedVolume4DTheta,
+          _thetaData, loadedVolume4DTheta[0], aFiberNum);
+        PopulateMemberParameters(loadedVolume4DPhi,
+          _phiData, loadedVolume4DPhi[0], aFiberNum);
+        PopulateMemberParameters(loadedVolume4Df,
+          _fData, loadedVolume4Df[0], aFiberNum);
+    }
 }
 
 void SampleManager::PopulateMemberParameters(
@@ -102,7 +102,6 @@ void SampleManager::PopulateMemberParameters(
   int xoff = aLoadedData[0].minx() - aMaskParams.minx();
   int yoff = aLoadedData[0].miny() - aMaskParams.miny();
   int zoff = aLoadedData[0].minz() - aMaskParams.minz();
-
   for (int z = aMaskParams.minz(); z <= aMaskParams.maxz(); z++)
   {
     for (int y = aMaskParams.miny(); y <= aMaskParams.maxy(); y++)
@@ -117,6 +116,7 @@ void SampleManager::PopulateMemberParameters(
               x*nz*ny + y*nz + z] =
                 aLoadedData[t](x+xoff,y+yoff,z+zoff);
         }
+
       }
     }
   }
@@ -124,146 +124,169 @@ void SampleManager::PopulateMemberParameters(
 
 void SampleManager::LoadBedpostData(const std::string& aBasename)
 {
-    std::cout<<"Loading Bedpost samples....."<<std::endl;
-    if(aBasename == "")
+  std::cout<<"Loading Bedpost samples....."<<std::endl;
+  if(aBasename == "")
+  {
+    std::cout<< "Bad File Name"<<std::endl;
+    return;
+  }
+
+  //Set Particle Number and Max Steps
+  _nParticles = _oclptxOptions.nparticles.value();
+  _nMaxSteps = _oclptxOptions.nsteps.value();
+
+  //Load Sample Data
+  std::string thetaSampleNames;
+  std::string phiSampleNames;
+  std::string fSampleNames;
+
+  //Single Fiber Case.
+  if(NEWIMAGE::fsl_imageexists(aBasename+"_thsamples"))
+  {
+    thetaSampleNames = aBasename+"_thsamples";
+    phiSampleNames = aBasename+"_phisamples";
+    fSampleNames = aBasename+"_fsamples";
+    LoadBedpostDataHelper(
+      thetaSampleNames,phiSampleNames,fSampleNames);
+  }
+  //Multiple Fiber Case.
+  else
+  {
+    int fiberNum = 1;
+    std::string fiberNumAsstring = IntTostring(fiberNum);
+    thetaSampleNames = aBasename+"_th"+fiberNumAsstring+"samples";
+    bool doesFiberExist = NEWIMAGE::fsl_imageexists(thetaSampleNames);
+    while(doesFiberExist)
     {
-      std::cout<< "Bad File Name"<<std::endl;
-      return;
-    }
+      phiSampleNames = aBasename+"_ph"+fiberNumAsstring+"samples";
+      fSampleNames = aBasename+"_f"+fiberNumAsstring+"samples";
 
-    //Set Particle Number and Max Steps
-    _nParticles = _oclptxOptions.nparticles.value();
-    _nMaxSteps = _oclptxOptions.nsteps.value();
-
-    //Load Sample Data
-    std::string thetaSampleNames;
-    std::string phiSampleNames;
-    std::string fSampleNames;
-
-    //Single Fiber Case.
-    if(NEWIMAGE::fsl_imageexists(aBasename+"_thsamples"))
-    {
-      thetaSampleNames = aBasename+"_thsamples";
-      phiSampleNames = aBasename+"_phisamples";
-      fSampleNames = aBasename+"_fsamples";
       LoadBedpostDataHelper(
-        thetaSampleNames,phiSampleNames,fSampleNames);
-    }
-    //Multiple Fiber Case.
-    else
-    {
-      int fiberNum = 1;
-      std::string fiberNumAsstring = IntTostring(fiberNum);
+       thetaSampleNames,phiSampleNames,fSampleNames);
+
+      fiberNum++;
+      fiberNumAsstring = IntTostring(fiberNum);
       thetaSampleNames = aBasename+"_th"+fiberNumAsstring+"samples";
-      bool doesFiberExist = NEWIMAGE::fsl_imageexists(thetaSampleNames);
-      while(doesFiberExist)
-      {
-        phiSampleNames = aBasename+"_ph"+fiberNumAsstring+"samples";
-        fSampleNames = aBasename+"_f"+fiberNumAsstring+"samples";
-
-        LoadBedpostDataHelper(
-         thetaSampleNames,phiSampleNames,fSampleNames);
-
-        fiberNum++;
-        fiberNumAsstring = IntTostring(fiberNum);
-        thetaSampleNames = aBasename+"_th"+fiberNumAsstring+"samples";
-        doesFiberExist = NEWIMAGE::fsl_imageexists(thetaSampleNames);
-      }
-      if(fiberNum == 1)
-      {
-          std::cout<<
-           "Could not find samples. Exiting Program..."<<std::endl;
-          exit(1);
-      }
-      std::cout<<"Finished Loading Samples from Bedpost"<<std::endl;
+      doesFiberExist = NEWIMAGE::fsl_imageexists(thetaSampleNames);
     }
+    if(fiberNum == 1)
+    {
+        std::cout<<
+         "Could not find samples. Exiting Program..."<<std::endl;
+        exit(1);
+    }
+    std::cout<<"Finished Loading Samples from Bedpost"<<std::endl;
+  }
 }
 
 void SampleManager::ParseCommandLine(int argc, char** argv)
 {
-    _oclptxOptions.parse_command_line(argc, argv);
+  _oclptxOptions.parse_command_line(argc, argv);
 
-    if (_oclptxOptions.verbose.value()>0)
-    {
-      _oclptxOptions.status();
-    }
+  if (_oclptxOptions.verbose.value()>0)
+  {
+    _oclptxOptions.status();
+  }
 
-    if (_oclptxOptions.simple.value())
-    {
-        if (_oclptxOptions.matrix1out.value() ||
-          _oclptxOptions.matrix3out.value())
+  if (_oclptxOptions.simple.value())
+  {
+      if (_oclptxOptions.matrix1out.value() ||
+        _oclptxOptions.matrix3out.value())
+      {
+        std::cout<<
+         "Error: cannot use matrix1 and matrix3 in simple mode"<<
+            std::endl;
+        exit(1);
+      }
+      std::cout<<"Running in simple mode"<<std::endl;
+      this->LoadBedpostData(_oclptxOptions.basename.value());
+      if(_oclptxOptions.seedref.value() == "")
+      {
+        NEWIMAGE::read_volume(_brainMask,
+          _oclptxOptions.maskfile.value());
+      }
+      else
+      {
+        NEWIMAGE::read_volume(_brainMask,
+          _oclptxOptions.seedref.value());
+      }
+      if(_oclptxOptions.rubbishfile.value() != "")
+      {
+         NEWIMAGE::read_volume(_exclusionMask,
+         _oclptxOptions.rubbishfile.value());
+         std::cout<<"Successfully loaded Exclusion Mask"<<endl;
+      }
+      if(_oclptxOptions.stopfile.value() != "")
+      {
+        NEWIMAGE::read_volume(_terminationMask,
+        _oclptxOptions.stopfile.value());
+        std::cout<<"Successfully loaded Termination Mask"<<endl;
+      }
+      if(_oclptxOptions.waypoints.set())
+      {
+        std::string waypoints = _oclptxOptions.waypoints.value();
+        std::istringstream ss(waypoints);
+        std::string wayMaskLocation;
+        while(std::getline(ss,wayMaskLocation,','))
         {
-          std::cout<<
-           "Error: cannot use matrix1 and matrix3 in simple mode"<<
-              std::endl;
-          exit(1);
+          NEWIMAGE::volume<short int> vol;
+          NEWIMAGE::read_volume(vol, wayMaskLocation);
+          _wayMasks.push_back(vol);
         }
-        std::cout<<"Running in simple mode"<<std::endl;
-        this->LoadBedpostData(_oclptxOptions.basename.value());
-        if(_oclptxOptions.seedref.value() == "")
-        {
-          NEWIMAGE::read_volume(_brainMask,
-            _oclptxOptions.maskfile.value());
-        }
-        else
-        {
-          NEWIMAGE::read_volume(_brainMask,
-            _oclptxOptions.seedref.value());
-        }
-        this->GenerateSeedParticles(_oclptxOptions.sampvox.value());
-    }
-    else if (_oclptxOptions.network.value())
-    {
-        std::cout<<"Running in network mode"<<std::endl;
-    }
-    else
-    {
-        std::cout<<"Running in seedmask mode"<<std::endl;
-    }
+        cout<<"Successfully loaded " << _wayMasks.size() << " WayMasks"<<endl;
+      }
+      _showPaths = _oclptxOptions.showPaths.value();
+      this->GenerateSeedParticles(_oclptxOptions.sampvox.value());
+  }
+  else if (_oclptxOptions.network.value())
+  {
+      std::cout<<"Running in network mode"<<std::endl;
+  }
+  else
+  {
+      std::cout<<"Running in seedmask mode"<<std::endl;
+  }
 }
 
 void SampleManager::GenerateSeedParticles(float aSampleVoxel)
 {
-   using namespace std;
+ using namespace std;
 
-   Matrix seeds =
-    MISCMATHS::read_ascii_matrix(_oclptxOptions.seedfile.value());
-   srand(_oclptxOptions.rseed.value());
-   cout<<"NParticles " << _nParticles<<endl;
-   cout<<"NSteps " << _nMaxSteps<<endl;
-   cout<< "NRows " << seeds.Nrows()<<endl;
+ Matrix seeds =
+  MISCMATHS::read_ascii_matrix(_oclptxOptions.seedfile.value());
+ srand(_oclptxOptions.rseed.value());
+ cout<<"NParticles " << _nParticles<<endl;
+ cout<<"NSteps " << _nMaxSteps<<endl;
+ cout<< "NRows " << seeds.Nrows()<<endl;
 
-   float4 seed;
-   // If there is no seed file given with the -x CLI parameter,
-   // we use the middle of the mask as the seed.
-   if (seeds.Nrows() == 0)
-   {
-      seed.t = 1.0;
-      seed.x = floor((_brainMask.xsize())/2.0);
-      seed.y = floor((_brainMask.ysize())/2.0);
-      seed.z = floor((_brainMask.zsize())/2.0);
-      std::cout << "Seeded at "<< "x = " << seed.x << " y= " <<
-        seed.y<< " z = "<< seed.z<<endl;
-      GenerateSeedParticlesHelper(seed,aSampleVoxel);
-   }
-   else
-   {
-      std::cout<<"File included\n";
-      _nParticles = seeds.Nrows();
-      if (seeds.Ncols()!=3 && seeds.Nrows()==3)
-      {
-         seeds=seeds.t();
-      }
-      for (int t = 1; t<=seeds.Nrows(); t++)
-      {
-         seed.t = t;
-         seed.x = seeds(t,1);
-         seed.y = seeds(t,2);
-         seed.z = seeds(t,3);
-         _seedParticles.push_back(seed);
-         //GenerateSeedParticlesHelper(seed, aSampleVoxel);
-      }
-   }
+ float4 seed;
+ // If there is no seed file given with the -x CLI parameter,
+ // we use the middle of the mask as the seed.
+ if (seeds.Nrows() == 0)
+ {
+    seed.t = 1.0;
+    seed.x = floor((_brainMask.xsize())/2.0);
+    seed.y = floor((_brainMask.ysize())/2.0);
+    seed.z = floor((_brainMask.zsize())/2.0);
+    std::cout << "Seeded at "<< "x = " << seed.x << " y= " <<
+      seed.y<< " z = "<< seed.z<<endl;
+    GenerateSeedParticlesHelper(seed,aSampleVoxel);
+ }
+ else
+ {
+    if (seeds.Ncols()!=3 && seeds.Nrows()==3)
+    {
+       seeds=seeds.t();
+    }
+    for (int t = 1; t<=seeds.Nrows(); t++)
+    {
+       seed.t = t;
+       seed.x = seeds(t,1);
+       seed.y = seeds(t,2);
+       seed.z = seeds(t,3);
+       GenerateSeedParticlesHelper(seed, aSampleVoxel);
+    }
+ }
 }
 
 void SampleManager::GenerateSeedParticlesHelper(
@@ -277,6 +300,7 @@ void SampleManager::GenerateSeedParticlesHelper(
       float dx,dy,dz;
       float radSq = aSampleVoxel*aSampleVoxel;
       
+      // TODO
       // rand not seeded properly, on purpose(want the same data set)
       // seed it with sys clock later.
       
@@ -300,41 +324,77 @@ void SampleManager::GenerateSeedParticlesHelper(
 
 const NEWIMAGE::volume<short int>* SampleManager::GetBrainMask()
 {
-     return &_brainMask;
+  return &_brainMask;
 }
 
 const unsigned short int* SampleManager::GetBrainMaskToArray()
 {
-    const int maxZ = _brainMask.maxz();
-    const int maxY = _brainMask.maxy();
-    const int maxX = _brainMask.maxx();
-    const int minZ = _brainMask.minz();
-    const int minY = _brainMask.miny();
-    const int minX = _brainMask.minx();
-    const int sizeX = _brainMask.xsize();
-    const int sizeY = _brainMask.ysize();
-    const int sizeZ = _brainMask.zsize();
-    std::cout << "BrainMask Size "<< "x = " << _brainMask.xsize()<< " y= " <<
-      _brainMask.ysize()<< " z = "<< _brainMask.zsize()<<endl;
-    std::cout << "BrainMask Min "<< "x = " << _brainMask.minx()<< " y= " <<
-      _brainMask.miny()<< " z = "<< _brainMask.minz()<<endl;
-    std::cout << "BrainMask Max "<< "x = " << _brainMask.maxx()<< " y= " <<
-      _brainMask.maxy()<< " z = "<< _brainMask.maxz()<<endl;
+  return GetMaskToArray(_brainMask);
+}
 
-    unsigned short int* target =
-      new unsigned short int[sizeX * sizeY * sizeZ];
+const NEWIMAGE::volume<short int>* SampleManager::GetExclusionMask()
+{
+  return &_exclusionMask;
+}
 
-    for (int z = minZ; z <= maxZ; z++)
+const unsigned short int* SampleManager::GetExclusionMaskToArray()
+{
+  return GetMaskToArray(_exclusionMask);
+}
+
+const NEWIMAGE::volume<short int>* SampleManager::GetTerminationMask()
+{
+  return &_terminationMask;
+}
+
+const unsigned short int* SampleManager::GetTerminationMaskToArray()
+{
+  return GetMaskToArray(_terminationMask);
+}
+
+const std::vector<unsigned short int*> SampleManager::GetWayMasksToVector()
+{
+  vector<unsigned short int*> waymasks;
+  for (unsigned int i = 0; i < _wayMasks.size(); i++)
+  {
+    waymasks.push_back(GetMaskToArray(_wayMasks.at(i)));
+  }
+  return waymasks;
+}
+
+
+unsigned short int* SampleManager::GetMaskToArray(NEWIMAGE::volume<short int> aMask)
+{
+  const int maxZ = aMask.maxz();
+  const int maxY = aMask.maxy();
+  const int maxX = aMask.maxx();
+  const int minZ = aMask.minz();
+  const int minY = aMask.miny();
+  const int minX = aMask.minx();
+  const int sizeX = aMask.xsize();
+  const int sizeY = aMask.ysize();
+  const int sizeZ = aMask.zsize();
+  std::cout << "Mask Size "<< "x = " << aMask.xsize()<< " y= " <<
+    aMask.ysize()<< " z = "<< aMask.zsize()<<endl;
+  std::cout << "Mask Min "<< "x = " << aMask.minx()<< " y= " <<
+    aMask.miny()<< " z = "<< aMask.minz()<<endl;
+  std::cout << "Mask Max "<< "x = " << aMask.maxx()<< " y= " <<
+    aMask.maxy()<< " z = "<< aMask.maxz()<<endl;
+
+  unsigned short int* target =
+    new unsigned short int[sizeX * sizeY * sizeZ];
+
+  for (int z = minZ; z <= maxZ; z++)
+  {
+    for (int y = minY; y <= maxY; y++)
     {
-      for (int y = minY; y <= maxY; y++)
+      for (int x = minX; x <= maxX; x++)
       {
-        for (int x = minX; x <= maxX; x++)
-        {
-              target[x*sizeY*sizeZ + y*sizeZ + z] = _brainMask(x,y,z);
-        }
+            target[x*sizeY*sizeZ + y*sizeZ + z] = aMask(x,y,z);
       }
     }
-    return target;
+  }
+  return target;
 }
 
 float const SampleManager::GetThetaData(
