@@ -48,7 +48,8 @@ __kernel void Collatz(
       if (0 == step)  // Stop counting steps.
         num_steps[glid] = 0;
     }
-    else
+
+    if (!complete[glid])
       num_steps[glid] += 1;
 
     index = glid * attrs.num_steps + step;
