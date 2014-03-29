@@ -280,11 +280,12 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
     }
     for (int t = 1; t<=seeds.Nrows(); t++)
     {
-       seed.t = t;
-       seed.x = seeds(t,1);
-       seed.y = seeds(t,2);
-       seed.z = seeds(t,3);
-       GenerateSeedParticlesHelper(seed, aSampleVoxel);
+      seed.t = t;
+      seed.x = seeds(t,1);
+      seed.y = seeds(t,2);
+      seed.z = seeds(t,3);
+      _seedParticles.push_back(seed);
+      //GenerateSeedParticlesHelper(seed, aSampleVoxel);
     }
  }
 }
