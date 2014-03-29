@@ -32,12 +32,20 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cmath>
 
 #include "samplemanager.h"
 #include "oclptxOptions.h"
 
 //
 // Assorted Functions Declerations
+//
+
+float BoundPhi(float angle);
+float BoundTheta(float angle);
+
+//
+// Member Functions
 //
 
 std::string SampleManager::IntTostring(const int& value)
@@ -79,6 +87,38 @@ void SampleManager::LoadBedpostDataHelper(
         PopulateMemberParameters(loadedVolume4Df,
           _fData, loadedVolume4Df[0], aFiberNum);
     }
+
+    this->BoundAngles();
+}
+
+void SampleManager::BoundAngles()
+{
+  uint32_t nx = this->_thetaData.nx;
+  uint32_t ny = this->_thetaData.ny;
+  uint32_t nz = this->_thetaData.nz;
+  uint32_t ns = this->_thetaData.ns;
+  uint32_t index = 0;
+
+  for (uint32_t d = 0; d < this->_thetaData.data.size(); d++)
+  {
+    for (uint32_t x = 0; x < nx; x++)
+    {
+      for (uint32_t y = 0; y < ny; y++)
+      {
+        for (uint32_t z = 0; z < nz; z++)
+        {
+          for (uint32_t s = 0; s < ns; s++)
+          {
+            index = s*(nx*ny*nz) + x*(ny*nz) + y*nz + z;
+            this->_thetaData.data.at(d)[index] =
+              BoundTheta(this->_thetaData.data.at(d)[index]);
+            this->_phiData.data.at(d)[index] =
+              BoundPhi(this->_phiData.data.at(d)[index]);
+          }
+        }
+      }
+    }
+  }
 }
 
 void SampleManager::PopulateMemberParameters(
@@ -507,5 +547,19 @@ SampleManager::~SampleManager()
     delete _manager;
 }
 
+float BoundPhi(float angle)
+{
+  float r_angle = atan2(sin(angle), cos(angle));
+
+  if (r_angle < 0.)
+    return 2*M_PI + r_angle;
+  else
+    return r_angle;
+}
+
+float BoundTheta(float angle)
+{
+  return acos(cos(angle));
+}
 
 //EOF
