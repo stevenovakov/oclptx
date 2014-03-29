@@ -274,6 +274,7 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
  }
  else
  {
+    this->_nParticles = seeds.Nrows();
     if (seeds.Ncols()!=3 && seeds.Nrows()==3)
     {
        seeds=seeds.t();
@@ -364,7 +365,8 @@ const std::vector<unsigned short int*> SampleManager::GetWayMasksToVector()
 }
 
 
-unsigned short int* SampleManager::GetMaskToArray(NEWIMAGE::volume<short int> aMask)
+unsigned short int* SampleManager::GetMaskToArray(
+  NEWIMAGE::volume<short int> aMask)
 {
   const int maxZ = aMask.maxz();
   const int maxY = aMask.maxy();
@@ -375,12 +377,6 @@ unsigned short int* SampleManager::GetMaskToArray(NEWIMAGE::volume<short int> aM
   const int sizeX = aMask.xsize();
   const int sizeY = aMask.ysize();
   const int sizeZ = aMask.zsize();
-  std::cout << "Mask Size "<< "x = " << aMask.xsize()<< " y= " <<
-    aMask.ysize()<< " z = "<< aMask.zsize()<<endl;
-  std::cout << "Mask Min "<< "x = " << aMask.minx()<< " y= " <<
-    aMask.miny()<< " z = "<< aMask.minz()<<endl;
-  std::cout << "Mask Max "<< "x = " << aMask.maxx()<< " y= " <<
-    aMask.maxy()<< " z = "<< aMask.maxz()<<endl;
 
   unsigned short int* target =
     new unsigned short int[sizeX * sizeY * sizeZ];

@@ -378,7 +378,6 @@ void OclPtxHandler::PrngInit()
 
   init_rng(rng, seed, this->section_size);
 
-  printf("create\n");
   this->particle_rng_buffer =
     cl::Buffer(
       *(this->ocl_context),
@@ -388,7 +387,6 @@ void OclPtxHandler::PrngInit()
       NULL
     );
 
-  std::cout<<"write\n";
   this->ocl_cq->enqueueWriteBuffer(
     this->particle_rng_buffer,
     CL_FALSE,
@@ -400,7 +398,6 @@ void OclPtxHandler::PrngInit()
   );
 
   this->total_gpu_mem_used += path_rng_mem_size;
-
   delete[] rng;
 
   // may not need to do this here, may want to wait to block until
@@ -449,7 +446,6 @@ void OclPtxHandler::SingleBufferInit()
   );
 
   this->total_gpu_mem_used += interval_mem_size;
-
   // may not need to do this here, may want to wait to block until
   // all "initialization" operations are finished.
   this->ocl_cq->finish();
