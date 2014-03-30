@@ -55,7 +55,7 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
 
   gpu_complete_ = new cl::Buffer(
       *context_,
-      CL_MEM_WRITE_ONLY,
+      CL_MEM_READ_WRITE,
       2 * attrs_.particles_per_side * sizeof(cl_ushort));
   if (!gpu_complete_)
     abort();
