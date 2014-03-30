@@ -48,7 +48,7 @@ __kernel void OclPtxInterpolate(
 
   // Debugging info
   __global float4* particle_paths, //RW
-  __global ushort* particle_steps_taken, //RW
+  __global ushort* particle_steps, //RW
 
   // Output
   __global ushort* particle_done, //RW
@@ -68,11 +68,9 @@ __kernel void OclPtxInterpolate(
 {
   uint glid = get_global_id(0);
   
-  uint steps_taken = particle_steps_taken[glid];
-  uint current_path_index =
-    glid*(attrs.steps_per_kernel) + steps_taken;
+  uint path_index;
     
-  uint interval_steps_taken;
+  uint step;
 
   uint pdf_entries_per_particle = (attrs.sample_nx*attrs.sample_ny*attrs.sample_nz / 32) + 1;
   
@@ -109,9 +107,13 @@ __kernel void OclPtxInterpolate(
   uint entry_num;
   uint shift_num;
   uint particle_entry;
-  
-  for (interval_steps_taken = 0; interval_steps_taken < attrs.steps_per_kernel;
-    interval_steps_taken++)
+
+  // No new valid data.  Likely the host is out of data.  We need to avoid
+  // screwing it up.
+  if (particle_done[glid])
+    particle_steps[glid] = 0;
+
+  for (step = 0; step < attrs.steps_per_kernel; ++step)
   {
     // calculate current index in diffusion space
     current_select_vertex.s0 = floor(particle_pos.s0);
@@ -182,7 +184,7 @@ __kernel void OclPtxInterpolate(
     dr.s2 = cos( theta );
     
     // alternates initial direction of particle set
-    if( steps_taken == 0 && glid%2 == 0)
+    if( particle_steps[glid] == 0 && glid%2 == 0)
       dr = dr*-1.0;
 
     //
@@ -203,10 +205,11 @@ __kernel void OclPtxInterpolate(
     // Curvature Threshold
     //
     
-    if (steps_taken > 1 && jump_dot < attrs.curvature_threshold)
+    if (particle_steps[glid] > 1 && jump_dot < attrs.curvature_threshold)
     {
       particle_done[glid] = 1;
-      break;
+      if (0 == step)
+        particle_steps[glid] = 0;
     }
 
     // update last flow vector
@@ -225,7 +228,8 @@ __kernel void OclPtxInterpolate(
         temp_pos.s2 > zmax || zmin > temp_pos.s2)
     {
       particle_done[glid] = 1;
-      break;
+      if (0 == step)
+        particle_steps[glid] = 0;
     }
     //
     // Brain Mask Test - Checks NEAREST vertex.
@@ -239,7 +243,8 @@ __kernel void OclPtxInterpolate(
     if (bounds_test == 0)
     {
       particle_done[glid] = 1;
-      break;
+      if (0 == step)
+        particle_steps[glid] = 0;
     }
 #if TERMINATION
 #endif
@@ -251,28 +256,30 @@ __kernel void OclPtxInterpolate(
     particle_pos = temp_pos;
 
     // add to particle paths
-    current_path_index = current_path_index + 1;
-    particle_paths[current_path_index] = particle_pos;
+    path_index = glid * attrs.steps_per_kernel + step;
+    particle_paths[path_index] = particle_pos;
   
-    // update steps taken
-    steps_taken = steps_taken + 1;
-    // update step location
-    particle_steps_taken[glid] = steps_taken;
-
     // update particle pdf
     vertex_num =
       round(particle_pos.s0)*round(particle_pos.s1)*round(particle_pos.s2);
     entry_num = vertex_num / 32;
     shift_num = 31 - (vertex_num % 32);
 
-    particle_entry =
-      particle_pdfs[glid * pdf_entries_per_particle + entry_num];
-    particle_pdfs[glid * pdf_entries_per_particle + entry_num] =
-      particle_entry | (0x00000001 << shift_num);
+//    particle_entry =
+//      particle_pdfs[glid * pdf_entries_per_particle + entry_num];
+//    particle_pdfs[glid * pdf_entries_per_particle + entry_num] =
+//      particle_entry | (0x00000001 << shift_num);
     
-    if (steps_taken == attrs.max_steps){
+    if (particle_steps[glid] + 1 == attrs.max_steps){
       particle_done[glid] = 1;
-      break;
+      if (0 == step)
+        particle_steps[glid] = 0;
+    }
+
+    // update step location
+    if (!particle_done[glid])
+    {
+      particle_steps[glid] += 1;
     }
   }
 }
