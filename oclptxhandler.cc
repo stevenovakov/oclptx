@@ -210,10 +210,10 @@ cl_ulong OclPtxHandler::GpuMemUsed()
 
 void OclPtxHandler::WriteInitialPosToDevice(
   const float4* initial_positions,
-  unsigned int nparticles,
-  unsigned int maximum_steps,
-  unsigned int ndevices,
-  unsigned int device_num
+  uint32_t nparticles,
+  uint32_t maximum_steps,
+  uint32_t ndevices,
+  uint32_t device_num
 )
 {
   uint32_t sec_size = nparticles/ndevices;
@@ -242,6 +242,8 @@ void OclPtxHandler::WriteInitialPosToDevice(
 
   // also doubles as the "is done" initial data
   std::vector<uint32_t> initial_steps(this->section_size, 0);
+  std::vector<uint32_t> initial_waypts(
+    this->section_size*this->env_dat->n_waypts, 0);
   std::vector<uint32_t> init_pdfs(pdfs_size, 0);
   std::vector<uint32_t> initial_global_pdf(this->env_dat->global_pdf_size, 0);
   // delete this at end of function always
@@ -296,6 +298,26 @@ void OclPtxHandler::WriteInitialPosToDevice(
       NULL
     );
 
+  if (this->env_dat->exclusion_mask)
+    this->particle_exclusion_buffer =
+      cl::Buffer(
+        *(this->ocl_context),
+        CL_MEM_READ_WRITE,
+        path_steps_mem_size,
+        NULL,
+        NULL
+      );
+
+  if (this->env_dat->n_waypts > 0)
+    this->particle_waypoints_buffer =
+      cl::Buffer(
+        *(this->ocl_context),
+        CL_MEM_READ_WRITE,
+        this->env_dat->n_waypts*path_steps_mem_size,
+        NULL,
+        NULL
+      );
+
   this->global_pdf_buffer =
     cl::Buffer(
       *(this->ocl_context),
@@ -335,6 +357,38 @@ void OclPtxHandler::WriteInitialPosToDevice(
     NULL,
     NULL
   );
+
+  this->ocl_cq->enqueueWriteBuffer(
+    this->particle_done_buffer,
+    CL_FALSE,
+    static_cast<uint32_t>(0),
+    path_steps_mem_size,
+    initial_steps.data(),
+    NULL,
+    NULL
+  );
+
+  if (this->env_dat->exclusion_mask)
+    this->ocl_cq->enqueueWriteBuffer(
+      this->particle_exclusion_buffer,
+      CL_FALSE,
+      static_cast<uint32_t>(0),
+      path_steps_mem_size,
+      initial_steps.data(),
+      NULL,
+      NULL
+    );
+
+  if (this->env_dat->n_waypts > 0)
+    this->ocl_cq->enqueueWriteBuffer(
+      this->particle_waypoints_buffer,
+      CL_FALSE,
+      static_cast<uint32_t>(0),
+      this->env_dat->n_waypts*path_steps_mem_size,
+      initial_waypts.data(),
+      NULL,
+      NULL
+    );
 
   this->ocl_cq->enqueueWriteBuffer(
     this->global_pdf_buffer,
@@ -453,13 +507,6 @@ void OclPtxHandler::SingleBufferInit()
 
 //*********************************************************************
 //
-// OclPtxHandler Reduction
-//
-//*********************************************************************
-
-
-//*********************************************************************
-//
 // OclPtxHandler Tractography
 //
 //*********************************************************************
@@ -497,7 +544,38 @@ void OclPtxHandler::Interpolate()
 
   this->ptx_kernel->setArg(16, this->max_steps);
   this->ptx_kernel->setArg(17, this->curvature_threshold);
-  // Now I have to write a kernel!!! Yaaaay : )
+  
+  // optional buffers
+  uint32_t last_index = 17;
+
+  if (this->env_dat->n_waypts > 0)
+  {
+    last_index += 1;
+    this->ptx_kernel->setArg(
+      last_index, this->env_dat->waypoint_masks_buffer);
+    last_index += 1;
+    this->ptx_kernel->setArg(last_index, this->particle_waypoints_buffer);
+    last_index += 1;
+    this->ptx_kernel->setArg(last_index, this->env_dat->n_waypts);
+  }
+
+  if (this->env_dat->exclusion_mask)
+  {
+    last_index += 1;
+    this->ptx_kernel->setArg(
+      last_index, this->env_dat->exclusion_mask_buffer);
+    last_index += 1;
+    this->ptx_kernel->setArg(last_index, this->particle_exclusion_buffer);
+  }
+
+  if (this->env_dat->terminate_mask)
+  {
+    last_index += 1;
+    this->ptx_kernel->setArg(
+      last_index, this->env_dat->termination_mask_buffer);
+  }
+
+  // execute
 
   this->ocl_cq->enqueueNDRangeKernel(
     *(this->ptx_kernel),

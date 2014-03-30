@@ -82,6 +82,10 @@ __kernel void OclPtxInterpolate(
   uint steps_taken = particle_steps_taken[particle_index];
   uint current_path_index =
     particle_index*(max_steps + 1) + steps_taken;
+
+#ifdef WAYPOINTS
+  uint mask_size = sample_nx * sample_ny * sample_nz;
+#endif
     
   uint interval_steps_taken;
 
@@ -254,17 +258,37 @@ __kernel void OclPtxInterpolate(
         round(temp_pos.s1)*(sample_nz) + round(temp_pos.s2);
 
     bounds_test = brain_mask[mask_index];
-
     if (bounds_test == 0)
     {
       particle_done[particle_index] = 1;
       break;
     }
+
 #ifdef TERMINATION
+    bounds_test = termination_mask[mask_index];
+    if (bounds_test == 0)
+    {
+      particle_done[particle_index] = 1;
+      break;
+    }
 #endif
+
 #ifdef EXCLUSION
+    bounds_test = exclusion_mask[mask_index];
+    if (bounds_test == 0)
+    {
+      particle_exclusion[particle_index] = 1;
+      particle_done[particle_index] = 1;
+      break;
+    }
 #endif
+
 #ifdef WAYPOINTS
+    for (uint w = 0; w < n_waypoint_masks; w++)
+    {
+      bounds_test = waypoint_masks[w*mask_size + mask_index];
+      particle_waypoints[particle_index*n_waypoint_masks + w] |= 1;
+    }
 #endif
     // update current location
     particle_pos = temp_pos;

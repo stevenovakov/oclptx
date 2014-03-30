@@ -38,6 +38,7 @@
 #include "oclenv.h"
 #include "oclptxhandler.h"
 #include "samplemanager.h"
+#include "oclptxOptions.h"
 #include "customtypes.h"
 #include "interptest.cc"
 

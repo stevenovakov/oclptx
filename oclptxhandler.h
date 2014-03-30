@@ -93,10 +93,10 @@ class OclPtxHandler{
     // can decide later.
 
     void WriteInitialPosToDevice( const float4* initial_positions,
-                                  unsigned int nparticles,
-                                  unsigned int max_steps,
-                                  unsigned int ndevices,
-                                  unsigned int device_num
+                                  uint32_t nparticles,
+                                  uint32_t max_steps,
+                                  uint32_t ndevices,
+                                  uint32_t device_num
                                 );
                                 
     void SingleBufferInit();
@@ -170,7 +170,9 @@ class OclPtxHandler{
     cl::Buffer particles_pdf_buffer;
 
     cl::Buffer particle_done_buffer;
-    //cl:Buffer particle_waypoint_buffer;
+    cl::Buffer particle_exclusion_buffer;
+    cl::Buffer particle_waypoints_buffer;
+
     
     unsigned int particles_mem_size;
     unsigned int particle_uint_mem_size;

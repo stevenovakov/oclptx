@@ -91,7 +91,6 @@ class oclptxOptions {
   Option<std::string>           outfile;
   Option<std::string>           logdir;
   Option<bool>             forcedir;
-  Option<bool>             showPaths;
 
   Option<std::string>           maskfile;
   Option<std::string>           seedfile;
@@ -146,6 +145,8 @@ class oclptxOptions {
   Option<int>              fibst;
   Option<int>              rseed;
 
+  Option<float>            mem_risk_frac;
+
   // hidden options
   FmribOption<std::string>      prefdirfile;      // inside this mask, pick orientation closest to whatever is in here
   FmribOption<std::string>      skipmask;         // inside this mask, ignore data (inertia)
@@ -195,9 +196,6 @@ inline oclptxOptions::oclptxOptions():
     false, requires_argument),
    forcedir(std::string("--forcedir"), false,
       std::string("Use the actual directory name given - i.e. don't add + to make a new directory\n\n"),
-      false, no_argument),
-  showPaths(std::string("--showpaths"), false,
-      std::string("Set this flag to log the paths in a seperate file\n\n"),
       false, no_argument),
    maskfile(std::string("-m,--mask"),"",
       std::string("Bet binary mask file in diffusion space"),
@@ -342,6 +340,11 @@ inline oclptxOptions::oclptxOptions():
    std::string("\tRandom seed"),
    false, requires_argument),
 
+  mem_risk_frac(std::string("--memrisk"), 1.0,
+    std::string("Threshold for fraction (0.0 to 1.0) of \
+      CL_DEVICE_GLOBAL_MEM_SIZE the application will attempt to \
+        use per device"), false, optional_argument),
+
 
    prefdirfile(std::string("--prefdir"), std::string(""),
          std::string("Prefered orientation preset in a 4D mask"),
@@ -384,7 +387,6 @@ inline oclptxOptions::oclptxOptions():
        options.add(outfile);
        options.add(logdir);
        options.add(forcedir);
-       options.add(showPaths);
 
        options.add(maskfile);
        options.add(seedfile);
@@ -449,6 +451,8 @@ inline oclptxOptions::oclptxOptions():
        options.add(locfibchoice);
        options.add(loccurvthresh);
        options.add(targetpaths);
+
+       options.add(mem_risk_frac);
 
      }
      catch(X_OptionError& e) {

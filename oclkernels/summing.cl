@@ -19,6 +19,13 @@ __kernel void PdfSum( __global uint* total_pdf,
                       __global uint* particles_done,
                       uint num_particles,
                       uint entries_per_particle
+#ifdef EXCLUSION
+                      , __global uint* particle_exclusion
+#endif
+#ifdef WAYPOINTS
+                      , __global uint* particle_waypoints,
+                      uint num_waypts
+#endif
 )
 {
   uint entry_num = get_global_id(0);
@@ -26,7 +33,7 @@ __kernel void PdfSum( __global uint* total_pdf,
   uint vertex_num;
   uint root_vertex = entry_num * 32;
   uint p,b;
-  uint particle_done =0;
+  uint particle_check = 0;
 
   uint particle_entry = 0;
 
@@ -41,7 +48,25 @@ __kernel void PdfSum( __global uint* total_pdf,
 
   for ( p = 0; p < num_particles; p++)
   {
-    particle_done = particles_done[p];
+#ifdef EXCLUSION
+    particle_check = particle_exclusion[p];
+
+    if (particle_check > 0)
+      continue;
+#endif
+
+#ifdef WAYPOINTS
+    particle_check = 1;
+    for (uint w = 0; w < num_waypts; w++)
+    {
+      particle_check *= particle_waypoints[p*num_waypts + w];
+    }
+
+    if (particle_check == 0)
+      continue;
+#endif
+
+    particle_check = particles_done[p];
 
     if (particle_done > 0)
     {
