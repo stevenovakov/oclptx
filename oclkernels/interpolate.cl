@@ -50,9 +50,9 @@ __kernel void OclPtxInterpolate(
   __global uint* particle_steps_taken, //RW
   __global uint* particle_done, //RW
   __global rng_t* rng, //RW
-  __global float* f_samples, //R
-  __global float* phi_samples, //R
-  __global float* theta_samples, //R
+  __global ushort* f_samples, //R
+  __global ushort* phi_samples, //R
+  __global ushort* theta_samples, //R
   __global ushort* brain_mask, //R
   uint max_steps,
   uint n_particles,
@@ -192,9 +192,9 @@ __kernel void OclPtxInterpolate(
       current_select_vertex.s2;
     
     // find next step location
-    f = f_samples[diffusion_index];
-    theta = theta_samples[diffusion_index];
-    phi = phi_samples[diffusion_index];
+    f = (float) f_samples[diffusion_index] / (float) (1<<15);
+    theta = (float) theta_samples[diffusion_index] / (float) (1<<14);
+    phi = (float) phi_samples[diffusion_index] / (float) (1<<13);
     
     dr.s0 = cos( phi ) * sin( theta );
     dr.s1 = sin( phi ) * sin( theta );

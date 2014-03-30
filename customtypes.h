@@ -86,7 +86,7 @@ struct FloatVolume
 
 struct BedpostXData
 {
-  std::vector<float*> data;
+  std::vector<unsigned short int*> data;
   uint32_t nx, ny, nz;  // discrete dimensions of mesh
   uint32_t ns;          //number of samples
   // uint32_t num_dir;

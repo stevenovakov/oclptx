@@ -286,7 +286,7 @@ void OclEnv::CreateKernels(
 
   std::string interp_kernel_source;
   std::string sum_kernel_source = fold + slash + "summing.cl";
-  std::string define_list =  "-I ./oclkernels -D PRNG";
+  std::string define_list =  "-I ./oclkernels";// -D PRNG";
 
   if (this->ocl_routine_name == "standard")
   {
@@ -559,7 +559,7 @@ int OclEnv::AvailableGPUMem(
   this->env_data.mask_mem_size = brain_mem_size;
 
   cl_uint single_direction_mem_size =
-    single_direction_size*f_data->ns*sizeof(float);
+    single_direction_size*f_data->ns*sizeof(unsigned short int); //sizeof(float);
 
   this->env_data.single_sample_mem_size = single_direction_mem_size;
 

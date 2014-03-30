@@ -102,7 +102,7 @@ void SampleManager::PopulateF(
   const int ny = aLoadedData.ysize();
   const int nz = aLoadedData.zsize();
 
-  aTargetContainer.data.push_back( new float[ns*nx*ny*nz] );
+  aTargetContainer.data.push_back( new unsigned short int[ns*nx*ny*nz] );
   aTargetContainer.nx = nx;
   aTargetContainer.ny = ny;
   aTargetContainer.nz = nz;
@@ -125,7 +125,7 @@ void SampleManager::PopulateF(
             //EncodeShort(aLoadedData[t](x+xoff,y+yoff,z+zoff), 1);
             aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
               x*nz*ny + y*nz + z] =
-                aLoadedData[t](x+xoff,y+yoff,z+zoff);
+                EncodeShort(aLoadedData[t](x+xoff,y+yoff,z+zoff), 1);
         }
 
       }
@@ -146,7 +146,7 @@ void SampleManager::PopulatePHI(
   const int ny = aLoadedData.ysize();
   const int nz = aLoadedData.zsize();
 
-  aTargetContainer.data.push_back( new float[ns*nx*ny*nz] );
+  aTargetContainer.data.push_back( new unsigned short int[ns*nx*ny*nz] );
   aTargetContainer.nx = nx;
   aTargetContainer.ny = ny;
   aTargetContainer.nz = nz;
@@ -176,7 +176,7 @@ void SampleManager::PopulatePHI(
             
             //EncodeShort(angle, 3);
             aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
-              x*nz*ny + y*nz + z] = angle;
+              x*nz*ny + y*nz + z] = EncodeShort(angle, 3);
         }
 
       }
@@ -197,7 +197,7 @@ void SampleManager::PopulateTHETA(
   const int ny = aLoadedData.ysize();
   const int nz = aLoadedData.zsize();
 
-  aTargetContainer.data.push_back( new float[ns*nx*ny*nz] );
+  aTargetContainer.data.push_back( new unsigned short int[ns*nx*ny*nz] );
   aTargetContainer.nx = nx;
   aTargetContainer.ny = ny;
   aTargetContainer.nz = nz;
@@ -224,7 +224,7 @@ void SampleManager::PopulateTHETA(
 
             //EncodeShort(angle, 2);
             aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
-              x*nz*ny + y*nz + z] = angle;
+              x*nz*ny + y*nz + z] = EncodeShort(angle, 2);
         }
 
       }
