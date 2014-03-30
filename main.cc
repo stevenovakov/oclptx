@@ -32,15 +32,30 @@ cl_ulong8 rng_zero = {0,};
 int main(int argc, char **argv)
 {
   const int kStepsPerKernel = 10;
-  const int kNumReducers = 2;
+  const int kNumReducers = 1;
   FILE *global_fd;
 
   // Add the particles to our list
   Fifo<struct OclPtxHandler::particle_data> particles_fifo(lb(argc-1)+1);
   struct OclPtxHandler::particle_data *data;
 
-  data = new OclPtxHandler::particle_data;
   cl_float4 value = {51., 51., 30., 0};
+  data = new OclPtxHandler::particle_data;
+  *data = {rng_zero, value};
+  particles_fifo.PushOrDie(data);
+
+  value = {51.,52.,30.,0.};
+  data = new OclPtxHandler::particle_data;
+  *data = {rng_zero, value};
+  particles_fifo.PushOrDie(data);
+
+  value = {51.,51.,31.,0.};
+  data = new OclPtxHandler::particle_data;
+  *data = {rng_zero, value};
+  particles_fifo.PushOrDie(data);
+
+  value = {51.,52.,31.,0.};
+  data = new OclPtxHandler::particle_data;
   *data = {rng_zero, value};
   particles_fifo.PushOrDie(data);
 
