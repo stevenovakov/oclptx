@@ -117,17 +117,29 @@ class SampleManager
       const NEWIMAGE::volume<float>& aMask =
         NEWIMAGE::volume<float>(),
       const int aFiberNum = 0);
-    void PopulateMemberParameters(
+    void PopulateF(
       const NEWIMAGE::volume4D<float> aLoadedData,
       BedpostXData& aTargetContainer,
       const NEWIMAGE::volume<float> aMaskParams,
-      const int aFiberNum);
+      const int aFiberNum,
+      bool _16bit);
+    void PopulatePHI(
+      const NEWIMAGE::volume4D<float> aLoadedData,
+      BedpostXData& aTargetContainer,
+      const NEWIMAGE::volume<float> aMaskParams,
+      const int aFiberNum,
+      bool _16bit);
+    void PopulateTHETA(
+      const NEWIMAGE::volume4D<float> aLoadedData,
+      BedpostXData& aTargetContainer,
+      const NEWIMAGE::volume<float> aMaskParams,
+      const int aFiberNum,
+      bool _16bit);
     void GenerateSeedParticles(float aSampleVoxel);
     void GenerateSeedParticlesHelper(
       float4 aSeed, float aSampleVoxel);
     std::string IntTostring(const int& value);
     unsigned short int* GetMaskToArray(NEWIMAGE::volume<short int> aMask);
-    void BoundAngles();
 
     //Statics
     static SampleManager* _manager;
