@@ -37,10 +37,6 @@
 //#include <thread>
 //#include <mutex>
 
-#define __CL_ENABLE_EXCEPTIONS
-// adds exception support from CL libraries
-// define before CL headers inclusion
-
 #ifdef __APPLE__
 #include <OpenCL/opencl.hpp>
 #else
