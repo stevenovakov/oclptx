@@ -41,8 +41,7 @@
 // Assorted Functions Declerations
 //
 
-float BoundPhi(float angle);
-float BoundTheta(float angle);
+unsigned short int EncodeShort( float val, uint32_t significand);
 
 //
 // Member Functions
@@ -80,52 +79,22 @@ void SampleManager::LoadBedpostDataHelper(
     }
     else
     {
-        PopulateMemberParameters(loadedVolume4DTheta,
-          _thetaData, loadedVolume4DTheta[0], aFiberNum);
-        PopulateMemberParameters(loadedVolume4DPhi,
-          _phiData, loadedVolume4DPhi[0], aFiberNum);
-        PopulateMemberParameters(loadedVolume4Df,
-          _fData, loadedVolume4Df[0], aFiberNum);
+        PopulateTHETA(loadedVolume4DTheta,
+          _thetaData, loadedVolume4DTheta[0], aFiberNum, false);
+        PopulatePHI(loadedVolume4DPhi,
+          _phiData, loadedVolume4DPhi[0], aFiberNum, false);
+        PopulateF(loadedVolume4Df,
+          _fData, loadedVolume4Df[0], aFiberNum, false);
     }
-
-    this->BoundAngles();
 }
 
-void SampleManager::BoundAngles()
-{
-  uint32_t nx = this->_thetaData.nx;
-  uint32_t ny = this->_thetaData.ny;
-  uint32_t nz = this->_thetaData.nz;
-  uint32_t ns = this->_thetaData.ns;
-  uint32_t index = 0;
 
-  for (uint32_t d = 0; d < this->_thetaData.data.size(); d++)
-  {
-    for (uint32_t x = 0; x < nx; x++)
-    {
-      for (uint32_t y = 0; y < ny; y++)
-      {
-        for (uint32_t z = 0; z < nz; z++)
-        {
-          for (uint32_t s = 0; s < ns; s++)
-          {
-            index = s*(nx*ny*nz) + x*(ny*nz) + y*nz + z;
-            this->_thetaData.data.at(d)[index] =
-              BoundTheta(this->_thetaData.data.at(d)[index]);
-            this->_phiData.data.at(d)[index] =
-              BoundPhi(this->_phiData.data.at(d)[index]);
-          }
-        }
-      }
-    }
-  }
-}
-
-void SampleManager::PopulateMemberParameters(
+void SampleManager::PopulateF(
   const NEWIMAGE::volume4D<float> aLoadedData,
   BedpostXData& aTargetContainer,
   const NEWIMAGE::volume<float> aMaskParams,
-  const int aFiberNum)
+  const int aFiberNum,
+  bool _16bit)
 {
 
   const int ns = aLoadedData.tsize();
@@ -142,6 +111,7 @@ void SampleManager::PopulateMemberParameters(
   int xoff = aLoadedData[0].minx() - aMaskParams.minx();
   int yoff = aLoadedData[0].miny() - aMaskParams.miny();
   int zoff = aLoadedData[0].minz() - aMaskParams.minz();
+
   for (int z = aMaskParams.minz(); z <= aMaskParams.maxz(); z++)
   {
     for (int y = aMaskParams.miny(); y <= aMaskParams.maxy(); y++)
@@ -152,9 +122,109 @@ void SampleManager::PopulateMemberParameters(
         for (int t = aLoadedData.mint();
           t <= aLoadedData.maxt(); t++)
         {
+            //EncodeShort(aLoadedData[t](x+xoff,y+yoff,z+zoff), 1);
             aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
               x*nz*ny + y*nz + z] =
                 aLoadedData[t](x+xoff,y+yoff,z+zoff);
+        }
+
+      }
+    }
+  }
+}
+
+void SampleManager::PopulatePHI(
+  const NEWIMAGE::volume4D<float> aLoadedData,
+  BedpostXData& aTargetContainer,
+  const NEWIMAGE::volume<float> aMaskParams,
+  const int aFiberNum,
+  bool _16bit)
+{
+
+  const int ns = aLoadedData.tsize();
+  const int nx = aLoadedData.xsize();
+  const int ny = aLoadedData.ysize();
+  const int nz = aLoadedData.zsize();
+
+  aTargetContainer.data.push_back( new float[ns*nx*ny*nz] );
+  aTargetContainer.nx = nx;
+  aTargetContainer.ny = ny;
+  aTargetContainer.nz = nz;
+  aTargetContainer.ns = ns;
+
+  int xoff = aLoadedData[0].minx() - aMaskParams.minx();
+  int yoff = aLoadedData[0].miny() - aMaskParams.miny();
+  int zoff = aLoadedData[0].minz() - aMaskParams.minz();
+
+  float angle;
+
+  for (int z = aMaskParams.minz(); z <= aMaskParams.maxz(); z++)
+  {
+    for (int y = aMaskParams.miny(); y <= aMaskParams.maxy(); y++)
+    {
+      for (int x = aMaskParams.minx(); x <= aMaskParams.maxx(); x++)
+      {
+
+        for (int t = aLoadedData.mint();
+          t <= aLoadedData.maxt(); t++)
+        {
+            angle = aLoadedData[t](x+xoff,y+yoff,z+zoff);
+            angle = atan2(sin(angle), cos(angle));
+
+            if (angle < 0.)
+              angle = 2*M_PI + angle;
+            
+            //EncodeShort(angle, 3);
+            aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
+              x*nz*ny + y*nz + z] = angle;
+        }
+
+      }
+    }
+  }
+}
+
+void SampleManager::PopulateTHETA(
+  const NEWIMAGE::volume4D<float> aLoadedData,
+  BedpostXData& aTargetContainer,
+  const NEWIMAGE::volume<float> aMaskParams,
+  const int aFiberNum,
+  bool _16bit)
+{
+
+  const int ns = aLoadedData.tsize();
+  const int nx = aLoadedData.xsize();
+  const int ny = aLoadedData.ysize();
+  const int nz = aLoadedData.zsize();
+
+  aTargetContainer.data.push_back( new float[ns*nx*ny*nz] );
+  aTargetContainer.nx = nx;
+  aTargetContainer.ny = ny;
+  aTargetContainer.nz = nz;
+  aTargetContainer.ns = ns;
+
+  int xoff = aLoadedData[0].minx() - aMaskParams.minx();
+  int yoff = aLoadedData[0].miny() - aMaskParams.miny();
+  int zoff = aLoadedData[0].minz() - aMaskParams.minz();
+
+  float angle;
+
+  for (int z = aMaskParams.minz(); z <= aMaskParams.maxz(); z++)
+  {
+    for (int y = aMaskParams.miny(); y <= aMaskParams.maxy(); y++)
+    {
+      for (int x = aMaskParams.minx(); x <= aMaskParams.maxx(); x++)
+      {
+
+        for (int t = aLoadedData.mint();
+          t <= aLoadedData.maxt(); t++)
+        {
+            angle = aLoadedData[t](x+xoff,y+yoff,z+zoff);
+            angle = acos(cos(angle));
+
+            //EncodeShort(angle, 2);
+            aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
+              x*nz*ny + y*nz + z] = angle;
         }
 
       }
@@ -547,19 +617,14 @@ SampleManager::~SampleManager()
     delete _manager;
 }
 
-float BoundPhi(float angle)
+unsigned short int EncodeShort( float val, uint32_t significand)
 {
-  float r_angle = atan2(sin(angle), cos(angle));
+  unsigned short int ret = 0;
+  
+  ret = static_cast<unsigned short int>(
+      val * (1 << (16 - significand)));
 
-  if (r_angle < 0.)
-    return 2*M_PI + r_angle;
-  else
-    return r_angle;
-}
-
-float BoundTheta(float angle)
-{
-  return acos(cos(angle));
+  return ret;
 }
 
 //EOF
