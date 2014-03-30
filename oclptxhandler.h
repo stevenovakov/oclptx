@@ -33,7 +33,7 @@ class OclPtxHandler{
     cl_uint sample_nz;
     cl_uint num_samples;
     cl_float curvature_threshold;
-    cl_uint num_waypoint_masks;
+    cl_uint n_waypoint_masks;
   } __attribute__((aligned(8)));
 
   OclPtxHandler() {}
@@ -75,6 +75,8 @@ class OclPtxHandler{
   cl::Buffer *gpu_data_;  // Type particle_data
   cl::Buffer *gpu_complete_;  // Type ushort array
   cl::Buffer *gpu_local_pdf_;
+  cl::Buffer *gpu_waypoints_;
+  cl::Buffer *gpu_exclusion_;
   cl::Buffer *gpu_global_pdf_;
 
   // Debug Data

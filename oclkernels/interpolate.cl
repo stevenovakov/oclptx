@@ -39,7 +39,7 @@ struct particle_attrs
   uint sample_nz;
   uint num_samples;
   float curvature_threshold;
-  uint num_waypoint_masks;
+  uint n_waypoint_masks;
 } __attribute__((aligned(8)));
 
 __kernel void OclPtxInterpolate(
@@ -53,17 +53,26 @@ __kernel void OclPtxInterpolate(
   // Output
   __global ushort* particle_done, //RW
   __global uint* particle_pdfs, //RW
+  __global ushort* particle_waypoints, //W
+  __global ushort* particle_exclusion, //W
 
   // Global Data
   __global float* f_samples, //R
   __global float* phi_samples, //R
   __global float* theta_samples, //R
-  __global ushort* brain_mask //R
+  __global ushort* brain_mask, //R
+  __global ushort* waypoint_masks,  //R
+  __global ushort* termination_mask,  //R
+  __global ushort* exclusion_mask //R
 )
 {
   uint glid = get_global_id(0);
   
   uint path_index;
+
+#ifdef WAYPOINTS
+  uint mask_size = attrs.sample_nx * attrs.sample_ny * attrs.sample_nz;
+#endif
     
   uint step;
 
@@ -234,19 +243,45 @@ __kernel void OclPtxInterpolate(
         round(temp_pos.s1)*(attrs.sample_nz) + round(temp_pos.s2);
 
     bounds_test = brain_mask[mask_index];
-
     if (bounds_test == 0)
     {
       particle_done[glid] = 1;
       if (0 == step)
         particle_steps[glid] = 0;
     }
-#if TERMINATION
-#endif
-#if EXCLUSION
-#endif
-#if WAYPOINTS
-#endif
+
+#ifdef TERMINATION
+    bounds_test = termination_mask[mask_index];
+    if (bounds_test == 0)
+    {
+      particle_done[glid] = 1;
+      if (0 == step)
+        particle_steps[glid] = 0;
+      break;
+    }
+#endif  // TERMINATION
+
+#ifdef EXCLUSION
+    bounds_test = exclusion_mask[mask_index];
+    if (bounds_test == 0)
+    {
+      particle_exclusion[glid] = 1;
+      particle_done[glid] = 1;
+      if (0 == step)
+        particle_steps[glid] = 0;
+      break;
+    }
+#endif  // EXCLUSION
+
+#ifdef WAYPOINTS
+    for (uint w = 0; w < attrs.n_waypoint_masks; w++)
+    {
+      bounds_test = waypoint_masks[w*mask_size + mask_index];
+      if (bounds_test > 0)
+        particle_waypoints[glid*attrs.n_waypoint_masks + w] |= 1;
+    }
+#endif  // WAYPOINTS
+
     // update current location
     particle_pos = temp_pos;
 

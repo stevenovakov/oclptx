@@ -89,12 +89,14 @@ int main(int argc, char *argv[] )
   {
     s_manager.ParseCommandLine(argc, argv);
 
+    const oclptxOptions& ptx_options = s_manager.GetOclptxOptions();
+
     const BedpostXData* f_data = s_manager.GetFDataPtr();
     const BedpostXData* theta_data = s_manager.GetThetaDataPtr();
     const BedpostXData* phi_data = s_manager.GetPhiDataPtr();
 
-    unsigned int n_particles = s_manager.GetNumParticles();
-    unsigned int max_steps = s_manager.GetNumMaxSteps();
+    uint32_t n_particles = s_manager.GetNumParticles();
+    uint32_t max_steps = s_manager.GetNumMaxSteps();
 
     // do not calld delete[] on
     const float4* initial_positions =
@@ -109,43 +111,30 @@ int main(int argc, char *argv[] )
       s_manager.GetTerminationMaskToArray();
     std::vector<unsigned short int*> way_masks =
       s_manager.GetWayMasksToVector();
-
-    for (uint32_t i = 0; i < f_data->nx; i++)
-    {
-      for (uint32_t j = 0; j < f_data->ny; j++)
-      {
-        if (s_manager.GetfData(0,0,i,j,0) > 0.0)
-          printf("%f, %f, %f\n",
-          s_manager.GetfData(0,0,i, j, 0),
-          s_manager.GetPhiData(0,0,i, j, 0),
-          s_manager.GetThetaData(0,0,i, j, 0));
-      }
-    }
     
     // TODO get curv thresh from sample manager
-    float curvature_threshold = 0.2;
-    float mem_frac = 1.0;
       
-    OclEnv environment("standard");
-    unsigned int n_devices = environment.HowManyDevices();
+    OclEnv environment;
 
-    int enough_mem;
-    enough_mem = environment.AvailableGPUMem(
+    environment.OclInit();
+    environment.NewCLCommandQueues();
+
+    uint32_t n_devices = environment.HowManyDevices();
+
+    uint32_t r_particles;
+    r_particles = environment.AvailableGPUMem(
       f_data,
-      static_cast<uint32_t>(1),
-      static_cast<uint32_t>(0),
-      static_cast<uint32_t>(4),
-      false,
-      false,
-      static_cast<uint32_t>(0),
-      s_manager.GetShowPaths(),
-      max_steps,
-      mem_frac
-    ); // will pass args later
+      ptx_options,
+      way_masks.size(),
+      exclusion_mask,
+      termination_mask
+    );
 
-    if (enough_mem < 0)
+    if (r_particles < n_particles)
     {
-      printf("Insufficient GPU Memory: Terminating Program\n\n");
+      printf("Insufficient GPU Memory\n");
+      printf("R: %u, N: %u\n", r_particles, n_particles);
+      printf("Terminating Program\n\n");
     }
     else
     {
@@ -153,14 +142,16 @@ int main(int argc, char *argv[] )
       // and then (this is a naive, "serial" implementation;
       //
 
+      environment.CreateKernels("standard");
+
       environment.AllocateSamples(
         f_data,
         phi_data,
         theta_data,
         brain_mask,
-        NULL,
-        NULL,
-        NULL
+        exclusion_mask,
+        termination_mask,
+        &way_masks
       );
 
       std::vector<OclPtxHandler*> handlers;
@@ -173,7 +164,7 @@ int main(int argc, char *argv[] )
             environment.GetCq(d),
             environment.GetKernel(d),
             environment.GetSumKernel(d),
-            curvature_threshold,
+            ptx_options.c_thr.value(),
             environment.GetEnvData()
           )
         );
@@ -190,12 +181,12 @@ int main(int argc, char *argv[] )
         handlers.back()->SingleBufferInit();
       }
 
-      for (unsigned int d = 0; d < n_devices; d++)
+      for (uint32_t d = 0; d < n_devices; d++)
       {
         handlers.at(d)->BlockCq();
       }
 
-      for (unsigned int d = 0; d < n_devices; d++)
+      for (uint32_t d = 0; d < n_devices; d++)
       {
         printf( "Device %u, Total GPU Memory Allocated (MB): %.4f\n",
           d, handlers.at(d)->GpuMemUsed()/1e6);
@@ -206,7 +197,7 @@ int main(int argc, char *argv[] )
 
       t_start = std::chrono::high_resolution_clock::now();
 
-      for (unsigned int d = 0; d < n_devices; d++)
+      for (uint32_t d = 0; d < n_devices; d++)
       {
         handlers.at(d)->Interpolate();
         handlers.at(d)->PdfSum();
@@ -225,7 +216,7 @@ int main(int argc, char *argv[] )
       fprintf(path_file, "[");
       fclose(path_file);
 
-      for (unsigned int d = 0; d < n_devices; d++)
+      for (uint32_t d = 0; d < n_devices; d++)
       {
         handlers.at(d)->ParticlePathsToFile(path_filename);
 
@@ -247,7 +238,7 @@ int main(int argc, char *argv[] )
       uint32_t* device_pdf = new uint32_t[env_data->global_pdf_size];
 
       printf("Summing PDF(s) from all Devices...\n");
-      for (unsigned int d = 0; d < n_devices; d++)
+      for (uint32_t d = 0; d < n_devices; d++)
       {
         handlers.at(d)->GetPdfData(device_pdf);
         WriteToPdf(&global_pdf, device_pdf);
@@ -258,7 +249,7 @@ int main(int argc, char *argv[] )
       PdfToFile(pdf_filename, &global_pdf,
         env_data->nx, env_data->ny, env_data->nz);
 
-      for (unsigned int d = 0; d < n_devices; d++)
+      for (uint32_t d = 0; d < n_devices; d++)
       {
         delete handlers.at(d);
       }

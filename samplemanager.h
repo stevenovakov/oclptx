@@ -105,8 +105,7 @@ class SampleManager
     
     //OclptxOptions and custom options
     const oclptxOptions& GetOclptxOptions(){return _oclptxOptions;}
-    const bool GetShowPaths(){return _showPaths;}
-
+    
   private:
     SampleManager();
     void LoadBedpostData(const std::string& aBasename);
@@ -152,8 +151,11 @@ class SampleManager
     BedpostXData _fData;
     NEWIMAGE::volume<short int> _brainMask;
     NEWIMAGE::volume<short int> _exclusionMask;
+    bool exclude;
     NEWIMAGE::volume<short int> _terminationMask;
+    bool terminate;
     std::vector<NEWIMAGE::volume<short int>> _wayMasks;
+    bool way;
     //Path Logging
     bool _showPaths;
     //Input Constants

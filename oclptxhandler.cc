@@ -74,7 +74,7 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   if (!gpu_step_count_)
     abort();
 
-  int entries = (attrs_.sample_nx 
+  int entries = (attrs_.sample_nx
               * attrs_.sample_ny
               * attrs_.sample_nz);
 
@@ -83,6 +83,20 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
       CL_MEM_READ_WRITE,
       2 * attrs_.particles_per_side * ((entries / 32)+1));
   if (!gpu_local_pdf_)
+    abort();
+
+  gpu_waypoints_ = new cl::Buffer(
+      *context_,
+      CL_MEM_READ_WRITE,
+      2 * attrs_.particles_per_side * attrs_.n_waypoint_masks);
+  if (!gpu_waypoints_)
+    abort();
+
+  gpu_exclusion_ = new cl::Buffer(
+      *context_,
+      CL_MEM_READ_WRITE,
+      2 * attrs_.particles_per_side);
+  if (!gpu_exclusion_)
     abort();
 
   gpu_global_pdf_ = new cl::Buffer(
@@ -153,7 +167,7 @@ void OclPtxHandler::WriteParticle(
 
   if (NULL != path_dump_fd_)
     fprintf(path_dump_fd_, "%i:%f,%f,%fn\n",
-        offset, 
+        offset,
         data->position.s[0],
         data->position.s[1],
         data->position.s[2]);
@@ -200,9 +214,9 @@ void OclPtxHandler::WriteParticle(
   // Fill in the "particle pdf" buffer.
   // TODO(jeff): this is going to be horrendously slow.  This HAS to be done in
   // the summing kernel.
-  int entries_per_particle = (attrs_.sample_nx 
+  int entries_per_particle = (attrs_.sample_nx
                             * attrs_.sample_ny
-                            * attrs_.sample_nz / 32) + 1;  // TODO: Kill +1
+                            * attrs_.sample_nz / 32) + 1;
   cl_ushort *temp_local_pdf = new cl_ushort[entries_per_particle];
   for (int i = 0; i < entries_per_particle; ++i)
     temp_local_pdf[i] = 0;
@@ -215,6 +229,28 @@ void OclPtxHandler::WriteParticle(
       temp_local_pdf);
 
   delete[] temp_local_pdf;
+
+  //TODO(jeff): Can we allocate in Init?
+  cl_ushort *temp_waypoints = new cl_ushort[attrs_.n_waypoint_masks];
+  for (int i = 0; i < attrs_.n_waypoint_masks; ++i)
+    temp_waypoints[i] = 0;
+
+  cq_->enqueueWriteBuffer(
+      *gpu_waypoints_,
+      true,
+      offset * attrs_.n_waypoint_masks * sizeof(cl_ushort),
+      attrs.n_waypoint_masks * sizeof(cl_ushort),
+      temp_waypoints);
+
+  delete[] temp_waypoints;
+
+  cl_ushort temp_zero = 0;
+
+  cq_->enqueueWriteBuffer(
+    *gpu_exclusion_,
+    true,
+    offset * sizeof(cl_ushort),
+    sizeof(cl_ushort));
 }
 
 void OclPtxHandler::RunKernel(int side)
@@ -232,11 +268,16 @@ void OclPtxHandler::RunKernel(int side)
   ptx_kernel_->setArg(3, *gpu_step_count_);
   ptx_kernel_->setArg(4, *gpu_complete_);
   ptx_kernel_->setArg(5, *gpu_local_pdf_);
+  ptx_kernel_->setArg(6, *gpu_waypoints_);
+  ptx_kernel_->setArg(7, *gpu_exclusion_);
 
-  ptx_kernel_->setArg(6, *env_dat_->f_samples_buffers[0]);
-  ptx_kernel_->setArg(7, *env_dat_->phi_samples_buffers[0]);
-  ptx_kernel_->setArg(8, *env_dat_->theta_samples_buffers[0]);
-  ptx_kernel_->setArg(9, *env_dat_->brain_mask_buffer);
+  ptx_kernel_->setArg(8, *env_dat_->f_samples_buffers[0]);
+  ptx_kernel_->setArg(9, *env_dat_->phi_samples_buffers[0]);
+  ptx_kernel_->setArg(10, *env_dat_->theta_samples_buffers[0]);
+  ptx_kernel_->setArg(11, *env_dat_->brain_mask_buffer);
+  ptx_kernel_->setArg(12, *env_dat_->waypoint_masks_buffer);
+  ptx_kernel_->setArg(13, *env_dat_->termination_mask_buffer);
+  ptx_kernel_->setArg(14, *env_dat_->exclusion_mask_buffer);
 
   cq_->enqueueNDRangeKernel(
     *(ptx_kernel_),
@@ -314,7 +355,7 @@ void OclPtxHandler::DumpPath(int offset, int count)
         && 0 != step_count_buf[id])
         || step < step_count_buf[id] % attrs_.steps_per_kernel)
         fprintf(path_dump_fd_, "%i:%f,%f,%f\n",
-            id + offset, 
+            id + offset,
             value.s[0],
             value.s[1],
             value.s[2]);

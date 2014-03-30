@@ -58,28 +58,15 @@
 //
 // Constructor(s)
 //
-OclEnv::OclEnv(
-  std::string ocl_routine
-)
+OclEnv::OclEnv()
 {
-  this->ocl_routine_name = ocl_routine;
-  this->ocl_profiling = false;
-}
-
-void OclEnv::Init()
-{
-  this->OclInit();
-  this->OclDeviceInfo();
-  this->NewCLCommandQueues();
-  this->CreateKernels();
-
   this->env_data.f_samples_buffers = NULL;
   this->env_data.phi_samples_buffers = NULL;
   this->env_data.theta_samples_buffers = NULL;
   this->env_data.brain_mask_buffer = NULL;
   this->env_data.exclusion_mask_buffer = NULL;
   this->env_data.termination_mask_buffer = NULL;
-  this->env_data.waypoint_masks = NULL;
+  this->env_data.waypoint_masks_buffer = NULL;
 }
 
 //
@@ -110,13 +97,8 @@ OclEnv::~OclEnv()
     delete this->env_data.exclusion_mask_buffer;
   if (this->env_data.termination_mask_buffer != NULL)
     delete this->env_data.termination_mask_buffer;
-  if (this->env_data.waypoint_masks != NULL)
-  {
-    for (uint32_t w = 0; w < this->env_data.n_waypts; w ++)
-      delete this->env_data.waypoint_masks[w];
-
-    delete[] this->env_data.waypoint_masks;
-  }
+  if (this->env_data.waypoint_masks_buffer != NULL)
+    delete this->env_data.waypoint_masks_buffer;
 }
 
 //*********************************************************************
@@ -147,8 +129,7 @@ cl::Kernel * OclEnv::GetSumKernel(unsigned int kernel_num)
 
 void OclEnv::SetOclRoutine(std::string new_routine)
 {
-  this->ocl_routine_name = new_routine;
-  this->CreateKernels();
+  this->CreateKernels(new_routine);
 }
 
 EnvironmentData * OclEnv::GetEnvData()
@@ -216,7 +197,6 @@ void OclEnv::OclDeviceInfo()
     std::cout<<"\tMax Work Item Sizes (x, y, z): " << siT[0] <<
       ", " << siT[1] << ", " << siT[2] << "\n";
 
-
     dit->getInfo(CL_DEVICE_MAX_MEM_ALLOC_SIZE, &print_ulong);
     std::cout<<"\tMax Mem Alloc Size: " << print_ulong << "\n";
 
@@ -234,30 +214,17 @@ unsigned int OclEnv::HowManyDevices()
 void OclEnv::NewCLCommandQueues()
 {
   this->ocl_device_queues.clear();
-  //this->ocl_device_queue_mutexs.clear();
 
   for (unsigned int k = 0; k < this->ocl_devices.size(); k++ )
   {
     std::cout<<"Create CommQueue, Kernel, Device: "<<k<<"\n";
 
-    if (this->ocl_profiling)
-    {
-      this->ocl_device_queues.push_back(  cl::CommandQueue(
-                                            this->ocl_context,
-                                            this->ocl_devices[k],
-                                            CL_QUEUE_PROFILING_ENABLE
-                                          )
-                                        );
-    }
-    else
-    {
-      this->ocl_device_queues.push_back(  cl::CommandQueue(
-                                            this->ocl_context,
-                                            this->ocl_devices[k]
-                                          )
-                                        );
-    }
-    //this->ocl_device_queue_mutexs.push_back(MutexWrapper());
+    this->ocl_device_queues.push_back(
+      cl::CommandQueue(
+        this->ocl_context,
+        this->ocl_devices[k]
+      )
+    );
   }
 }
 
@@ -265,14 +232,7 @@ void OclEnv::NewCLCommandQueues()
 //
 //
 //
-void OclEnv::CreateKernels(
-  bool two_dir,
-  bool three_dir,
-  bool waypoints,
-  bool termination,
-  bool exclusion,
-  bool euler_stream
-)
+void OclEnv::CreateKernels( std::string kernel_name )
 {
   this->ocl_kernel_set.clear();
   this->sum_kernel_set.clear();
@@ -286,39 +246,39 @@ void OclEnv::CreateKernels(
   std::string sum_kernel_source = fold + slash + "summing.cl";
   std::string define_list =  "-I ./oclkernels -D PRNG";
 
-  if (this->ocl_routine_name == "standard")
+  if (kernel_name == "standard")
   {
     interp_kernel_source = fold + slash + "interpolate.cl";
   }
-  else if (this->ocl_routine_name == "rng_test")
+  else if (kernel_name == "rng_test")
   {
     interp_kernel_source = fold + slash + "rng_test.cl";
   }
-  else if (this->ocl_routine_name == "collatz")
+  else if (kernel_name == "interptest")
   {
-    interp_kernel_source = fold + slash + "collatz.cl";
-  }
-  else if (this->ocl_routine_name == "interptest")
-  {
-    //source_list.push_back("prngmethods.cl");
     interp_kernel_source = fold + slash + "interptest.cl";
   }
-  else if (this->ocl_routine_name == "basic")
+  else if (kernel_name == "basic")
   {
     interp_kernel_source = fold + slash + "basic.cl";
   }
+  else
+  {
+    printf("Invalid Kernel Name: Terminating...\n");
+    exit(EXIT_FAILURE);
+  }
 
-  if (two_dir)
+  if (this->env_data.bpx_dirs > 1)
     define_list += " -D TWO_DIR";
-  if (three_dir)
+  if (this->env_data.bpx_dirs > 2)
     define_list += " -D THREE_DIR";
-  if (waypoints)
+  if (this->env_data.n_waypts > 0)
     define_list += " -D WAYPOINTS";
-  if (termination)
+  if (this->env_data.terminate_mask)
     define_list += " -D TERMINATION";
-  if (exclusion)
+  if (this->env_data.exclusion_mask)
     define_list += " -D EXCLUSION";
-  if (euler_stream)
+  if (this->env_data.euler_streamline)
     define_list += " -D EULER_STREAMLINE";
 
   std::ifstream main_stream(interp_kernel_source);
@@ -364,7 +324,7 @@ void OclEnv::CreateKernels(
 
   cl::Program sum_program(this->ocl_context, sum_source);
 
-  err = sum_program.build(this->ocl_devices, "-I ./oclkernels");
+  err = sum_program.build(this->ocl_devices, define_list.c_str());
 
   if( this->OclErrorStrings(err) != "CL_SUCCESS")
   {
@@ -388,7 +348,7 @@ void OclEnv::CreateKernels(
   //
   for( unsigned int k = 0; k < this->ocl_devices.size(); k++)
   {
-    if (this->ocl_routine_name == "standard" )
+    if (kernel_name == "standard" )
     {
       this->ocl_kernel_set.push_back(cl::Kernel(main_program,
                                                 "OclPtxInterpolate",
@@ -397,25 +357,19 @@ void OclEnv::CreateKernels(
                                                 "PdfSum",
                                                 NULL));
     }
-    else if (this->ocl_routine_name == "rng_test")
+    else if (kernel_name == "rng_test")
     {
       this->ocl_kernel_set.push_back(cl::Kernel(main_program,
                                                 "RngTest",
                                                 NULL));
     }
-    else if (this->ocl_routine_name == "collatz")
-    {
-      this->ocl_kernel_set.push_back(cl::Kernel(main_program,
-                                                "Collatz",
-                                                NULL));
-    }
-    else if (this->ocl_routine_name == "interptest" )
+    else if (kernel_name == "interptest" )
     {
       this->ocl_kernel_set.push_back(cl::Kernel(main_program,
                                                 "InterpolateTestKernel",
                                                 NULL));
     }
-    else if (this->ocl_routine_name == "basic" )
+    else if (kernel_name == "basic" )
     {
       this->ocl_kernel_set.push_back(cl::Kernel(main_program,
                                                 "BasicInterpolate",
@@ -512,19 +466,18 @@ std::string OclEnv::OclErrorStrings(cl_int error)
 // AvailableGPUMem should run more thoroughly and calculate a lot of the vallues
 // currently bneing calculated in AllocateSamples
 //
-int OclEnv::AvailableGPUMem(
+uint32_t OclEnv::AvailableGPUMem(
   const BedpostXData* f_data,
-  uint32_t n_bpx_dirs,
-  uint32_t num_waypoint_masks,
-  uint32_t loopcheck_fraction,
-  bool exclusion_mask,
-  bool termination_mask,
+  const oclptxOptions& ptx_options,
   uint32_t n_waypoints,
-  bool save_particle_paths,
-  uint32_t m_steps,
-  float mem_fraction //also pass oclptxoptions here
+  const unsigned short int* exclusion_mask,
+  const unsigned short int* termination_mask
 )
 {
+  //TODO @STEVE
+  // figure out where this is actually assiged
+  uint32_t loopcheck_fraction = 4;
+
   // ***********************************************
   //  Hardware Parameters
   // ***********************************************
@@ -543,13 +496,14 @@ int OclEnv::AvailableGPUMem(
   dit->getInfo(CL_DEVICE_GLOBAL_MEM_SIZE, &gl_mem_size);
   this->env_data.global_mem_size = gl_mem_size;
 
-  useful_gl_mem_size = std::floor(gl_mem_size * mem_fraction);
+  useful_gl_mem_size =
+    std::floor(gl_mem_size * ptx_options.mem_risk_frac.value());
 
   // ***********************************************
   //  BPX Sample Parameters + Masks
   // ***********************************************
 
-  this->env_data.bpx_dirs = n_bpx_dirs;
+  this->env_data.bpx_dirs = f_data->data.size();
   this->env_data.nx = f_data->nx;
   this->env_data.ny = f_data->ny;
   this->env_data.nz = f_data->nz;
@@ -571,13 +525,34 @@ int OclEnv::AvailableGPUMem(
 
   this->env_data.single_sample_mem_size = single_direction_mem_size;
 
-  cl_uint total_mem_size = 3*single_direction_mem_size * n_bpx_dirs +
+  cl_uint total_mem_size =
+    3*single_direction_mem_size * this->env_data.bpx_dirs +
     brain_mem_size*(1 + n_waypoints);
 
-  if (exclusion_mask)
+  if (exclusion_mask != NULL)
+  {
+    printf("Exmask\n");
     total_mem_size += brain_mem_size;
-  if (termination_mask)
+    this->env_data.exclusion_mask = true;
+  }
+  else
+    this->env_data.exclusion_mask = false;
+
+  if (termination_mask != NULL)
+  {
+    printf("termimask\n");
     total_mem_size += brain_mem_size;
+    this->env_data.terminate_mask = true;
+  }
+  else
+    this->env_data.terminate_mask = false;
+
+  this->env_data.n_waypts = n_waypoints;
+
+
+  // ***********************************************
+  //  PDFS
+  // ***********************************************
 
   this->env_data.global_pdf_size = single_pdf_mask_size * 32;
   this->env_data.global_pdf_mem_size =
@@ -599,20 +574,37 @@ int OclEnv::AvailableGPUMem(
   dynamic_mem_per_particle += this->env_data.particle_pdf_mask_mem_size;
   
   // Loopcheck
-  uint32_t loopcheck_x = (f_data->nx / loopcheck_fraction) +
-    ((f_data->nx %loopcheck_fraction > 0)? 1 : 0);
-  uint32_t loopcheck_y = (f_data->ny / loopcheck_fraction) +
-    ((f_data->ny %loopcheck_fraction > 0)? 1 : 0);
-  uint32_t loopcheck_z = (f_data->nz / loopcheck_fraction) +
-    ((f_data->nz %loopcheck_fraction > 0)? 1 : 0);
+  uint32_t loopcheck_x;
+  uint32_t loopcheck_y;
+  uint32_t loopcheck_z;
+  cl_uint single_loopcheck_size;
+  cl_uint single_loopcheck_mask_size;
 
-  cl_uint single_loopcheck_size = loopcheck_x * loopcheck_y * loopcheck_z;
-  cl_uint single_loopcheck_mask_size = (single_loopcheck_size / 32)  +
-    ((single_loopcheck_size%32 > 0)? 1 : 0);
+  if (ptx_options.loopcheck.value())
+  {
+    this->env_data.loopcheck = true;
+    loopcheck_x = (f_data->nx / loopcheck_fraction) +
+      ((f_data->nx %loopcheck_fraction > 0)? 1 : 0);
+    loopcheck_y = (f_data->ny / loopcheck_fraction) +
+      ((f_data->ny %loopcheck_fraction > 0)? 1 : 0);
+    loopcheck_z = (f_data->nz / loopcheck_fraction) +
+      ((f_data->nz %loopcheck_fraction > 0)? 1 : 0);
 
-  this->env_data.particle_loopcheck_mem_size = single_loopcheck_mask_size * 32;
+    single_loopcheck_size = loopcheck_x * loopcheck_y * loopcheck_z;
+    single_loopcheck_mask_size = (single_loopcheck_size / 32)  +
+      ((single_loopcheck_size%32 > 0)? 1 : 0);
 
-  dynamic_mem_per_particle += this->env_data.particle_loopcheck_mem_size;
+
+    this->env_data.particle_loopcheck_mem_size =
+      single_loopcheck_mask_size * 32;
+
+    dynamic_mem_per_particle += this->env_data.particle_loopcheck_mem_size;
+  }
+  else
+  {
+    this->env_data.loopcheck = false;
+    this->env_data.particle_loopcheck_mem_size = 0;
+  }
 
   // particle_done, steps_taken
   dynamic_mem_per_particle += 2 * sizeof(uint32_t);
@@ -622,12 +614,12 @@ int OclEnv::AvailableGPUMem(
   dynamic_mem_per_particle += sizeof(cl_ulong8);
 
   // paths?
-  this->env_data.max_steps = m_steps;
-  this->env_data.save_paths = save_particle_paths;
+  this->env_data.max_steps = ptx_options.nsteps.value();
+  this->env_data.save_paths = ptx_options.save_paths.value();
 
-  if (save_particle_paths)
+  if (ptx_options.save_paths.value())
   {
-    dynamic_mem_per_particle += m_steps * sizeof(float4);
+    dynamic_mem_per_particle += this->env_data.max_steps * sizeof(float4);
   }
 
   // Compute Max Particles per Batch:
@@ -641,7 +633,7 @@ int OclEnv::AvailableGPUMem(
   printf("Num Samples: %u\n", f_data->ns);
   printf("Single Dir Sample Mem Size: %u (B), %.4f (MB), \n",
   single_direction_mem_size, single_direction_mem_size/1e6);
-  printf("Num_directions: %u \n", n_bpx_dirs);
+  printf("Num_directions: %u \n", this->env_data.bpx_dirs);
   printf("Total GPU Device Memory: %.4f (MB) \n", gl_mem_size/1e6);
   printf("Total USEFUL GPU Device Memory: %.4f (MB) \n", useful_gl_mem_size/1e6);
   printf("Total Static Data Memory Requirement: %.4f (MB) \n",
@@ -657,11 +649,7 @@ int OclEnv::AvailableGPUMem(
     printf("WARNING: BPX DATA > MAX BUFFER SIZE: %.4f (MB) vs %.4f (MB)\n",
       single_direction_mem_size/1e6, max_buff_size/1e6);
 
-  // 100 is an arbitrary minimum, have user selectable minimum?
-  if (r_particles > 100)
-    return 1;
-  else
-    return -1;
+  return r_particles;
 }
 
 
@@ -672,7 +660,7 @@ void OclEnv::AllocateSamples(
   const unsigned short int* brain_mask,
   const unsigned short int* exclusion_mask,
   const unsigned short int* termination_mask,
-  const unsigned short int** waypoint_masks
+  std::vector<unsigned short int*>* waypoint_masks
 )
 {
   uint32_t n_dirs = this->env_data.bpx_dirs;
@@ -719,6 +707,42 @@ void OclEnv::AllocateSamples(
       NULL,
       NULL
     );
+
+    if (exclusion_mask != NULL)
+    {
+      this->env_data.exclusion_mask_buffer = new
+        cl::Buffer(
+          this->ocl_context,
+          CL_MEM_READ_ONLY,
+          this->env_data.mask_mem_size,
+          NULL,
+          NULL
+        );
+    }
+
+    if (termination_mask != NULL)
+    {
+      this->env_data.termination_mask_buffer = new
+        cl::Buffer(
+          this->ocl_context,
+          CL_MEM_READ_ONLY,
+          this->env_data.mask_mem_size,
+          NULL,
+          NULL
+        );
+    }
+
+    if (this->env_data.n_waypts > 0)
+    {
+      this->env_data.waypoint_masks_buffer = new
+        cl::Buffer(
+          this->ocl_context,
+          CL_MEM_READ_ONLY,
+          this->env_data.n_waypts * this->env_data.mask_mem_size,
+          NULL,
+          NULL
+        );
+    }
 
     //
     // TODO @STEVE
@@ -769,6 +793,41 @@ void OclEnv::AllocateSamples(
         NULL,
         NULL
       );
+
+      if (exclusion_mask != NULL)
+        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+          *(this->env_data.exclusion_mask_buffer),
+          CL_FALSE,
+          static_cast<unsigned int>(0),
+          this->env_data.mask_mem_size,
+          const_cast<unsigned short int*>(exclusion_mask),
+          NULL,
+          NULL
+        );
+
+      if (termination_mask != NULL)
+        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+          *(this->env_data.termination_mask_buffer),
+          CL_FALSE,
+          static_cast<unsigned int>(0),
+          this->env_data.mask_mem_size,
+          const_cast<unsigned short int*>(termination_mask),
+          NULL,
+          NULL
+        );
+
+      for (uint32_t w = 0; w < this->env_data.n_waypts; w++)
+      {
+        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+          *(this->env_data.waypoint_masks_buffer),
+          CL_FALSE,
+          w * this->env_data.mask_mem_size,
+          this->env_data.mask_mem_size,
+          waypoint_masks->at(w),
+          NULL,
+          NULL
+        );
+      }
 
       this->ocl_device_queues.at(d).flush();
     }

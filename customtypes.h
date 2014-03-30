@@ -112,28 +112,23 @@ struct BedpostXData
 struct EnvironmentData
 {
   //OpenCL Related
-  cl::Context* ocl_context;
+  cl::Context* ocl_context; //
 
-  cl_ulong max_buffer_size;
-  cl_ulong global_mem_size;
-
-  float mem_safety_fraction;
-
-  cl_ulong total_gpu_mem_used;
-  // maximum fraction of global_mem_size to be used
-  // in an attempt to stave off fragmentation issues.
+  cl_ulong max_buffer_size; //
+  cl_ulong global_mem_size; //
 
   //Input Data - Size Related
   uint32_t nx; //
   uint32_t ny; // also serves as mask dims
   uint32_t nz; //
-  uint32_t ns;
+  uint32_t ns; //
 
-  uint32_t bpx_dirs;
+  uint32_t bpx_dirs; //
   uint32_t n_waypts;
   bool exclusion_mask;
   bool terminate_mask;
   bool prefdir;
+  bool loopcheck;
   uint32_t loopcheck_fraction;
 
   // Interpolation Options
@@ -171,7 +166,7 @@ struct EnvironmentData
   cl::Buffer** theta_samples_buffers;
   cl::Buffer* brain_mask_buffer;
 
-  cl::Buffer** waypoint_masks;
+  cl::Buffer* waypoint_masks_buffer;
   cl::Buffer* exclusion_mask_buffer;
   cl::Buffer* termination_mask_buffer;
 };

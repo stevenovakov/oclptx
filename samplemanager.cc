@@ -118,16 +118,13 @@ void SampleManager::PopulateF(
     {
       for (int x = aMaskParams.minx(); x <= aMaskParams.maxx(); x++)
       {
-
         for (int t = aLoadedData.mint();
           t <= aLoadedData.maxt(); t++)
         {
-            //EncodeShort(aLoadedData[t](x+xoff,y+yoff,z+zoff), 1);
             aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
               x*nz*ny + y*nz + z] =
                 aLoadedData[t](x+xoff,y+yoff,z+zoff);
         }
-
       }
     }
   }
@@ -174,7 +171,6 @@ void SampleManager::PopulatePHI(
             if (angle < 0.)
               angle = 2*M_PI + angle;
             
-            //EncodeShort(angle, 3);
             aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
               x*nz*ny + y*nz + z] = angle;
         }
@@ -215,18 +211,15 @@ void SampleManager::PopulateTHETA(
     {
       for (int x = aMaskParams.minx(); x <= aMaskParams.maxx(); x++)
       {
-
         for (int t = aLoadedData.mint();
           t <= aLoadedData.maxt(); t++)
         {
             angle = aLoadedData[t](x+xoff,y+yoff,z+zoff);
             angle = acos(cos(angle));
 
-            //EncodeShort(angle, 2);
             aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
               x*nz*ny + y*nz + z] = angle;
         }
-
       }
     }
   }
@@ -345,7 +338,6 @@ void SampleManager::ParseCommandLine(int argc, char** argv)
         }
         cout<<"Successfully loaded " << _wayMasks.size() << " WayMasks"<<endl;
       }
-      _showPaths = _oclptxOptions.showPaths.value();
       this->GenerateSeedParticles(_oclptxOptions.sampvox.value());
   }
   else if (_oclptxOptions.network.value())
@@ -365,9 +357,6 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
  Matrix seeds =
   MISCMATHS::read_ascii_matrix(_oclptxOptions.seedfile.value());
  srand(_oclptxOptions.rseed.value());
- cout<<"NParticles " << _nParticles<<endl;
- cout<<"NSteps " << _nMaxSteps<<endl;
- cout<< "NRows " << seeds.Nrows()<<endl;
 
  float4 seed;
  // If there is no seed file given with the -x CLI parameter,
@@ -451,7 +440,10 @@ const NEWIMAGE::volume<short int>* SampleManager::GetExclusionMask()
 
 const unsigned short int* SampleManager::GetExclusionMaskToArray()
 {
-  return GetMaskToArray(_exclusionMask);
+  if(_oclptxOptions.rubbishfile.value() != "")
+    return GetMaskToArray(_exclusionMask);
+  else
+    return NULL;
 }
 
 const NEWIMAGE::volume<short int>* SampleManager::GetTerminationMask()
@@ -461,11 +453,15 @@ const NEWIMAGE::volume<short int>* SampleManager::GetTerminationMask()
 
 const unsigned short int* SampleManager::GetTerminationMaskToArray()
 {
-  return GetMaskToArray(_terminationMask);
+  if(_oclptxOptions.stopfile.value() != "")
+    return GetMaskToArray(_terminationMask);
+  else
+    return NULL;
 }
 
 const std::vector<unsigned short int*> SampleManager::GetWayMasksToVector()
 {
+  
   vector<unsigned short int*> waymasks;
   for (unsigned int i = 0; i < _wayMasks.size(); i++)
   {
@@ -615,16 +611,6 @@ SampleManager::~SampleManager()
     }
 
     delete _manager;
-}
-
-unsigned short int EncodeShort( float val, uint32_t significand)
-{
-  unsigned short int ret = 0;
-  
-  ret = static_cast<unsigned short int>(
-      val * (1 << (16 - significand)));
-
-  return ret;
 }
 
 //EOF

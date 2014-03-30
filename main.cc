@@ -60,8 +60,9 @@ int main(int argc, char **argv)
   particles_fifo.PushOrDie(data);
 
   // Create our oclenv
-  OclEnv env("standard");
-  env.Init();
+  OclEnv env();
+  env.OclInit();
+  env.NewCLCommandQueues();
 
   // Startup the samplemanager
   SampleManager *sample_manager = &SampleManager::GetInstance();
@@ -69,7 +70,11 @@ int main(int argc, char **argv)
 
   env.AvailableGPUMem(
     sample_manager->GetFDataPtr(),
-    1, 0, 4, false, false, 0, true, kStepsPerKernel, 1.0);
+    sample_manager->GetOclptxOptions(),
+    sample_manager->GetWayMasksToVector()->size(),
+    NULL,
+    NULL
+  );
   env.AllocateSamples(
     sample_manager->GetFDataPtr(),
     sample_manager->GetPhiDataPtr(),
@@ -80,6 +85,8 @@ int main(int argc, char **argv)
     NULL
   );
 
+  env.CreateKernels("standard");
+
   global_fd = fopen("./path_output", "w");
   if (NULL == global_fd)
   {
@@ -88,7 +95,7 @@ int main(int argc, char **argv)
   }
 
   struct OclPtxHandler::particle_attrs attrs = {
-    kStepsPerKernel, 
+    kStepsPerKernel,
     10, // max_steps
     0, // Particles per side not determined here.
     env.GetEnvData()->nx,
@@ -96,7 +103,7 @@ int main(int argc, char **argv)
     env.GetEnvData()->nz,
     1, // num_samples
     0.2, // curvature threshold
-    0
+    env.GetEnvData()->n_waypts
     }; // num waymasks.
   int num_dev = env.HowManyDevices();
 

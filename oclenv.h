@@ -44,14 +44,13 @@
 #endif
 
 #include "customtypes.h"
+#include "oclptxOptions.h"
 
 class OclEnv{
 
   public:
 
-    OclEnv(){};
-
-    OclEnv(std::string ocl_routine);
+    OclEnv();
 
     ~OclEnv();
 
@@ -87,14 +86,7 @@ class OclEnv{
 
     void NewCLCommandQueues();
 
-    void CreateKernels(
-      bool two_dir = false,
-      bool three_dir = false,
-      bool waypoints = false,
-      bool termination = false,
-      bool exclusion = false,
-      bool euler_stream = false
-    );
+    void CreateKernels(std::string kernel_name);
 
     std::string OclErrorStrings(cl_int error);
 
@@ -102,17 +94,12 @@ class OclEnv{
     // Resource Allocation
     //
 
-    int AvailableGPUMem(
+    uint32_t AvailableGPUMem(
       const BedpostXData* f_data,
-      uint32_t n_bpx_dirs,
-      uint32_t num_waypoint_masks,
-      uint32_t loopcheck_fraction,
-      bool exclusion_mask,
-      bool termination_mask,
+      const oclptxOptions& ptx_options,
       uint32_t n_waypoints,
-      bool save_particle_paths,
-      uint32_t m_steps,
-      float mem_fraction //also pass oclptxoptions here
+      const unsigned short int* exclusion_mask,
+      const unsigned short int* termination_mask
     );
 
     void AllocateSamples(
@@ -122,7 +109,7 @@ class OclEnv{
       const unsigned short int* brain_mask,
       const unsigned short int* exclusion_mask,
       const unsigned short int* termination_mask,
-      const unsigned short int** waypoint_masks
+      std::vector<unsigned short int*>* waypoint_masks
     );
 
     //void ProcessOptions( oclptxOptions* options);
@@ -145,8 +132,6 @@ class OclEnv{
     //Every compiled kernel is stored here.
 
     std::string ocl_routine_name;
-
-    bool ocl_profiling;
 
     EnvironmentData env_data;
 };
