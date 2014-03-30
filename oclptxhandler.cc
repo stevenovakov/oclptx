@@ -115,6 +115,10 @@ void OclPtxHandler::ParticlePathsToFile(std::string path_filename)
   unsigned int * particle_steps;
   particle_steps = new unsigned int[this->section_size];
 
+  uint32_t * particle_exclusion;
+  uint32_t * particle_waypoints;
+  uint32_t waypts = this->env_dat->n_waypts;
+
   this->ocl_cq->enqueueReadBuffer(
     this->particle_paths_buffer,
     CL_FALSE,
@@ -130,6 +134,33 @@ void OclPtxHandler::ParticlePathsToFile(std::string path_filename)
     particle_steps
   );
 
+  if (this->env_dat->exclusion_mask)
+  {
+    particle_exclusion = new unsigned int[this->section_size];
+
+    this->ocl_cq->enqueueReadBuffer(
+      this->particle_exclusion_buffer,
+      CL_FALSE,
+      0,
+      this->particle_uint_mem_size,
+      particle_exclusion
+    );
+  }
+
+  if (waypts > 0)
+  {
+    particle_waypoints = new unsigned int[waypts * this->section_size];
+
+      particle_exclusion = new unsigned int[this->section_size];
+    this->ocl_cq->enqueueReadBuffer(
+      this->particle_waypoints_buffer,
+      CL_FALSE,
+      0,
+      waypts * this->particle_uint_mem_size,
+      particle_waypoints
+    );
+  }
+
   // blocking
   this->ocl_cq->finish();
 
@@ -143,9 +174,27 @@ void OclPtxHandler::ParticlePathsToFile(std::string path_filename)
 
   path_file = fopen(path_filename.c_str(), "ab");
 
+  uint32_t waybreak = 1;
+
   for (unsigned int n = 0; n < this->section_size; n++)
   {
     unsigned int p_steps = particle_steps[n];
+
+    if (particle_exclusion[n] > 0)
+      continue;
+
+    if (waypts > 0)
+    {
+      for (uint32_t w = 0; w < waypts; w++)
+        waybreak *= particle_waypoints[n*waypts + w];
+    }
+
+    if (waybreak == 0)
+    {
+      waybreak = 1;
+      continue;
+    }
+
 
     //if (p_steps > 0)
     //printf("Particle: %d, Steps Taken: %d\n", n, p_steps);
@@ -604,6 +653,25 @@ void OclPtxHandler::PdfSum()
   this->sum_kernel->setArg(2, this->particle_done_buffer);
   this->sum_kernel->setArg(3, this->n_particles);
   this->sum_kernel->setArg(4, this->env_dat->pdf_entries_per_particle);
+
+  // optional arguments
+  uint32_t last_index = 4;
+
+  if (this->env_dat->exclusion_mask)
+  {
+    last_index += 1;
+    this->ptx_kernel->setArg(last_index, this->particle_exclusion_buffer);
+  }
+
+  if (this->env_dat->n_waypts > 0)
+  {
+    last_index += 1;
+    this->ptx_kernel->setArg(last_index, this->particle_waypoints_buffer);
+    last_index += 1;
+    this->ptx_kernel->setArg(last_index, this->env_dat->n_waypts);
+  }
+
+  // execulte
 
   try{
     this->ocl_cq->enqueueNDRangeKernel(
