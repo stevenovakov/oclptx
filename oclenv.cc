@@ -602,6 +602,10 @@ uint32_t OclEnv::AvailableGPUMem(
     loopcheck_z = (f_data->nz / loopcheck_fraction) +
       ((f_data->nz %loopcheck_fraction > 0)? 1 : 0);
 
+    this->env_data.lx = loopcheck_x;
+    this->env_data.ly = loopcheck_y;
+    this->env_data.lz = loopcheck_z;
+
     single_loopcheck_size = loopcheck_x * loopcheck_y * loopcheck_z;
     single_loopcheck_mask_size = (single_loopcheck_size / 32)  +
       ((single_loopcheck_size%32 > 0)? 1 : 0);

@@ -127,6 +127,14 @@ __kernel void OclPtxInterpolate(
   if (particle_done[glid])
     particle_steps[glid] = 0;
 
+  uint3 loopcheck_voxel;
+
+  uint loopcheck_dir_size = attrs.lx * attrs.ly * attrs.lz;
+
+  uint loopcheck_index;
+  float4 last_loopcheck_dr;
+  float loopcheck_product;
+
   for (step = 0; step < attrs.steps_per_kernel; ++step)
   {
     // calculate current index in diffusion space
@@ -360,9 +368,34 @@ __kernel void OclPtxInterpolate(
 #endif  // WAYPOINTS
 
 #ifdef LOOPCHECK
+  loopcheck_voxel.s0 = round(temp_pos.s0)/5;
+  loopcheck_voxel.s1 = round(temp_pos.s1)/5;
+  loopcheck_voxel.s2 = round(temp_pos.s2)/5;
+
+
+  loopcheck_index = last_loopcheck_voxel.s0*(attrs.ly*attrs.lz) +
+    last_loopcheck_voxel.s1*attrs.lz + last_loopcheck_voxel.s2;
+
+  last_loopcheck_dr =
+      particle_loopcheck_lastdir[glid*loopcheck_dir_size +
+        loopcheck_index];
+
+  loopcheck_product = last_loopcheck_dr.s0*dr.s0 +
+    last_loopcheck_dr.s1*dr.s1 + last_loopcheck_dr.s2*dr.s2;
+
+  if (loopcheck_product < 0) // loopcheck break
+  {
+    particle_done[glid] = 1;
+    if (0 == step)
+      particle_steps[glid] = 0;
+    break;
+  }
+
+  particle_loopcheck_lastdir[glid*loopcheck_dir_size +
+    loopcheck_index] = dr;
 
 #endif  // LOOPCHECK
-    // update current location
+
     particle_pos = temp_pos;
 
     // add to particle paths
