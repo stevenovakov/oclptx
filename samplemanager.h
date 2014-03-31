@@ -69,12 +69,9 @@ class SampleManager
       int aSamp, int aX, int aY, int aZ);
     float const GetfData(int aFiberNum,
       int aSamp, int aX, int aY, int aZ);
-    unsigned short int const GetBrainMask( int aX, int aY, int aZ);
-    const NEWIMAGE::volume<short int>* GetBrainMask();
+
     const unsigned short int* GetBrainMaskToArray();
-    const NEWIMAGE::volume<short int>* GetExclusionMask();
     const unsigned short int* GetExclusionMaskToArray();
-    const NEWIMAGE::volume<short int>* GetTerminationMask();
     const unsigned short int* GetTerminationMaskToArray();
     const std::vector<unsigned short int*> GetWayMasksToVector();
 

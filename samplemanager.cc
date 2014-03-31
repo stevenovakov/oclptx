@@ -62,30 +62,22 @@ void SampleManager::LoadBedpostDataHelper(
   const NEWIMAGE::volume<float>& aMask,
   const int aFiberNum  )
 {
-    NEWIMAGE::volume4D<float> loadedVolume4DTheta;
-    NEWIMAGE::volume4D<float> loadedVolume4DPhi;
-    NEWIMAGE::volume4D<float> loadedVolume4Df;
+  NEWIMAGE::volume4D<float> loadedVolume4DTheta;
+  NEWIMAGE::volume4D<float> loadedVolume4DPhi;
+  NEWIMAGE::volume4D<float> loadedVolume4Df;
 
-    //Load Theta/Phi/f samples
-    NEWIMAGE::read_volume4D(loadedVolume4DTheta, aThetaSampleName);
-    NEWIMAGE::read_volume4D(loadedVolume4DPhi, aPhiSampleName);
-    NEWIMAGE::read_volume4D(loadedVolume4Df, afSampleName);
+  //Load Theta/Phi/f samples
+  NEWIMAGE::read_volume4D(loadedVolume4DTheta, aThetaSampleName);
+  NEWIMAGE::read_volume4D(loadedVolume4DPhi, aPhiSampleName);
+  NEWIMAGE::read_volume4D(loadedVolume4Df, afSampleName);
 
-    if(aMask.xsize() > 0)
-    {
-        //_thetaSamples.push_back(loadedVolume4DTheta.matrix(aMask));
-        //_phiSamples.push_back(loadedVolume4DPhi.matrix(aMask));
-        //_fSamples.push_back(loadedVolume4Df.matrix(aMask));
-    }
-    else
-    {
-        PopulateTHETA(loadedVolume4DTheta,
-          _thetaData, loadedVolume4DTheta[0], aFiberNum, false);
-        PopulatePHI(loadedVolume4DPhi,
-          _phiData, loadedVolume4DPhi[0], aFiberNum, false);
-        PopulateF(loadedVolume4Df,
-          _fData, loadedVolume4Df[0], aFiberNum, false);
-    }
+
+  PopulateTHETA(loadedVolume4DTheta,
+    _thetaData, loadedVolume4DTheta[0], aFiberNum, false);
+  PopulatePHI(loadedVolume4DPhi,
+    _phiData, loadedVolume4DPhi[0], aFiberNum, false);
+  PopulateF(loadedVolume4Df,
+    _fData, loadedVolume4Df[0], aFiberNum, false);
 }
 
 
@@ -137,7 +129,6 @@ void SampleManager::PopulatePHI(
   const int aFiberNum,
   bool _16bit)
 {
-
   const int ns = aLoadedData.tsize();
   const int nx = aLoadedData.xsize();
   const int ny = aLoadedData.ysize();
@@ -161,7 +152,6 @@ void SampleManager::PopulatePHI(
     {
       for (int x = aMaskParams.minx(); x <= aMaskParams.maxx(); x++)
       {
-
         for (int t = aLoadedData.mint();
           t <= aLoadedData.maxt(); t++)
         {
@@ -174,7 +164,6 @@ void SampleManager::PopulatePHI(
             aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
               x*nz*ny + y*nz + z] = angle;
         }
-
       }
     }
   }
@@ -187,7 +176,6 @@ void SampleManager::PopulateTHETA(
   const int aFiberNum,
   bool _16bit)
 {
-
   const int ns = aLoadedData.tsize();
   const int nx = aLoadedData.xsize();
   const int ny = aLoadedData.ysize();
@@ -274,9 +262,9 @@ void SampleManager::LoadBedpostData(const std::string& aBasename)
     }
     if(fiberNum == 1)
     {
-        std::cout<<
-         "Could not find samples. Exiting Program..."<<std::endl;
-        exit(1);
+      std::cout<<
+       "Could not find samples. Exiting Program..."<<std::endl;
+      exit(1);
     }
     std::cout<<"Finished Loading Samples from Bedpost"<<std::endl;
   }
@@ -342,27 +330,30 @@ void SampleManager::ParseCommandLine(int argc, char** argv)
   }
   else if (_oclptxOptions.network.value())
   {
-      std::cout<<"Running in network mode"<<std::endl;
+    std::cout<<"Network mode unsupported. Terminating Application"<<std::endl;
+    exit(1);
   }
   else
   {
-      std::cout<<"Running in seedmask mode"<<std::endl;
+    std::cout<<"Running in seedmask mode"<<std::endl;
   }
 }
 
 void SampleManager::GenerateSeedParticles(float aSampleVoxel)
 {
- using namespace std;
+  using namespace std;
 
- Matrix seeds =
+  Matrix seeds =
   MISCMATHS::read_ascii_matrix(_oclptxOptions.seedfile.value());
- srand(_oclptxOptions.rseed.value());
 
- float4 seed;
- // If there is no seed file given with the -x CLI parameter,
- // we use the middle of the mask as the seed.
- if (seeds.Nrows() == 0)
- {
+  srand(time(NULL));
+  srand(_oclptxOptions.rseed.value());
+
+  float4 seed;
+  // If there is no seed file given with the -x CLI parameter,
+  // we use the middle of the mask as the seed.
+  if (seeds.Nrows() == 0)
+  {
     seed.t = 1.0;
     seed.x = floor((_brainMask.xsize())/2.0);
     seed.y = floor((_brainMask.ysize())/2.0);
@@ -370,9 +361,9 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
     std::cout << "Seeded at "<< "x = " << seed.x << " y= " <<
       seed.y<< " z = "<< seed.z<<endl;
     GenerateSeedParticlesHelper(seed,aSampleVoxel);
- }
- else
- {
+  }
+  else
+  {
     this->_nParticles = seeds.Nrows();
     if (seeds.Ncols()!=3 && seeds.Nrows()==3)
     {
@@ -385,57 +376,45 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
       seed.y = seeds(t,2);
       seed.z = seeds(t,3);
       _seedParticles.push_back(seed);
-      //GenerateSeedParticlesHelper(seed, aSampleVoxel);
+    // TODO @STEVE
+    // Implement Jittering on seed file.
+    // GenerateSeedParticlesHelper(seed, aSampleVoxel);
     }
- }
+  }
 }
 
 void SampleManager::GenerateSeedParticlesHelper(
   float4 aSeed, float aSampleVoxel)
 {
-   for (int p = 0; p<_nParticles; p++)
-   {
-    float4 randomParticle = aSeed;
-    if(aSampleVoxel > 0)
+ for (int p = 0; p<_nParticles; p++)
+ {
+  float4 randomParticle = aSeed;
+  if(aSampleVoxel > 0)
+  {
+    float dx,dy,dz;
+    float radSq = aSampleVoxel*aSampleVoxel;
+    
+    while(true)
     {
-      float dx,dy,dz;
-      float radSq = aSampleVoxel*aSampleVoxel;
-      
-      // TODO
-      // rand not seeded properly, on purpose(want the same data set)
-      // seed it with sys clock later.
-      
-      while(true)
+      dx=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
+      dy=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
+      dz=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
+      if(dx*dx + dy*dy + dz*dz <= radSq)
       {
-        dx=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
-        dy=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
-        dz=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
-        if(dx*dx + dy*dy + dz*dz <= radSq)
-        {
-           break;
-        }
+         break;
       }
-      randomParticle.x += dx / _brainMask.xdim();
-      randomParticle.y += dy / _brainMask.ydim();
-      randomParticle.z += dz / _brainMask.zdim();
     }
-    _seedParticles.push_back(randomParticle);
-   }
-}
-
-const NEWIMAGE::volume<short int>* SampleManager::GetBrainMask()
-{
-  return &_brainMask;
+    randomParticle.x += dx / _brainMask.xdim();
+    randomParticle.y += dy / _brainMask.ydim();
+    randomParticle.z += dz / _brainMask.zdim();
+  }
+  _seedParticles.push_back(randomParticle);
+ }
 }
 
 const unsigned short int* SampleManager::GetBrainMaskToArray()
 {
   return GetMaskToArray(_brainMask);
-}
-
-const NEWIMAGE::volume<short int>* SampleManager::GetExclusionMask()
-{
-  return &_exclusionMask;
 }
 
 const unsigned short int* SampleManager::GetExclusionMaskToArray()
@@ -444,11 +423,6 @@ const unsigned short int* SampleManager::GetExclusionMaskToArray()
     return GetMaskToArray(_exclusionMask);
   else
     return NULL;
-}
-
-const NEWIMAGE::volume<short int>* SampleManager::GetTerminationMask()
-{
-  return &_terminationMask;
 }
 
 const unsigned short int* SampleManager::GetTerminationMaskToArray()
@@ -461,7 +435,6 @@ const unsigned short int* SampleManager::GetTerminationMaskToArray()
 
 const std::vector<unsigned short int*> SampleManager::GetWayMasksToVector()
 {
-  
   vector<unsigned short int*> waymasks;
   for (unsigned int i = 0; i < _wayMasks.size(); i++)
   {
@@ -542,12 +515,6 @@ float const SampleManager::GetfData(int aFiberNum,
   return 0.0f;
 }
 
-unsigned short int const SampleManager::GetBrainMask(
-  int aX, int aY, int aZ)
-{
-  return _brainMask(aX, aY, aZ);
-}
-
 const BedpostXData* SampleManager::GetThetaDataPtr()
 {
   if(_thetaData.data.size() > 0)
@@ -595,22 +562,22 @@ SampleManager::SampleManager():_oclptxOptions(
 
 SampleManager::~SampleManager()
 {
-    for (unsigned int i = 0; i < _thetaData.data.size(); i++)
-    {
-        delete[] _thetaData.data.at(i);
-    }
+  for (unsigned int i = 0; i < _thetaData.data.size(); i++)
+  {
+    delete[] _thetaData.data.at(i);
+  }
 
-    for (unsigned int i = 0; i < _phiData.data.size(); i++)
-    {
-        delete[] _phiData.data.at(i);
-    }
+  for (unsigned int i = 0; i < _phiData.data.size(); i++)
+  {
+    delete[] _phiData.data.at(i);
+  }
 
-    for (unsigned int i = 0; i < _fData.data.size(); i++)
-    {
-        delete[] _fData.data.at(i);
-    }
+  for (unsigned int i = 0; i < _fData.data.size(); i++)
+  {
+    delete[] _fData.data.at(i);
+  }
 
-    delete _manager;
+  delete _manager;
 }
 
 //EOF
