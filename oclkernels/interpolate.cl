@@ -195,11 +195,9 @@ __kernel void OclPtxInterpolate(
     theta = theta_samples[diffusion_index];
     phi = phi_samples[diffusion_index];
     
-    new_dr.s0 = cos(phi) * sin(theta);
-    new_dr.s1 = sin(phi) * sin(theta);
-    new_dr.s2 = cos(theta);
-
-    new_dr = new_dr / attrs.brain_mask_dim;
+    new_dr.s0 = cos( phi ) * sin( theta );
+    new_dr.s1 = sin( phi ) * sin( theta );
+    new_dr.s2 = cos( theta );
     
     // jump (aligns direction to prevent zig-zagging)
     jump_dot = new_dr.s0 * state[glid].dr.s0
@@ -211,7 +209,7 @@ __kernel void OclPtxInterpolate(
       new_dr = new_dr*-1.0;
     }
 
-    new_dr = new_dr * attrs.step_length;
+    new_dr = new_dr * attrs.step_length / attrs.brain_mask_dim;
 
     // update particle position
     temp_pos += new_dr;
@@ -281,7 +279,7 @@ __kernel void OclPtxInterpolate(
       dr2 = dr2*-1.0;
     }
 
-    dr2 = dr2*attrs.step_length;
+    dr2 = dr2*attrs.step_length / attrs.brain_mask_dim;
 
     new_dr = 0.5*(new_dr + dr2);
 #endif
