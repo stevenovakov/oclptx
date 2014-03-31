@@ -94,7 +94,7 @@ int main(int argc, char **argv)
     env.GetEnvData()->nx,
     env.GetEnvData()->ny,
     env.GetEnvData()->nz,
-    0, // num_samples
+    1, // num_samples
     0.2, // curvature threshold
     0
     }; // num waymasks.
