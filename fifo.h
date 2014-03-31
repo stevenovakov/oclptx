@@ -65,12 +65,21 @@ template<typename T> class Fifo
   std::mutex tail_mutex_;
 };
 
-template<typename T> Fifo<T>::Fifo(int order):
-  order_(order),
+
+template<typename T> Fifo<T>::Fifo(int count):
   head_(0),
   tail_(0)
 {
-  fifo_ = new T*[1 << order];
+  // log base 2
+  order_ = 1;
+  count>>=1;
+  while (count)
+  {
+    order_++;
+    count>>=1;
+  }
+
+  fifo_ = new T*[1 << order_];
 }
 
 template<typename T> Fifo<T>::~Fifo()
@@ -83,8 +92,10 @@ template<typename T> void Fifo<T>::PushOrDie(T *val)
   std::lock_guard<std::mutex> lock(head_mutex_);
 
   if (1 == ((tail_ - head_) & ((1 << order_) - 1)))
-    // FIFO Overflow
+  {
+    puts("FIFO overflow");
     abort();
+  }
 
   fifo_[head_] = val;
   head_ = (head_ + 1) & ((1 << order_)-1);
