@@ -693,9 +693,7 @@ uint32_t OclEnv::AvailableGPUMem(
     }
     r_particle_loopcheck_mem =
       this->env_data.particle_loopcheck_dir_mem_size * r_particles;
-    printf("Loopcheck Dirs MemSize: %lu\n\n", r_particle_loopcheck_mem);
   }
-
 
   printf("/**************************************************\n");
   printf("\tOCLENV::AVAILABLEGPUMEM\n");

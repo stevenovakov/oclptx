@@ -308,12 +308,15 @@ void OclPtxHandler::WriteInitialPosToDevice(
   {
     loopcheck_locs.resize(this->n_particles *
       this->env_dat->loopcheck_location_size);
-    loopcheck_locs = {0,};
+    for (uint32_t i = 0; i < loopcheck_locs.size(); i++)
+      loopcheck_locs.at(i) = 0;
+
     loopcheck_dirs.resize(this->n_particles *
       this->env_dat->loopcheck_dir_size);
     float4 zero_vec;
     zero_vec.x = 0.0; zero_vec.y = 0.0; zero_vec.z = 0.0; zero_vec.t = 0.0;
-    loopcheck_dirs = {zero_vec,};
+    for (uint32_t j = 0; j < loopcheck_dirs.size(); j++)
+      loopcheck_dirs.at(j) = zero_vec;
   }
 
   // delete this at end of function always
@@ -666,7 +669,7 @@ void OclPtxHandler::Interpolate()
   this->ptx_kernel->setArg(16, this->max_steps);
   this->ptx_kernel->setArg(17, this->curvature_threshold);
   this->ptx_kernel->setArg(18, this->delta_r);
-  printf("DR %f\n", this->delta_r);
+
   // optional buffers
   uint32_t last_index = 18;
 
