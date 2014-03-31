@@ -29,15 +29,17 @@
  *
  */
 
-#ifndef  OCLPTX_SAMPLEMANAGER_H_
-#define  OCLPTX_SAMPLEMANAGER_H_
+#ifndef  SAMPLEMANAGER_H_
+#define  SAMPLEMANAGER_H_
 
 #include <iostream>
 #include <vector>
 #include <string>
 
+#include "fifo.h"
 #include "newimage/newimageall.h"
 #include "miscmaths/miscmaths.h"
+#include "oclptxhandler.h"
 #include "oclptxOptions.h"
 #include "customtypes.h"
 
@@ -82,9 +84,9 @@ class SampleManager
 
     // Getters: Randomly seeded particles (uses midpoint
     //  of _brainMask if no seedfile is specified)
-    std::vector<float4> * const GetSeedParticles()
+    Fifo<struct OclPtxHandler::particle_data> *GetSeedParticles()
     {
-      return &_seedParticles;
+      return _seedParticles;
     }
 
     // If you use these getters, you must access data from\
@@ -132,15 +134,16 @@ class SampleManager
       bool _16bit);
     void GenerateSeedParticles(float aSampleVoxel);
     void GenerateSeedParticlesHelper(
-      float4 aSeed, float aSampleVoxel);
+      cl_float4 aSeed, float aSampleVoxel);
     std::string IntTostring(const int& value);
     unsigned short int* GetMaskToArray(NEWIMAGE::volume<short int> aMask);
+    cl_ulong8 NewRng();
 
     //Statics
     static SampleManager* _manager;
     oclptxOptions& _oclptxOptions;
     //Seed Particles
-    std::vector<float4> _seedParticles;
+    Fifo<struct OclPtxHandler::particle_data> *_seedParticles;
     //BedpostData
     BedpostXData _thetaData;
     BedpostXData _phiData;
@@ -159,6 +162,4 @@ class SampleManager
     int _nMaxSteps; //Default 2000
 };
 
-#endif
-
-//EOF
+#endif  // SAMPLEMANAGER_H_

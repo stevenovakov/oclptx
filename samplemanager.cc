@@ -41,11 +41,36 @@
 // Assorted Functions Declerations
 //
 
-unsigned short int EncodeShort( float val, uint32_t significand);
 
-//
-// Member Functions
-//
+uint64_t rand_64()
+{
+  // Assumption: rand() gives at least 16 bits.  It gives 31 on my system.
+  assert(RAND_MAX >= (1<<16));
+
+  uint64_t a,b,c,d;
+  a = rand() & ((1<<16)-1);
+  b = rand() & ((1<<16)-1);
+  c = rand() & ((1<<16)-1);
+  d = rand() & ((1<<16)-1);
+
+  uint64_t r = ((a << (16*3)) | (b << (16*2)) | (c << (16)) | d);
+
+  return r;
+}
+
+cl_ulong8 SampleManager::NewRng()
+{
+  cl_ulong8 rng = {0,};
+  fprintf(stderr, "Rng: ");
+  for (int i = 0; i < 5; i++)
+  {
+    rng.s[i] = rand_64();
+    fprintf(stderr, "%lx,", rng.s[i]);
+  }
+  fprintf(stderr, "\n");
+
+  return rng;
+}
 
 std::string SampleManager::IntTostring(const int& value)
 {
@@ -349,33 +374,34 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
   srand(time(NULL));
   srand(_oclptxOptions.rseed.value());
 
-  float4 seed;
+  cl_float4 seed;
+  struct OclPtxHandler::particle_data *particle;
+
   // If there is no seed file given with the -x CLI parameter,
   // we use the middle of the mask as the seed.
   if (seeds.Nrows() == 0)
   {
-    seed.t = 1.0;
-    seed.x = floor((_brainMask.xsize())/2.0);
-    seed.y = floor((_brainMask.ysize())/2.0);
-    seed.z = floor((_brainMask.zsize())/2.0);
-    std::cout << "Seeded at "<< "x = " << seed.x << " y= " <<
-      seed.y<< " z = "<< seed.z<<endl;
+    seed.s[0] = floor((_brainMask.xsize())/2.0);
+    seed.s[1] = floor((_brainMask.ysize())/2.0);
+    seed.s[2] = floor((_brainMask.zsize())/2.0);
     GenerateSeedParticlesHelper(seed,aSampleVoxel);
   }
   else
   {
     this->_nParticles = seeds.Nrows();
+    _seedParticles = new Fifo<struct OclPtxHandler::particle_data>(_nParticles);
     if (seeds.Ncols()!=3 && seeds.Nrows()==3)
     {
        seeds=seeds.t();
     }
     for (int t = 1; t<=seeds.Nrows(); t++)
     {
-      seed.t = t;
-      seed.x = seeds(t,1);
-      seed.y = seeds(t,2);
-      seed.z = seeds(t,3);
-      _seedParticles.push_back(seed);
+      seed.s[0] = seeds(t,1);
+      seed.s[1] = seeds(t,2);
+      seed.s[2] = seeds(t,3);
+      particle = new OclPtxHandler::particle_data;
+      *particle = {NewRng(), seed};
+      _seedParticles.PushOrDie(seed);
     // TODO @STEVE
     // Implement Jittering on seed file.
     // GenerateSeedParticlesHelper(seed, aSampleVoxel);
@@ -384,11 +410,13 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
 }
 
 void SampleManager::GenerateSeedParticlesHelper(
-  float4 aSeed, float aSampleVoxel)
+  cl_float4 aSeed, float aSampleVoxel)
 {
+ struct OclPtxHandler::particle_data *particle;
+ _seedParticles = new Fifo<struct OclPtxHandler::particle_data>(_nParticles);
  for (int p = 0; p<_nParticles; p++)
  {
-  float4 randomParticle = aSeed;
+  cl_float4 randomParticle = aSeed;
   if(aSampleVoxel > 0)
   {
     float dx,dy,dz;
@@ -404,11 +432,14 @@ void SampleManager::GenerateSeedParticlesHelper(
          break;
       }
     }
-    randomParticle.x += dx / _brainMask.xdim();
-    randomParticle.y += dy / _brainMask.ydim();
-    randomParticle.z += dz / _brainMask.zdim();
+    randomParticle.s[0] += dx / _brainMask.xdim();
+    randomParticle.s[1] += dy / _brainMask.ydim();
+    randomParticle.s[2] += dz / _brainMask.zdim();
   }
-  _seedParticles.push_back(randomParticle);
+
+  particle = new OclPtxHandler::particle_data;
+  *particle = {NewRng(), randomParticle};
+  _seedParticles.PushOrDie(randomParticle);
  }
 }
 
@@ -558,10 +589,15 @@ SampleManager& SampleManager::GetInstance()
 
 //Private Constructor.
 SampleManager::SampleManager():_oclptxOptions(
-  oclptxOptions::getInstance()){}
+  oclptxOptions::getInstance()),
+  _seedParticles(NULL)
+{}
 
 SampleManager::~SampleManager()
 {
+  if (NULL != _seedParticles)
+    delete _seedParticles;
+
   for (unsigned int i = 0; i < _thetaData.data.size(); i++)
   {
     delete[] _thetaData.data.at(i);
@@ -579,5 +615,3 @@ SampleManager::~SampleManager()
 
   delete _manager;
 }
-
-//EOF

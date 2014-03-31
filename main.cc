@@ -15,18 +15,6 @@
 #include "samplemanager.h"
 #include "threading.h"
 
-// log base 2
-int lb(int x)
-{
-  int r = 0;
-  x>>=1;
-  while (x)
-  {
-    r++;
-    x>>=1;
-  }
-  return r;
-}
 
 cl_ulong8 rng_zero = {0,};
 
@@ -35,30 +23,7 @@ int main(int argc, char **argv)
   const int kStepsPerKernel = 10;
   const int kNumReducers = 1;
   FILE *global_fd;
-
-  // Add the particles to our list
-  Fifo<struct OclPtxHandler::particle_data> particles_fifo(lb(argc-1)+1);
-  struct OclPtxHandler::particle_data *data;
-
-  cl_float4 value = {51., 51., 30., 0};
-  data = new OclPtxHandler::particle_data;
-  *data = {rng_zero, value};
-  particles_fifo.PushOrDie(data);
-
-  value = {51.,52.,30.,0.};
-  data = new OclPtxHandler::particle_data;
-  *data = {rng_zero, value};
-  particles_fifo.PushOrDie(data);
-
-  value = {51.,51.,31.,0.};
-  data = new OclPtxHandler::particle_data;
-  *data = {rng_zero, value};
-  particles_fifo.PushOrDie(data);
-
-  value = {51.,52.,31.,0.};
-  data = new OclPtxHandler::particle_data;
-  *data = {rng_zero, value};
-  particles_fifo.PushOrDie(data);
+  Fifo<struct OclPtxHandler::particle_data> *particles_fifo;
 
   // Create our oclenv
   OclEnv env();
@@ -68,6 +33,7 @@ int main(int argc, char **argv)
   // Startup the samplemanager
   SampleManager *sample_manager = &SampleManager::GetInstance();
   sample_manager->ParseCommandLine(argc, argv);
+  particles_fifo = sample_manager->GetSeedParticles();
 
   env.AvailableGPUMem(
     sample_manager->GetFDataPtr(),
@@ -135,7 +101,7 @@ int main(int argc, char **argv)
     gpu_managers[i] = new std::thread(
         threading::RunThreads,
         &handler[i],
-        &particles_fifo,
+        particles_fifo,
         kNumReducers);
   }
 
