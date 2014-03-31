@@ -34,6 +34,9 @@ class OclPtxHandler{
     cl_uint num_samples;
     cl_float curvature_threshold;
     cl_uint n_waypoint_masks;
+    cl_uint lx;  // Loopcheck sizes
+    cl_uint ly;
+    cl_uint lz;
   } __attribute__((aligned(8)));
 
   OclPtxHandler() {}
@@ -78,6 +81,7 @@ class OclPtxHandler{
   cl::Buffer *gpu_waypoints_;
   cl::Buffer *gpu_exclusion_;
   cl::Buffer *gpu_global_pdf_;
+  cl::Buffer *gpu_loopcheck_;
 
   // Debug Data
   cl::Buffer *gpu_path_;  // Type ulong

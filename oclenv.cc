@@ -284,6 +284,8 @@ void OclEnv::CreateKernels( std::string kernel_name )
     define_list += " -D WAYAND";
   if (this->env_data.save_paths)
     define_list += " -D PATH_SAVE";
+  if (this->env_data.loopcheck)
+    define_list += " -D LOOPCHECK";
 
   std::ifstream main_stream(interp_kernel_source);
   std::string main_code(  (std::istreambuf_iterator<char>(main_stream) ),
@@ -480,10 +482,6 @@ uint32_t OclEnv::AvailableGPUMem(
   const unsigned short int* termination_mask
 )
 {
-  //TODO @STEVE
-  // figure out where this is actually assiged
-  uint32_t loopcheck_fraction = 4;
-
   // ***********************************************
   //  Hardware Parameters
   // ***********************************************
@@ -591,6 +589,9 @@ uint32_t OclEnv::AvailableGPUMem(
   cl_uint single_loopcheck_size;
   cl_uint single_loopcheck_mask_size;
 
+  // Hard Coded, just like in ptx2
+  uint32_t loopcheck_fraction = 5;
+
   if (ptx_options.loopcheck.value())
   {
     this->env_data.loopcheck = true;
@@ -605,16 +606,23 @@ uint32_t OclEnv::AvailableGPUMem(
     single_loopcheck_mask_size = (single_loopcheck_size / 32)  +
       ((single_loopcheck_size%32 > 0)? 1 : 0);
 
+    this->env_data.loopcheck_dir_size = single_loopcheck_size;
+    this->env_data.loopcheck_location_size = single_loopcheck_mask_size;
 
-    this->env_data.particle_loopcheck_mem_size =
-      single_loopcheck_mask_size * 32;
+    this->env_data.particle_loopcheck_location_mem_size =
+      single_loopcheck_mask_size * sizeof(uint32_t);
+    this->env_data.particle_loopcheck_dir_mem_size =
+      loopcheck_x * loopcheck_y *loopcheck_z * sizeof(float4);
 
-    dynamic_mem_per_particle += this->env_data.particle_loopcheck_mem_size;
+    dynamic_mem_per_particle +=
+      this->env_data.particle_loopcheck_location_mem_size +
+        this->env_data.particle_loopcheck_dir_mem_size;
   }
   else
   {
     this->env_data.loopcheck = false;
-    this->env_data.particle_loopcheck_mem_size = 0;
+    this->env_data.particle_loopcheck_location_mem_size = 0;
+    this->env_data.particle_loopcheck_dir_mem_size = 0;
   }
 
   // particle_done, steps_taken
@@ -628,16 +636,16 @@ uint32_t OclEnv::AvailableGPUMem(
 
   this->env_data.euler_streamline = ptx_options.modeuler.value();
   if (this->env_data.euler_streamline)
-    printf("\nUsing Modified Euler Integration Method\n");
+    printf("\nUsing Modified Euler Integration Method\n\n");
 
-  printf("\nStep Length: %f\n", ptx_options.steplength.value());
+  printf("Step Length: %f\n\n", ptx_options.steplength.value());
 
   // paths?
   this->env_data.max_steps = ptx_options.nsteps.value();
   this->env_data.save_paths = ptx_options.save_paths.value();
   
   if (this->env_data.save_paths)
-    printf("\nSaving Path Data\n");
+    printf("Saving Path Data\n\n");
 
   if (ptx_options.save_paths.value())
   {
@@ -647,6 +655,36 @@ uint32_t OclEnv::AvailableGPUMem(
   // Compute Max Particles per Batch:
   r_particles = (dynamic_mem_left/dynamic_mem_per_particle) /2;
   this->env_data.max_particles_per_batch = r_particles;
+
+  if (this->env_data.save_paths)
+  {
+    cl_ulong particle_path_mem =
+      this->env_data.max_steps * r_particles * sizeof(float4);
+    if (particle_path_mem > max_buff_size)
+    {
+      printf("WARNING: Particle Paths Exceed MAX BUFFER SIZE,\
+        REDUCING PARTICLES\n");
+      r_particles =
+        max_buff_size / (this->env_data.max_steps * sizeof(float4));
+    }
+  }
+
+  if (this->env_data.loopcheck)
+  {
+    printf("Using Loopcheck (1/5 grid size)\n\n");
+    cl_ulong r_particle_loopcheck_mem =
+      this->env_data.particle_loopcheck_dir_mem_size * r_particles;
+    if (r_particle_loopcheck_mem > max_buff_size)
+    {
+      printf("WARNING: Loopcheck Dirs Exceed MAX BUFFER SIZE,\
+        REDUCING PARTICLES\n");
+      r_particles =
+        max_buff_size / this->env_data.particle_loopcheck_dir_mem_size;
+    }
+    r_particle_loopcheck_mem =
+      this->env_data.particle_loopcheck_dir_mem_size * r_particles;
+    printf("Loopcheck Dirs MemSize: %lu\n\n", r_particle_loopcheck_mem);
+  }
 
 
   printf("/**************************************************\n");
@@ -668,10 +706,12 @@ uint32_t OclEnv::AvailableGPUMem(
   printf("Total Dynamic Data Memory Requirement: %.4f (MB)\n\n",
     2*r_particles*dynamic_mem_per_particle/1e6);
 
-  if (single_direction_mem_size > max_buff_size)
-    printf("WARNING: BPX DATA > MAX BUFFER SIZE: %.4f (MB) vs %.4f (MB)\n",
+  if (single_direction_mem_size > max_buff_size){
+    printf("ERROR: BPX DATA > MAX BUFFER SIZE: %.4f (MB) vs %.4f (MB)\n",
       single_direction_mem_size/1e6, max_buff_size/1e6);
-
+    printf("TERMINATING PROGRAM...\n");
+    exit(EXIT_FAILURE);
+  }
   return r_particles;
 }
 

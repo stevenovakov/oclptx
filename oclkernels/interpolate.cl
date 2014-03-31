@@ -41,6 +41,9 @@ struct particle_attrs
   float curvature_threshold;
   uint n_waypoint_masks;
   float step_length;  // TODO(steve) figure out differences in steplength (why div 2)
+  uint lx;  // Loopcheck sizes
+  uint ly;
+  uint lz;
 } __attribute__((aligned(8)));
 
 __kernel void OclPtxInterpolate(
@@ -48,23 +51,24 @@ __kernel void OclPtxInterpolate(
   __global struct particle_data *state,  /* RW */
 
   // Debugging info
-  __global float4* particle_paths, //RW
-  __global ushort* particle_steps, //RW
+  __global float4 *particle_paths, //RW
+  __global ushort *particle_steps, //RW
 
   // Output
-  __global ushort* particle_done, //RW
-  __global uint* particle_pdfs, //RW
-  __global ushort* particle_waypoints, //W
-  __global ushort* particle_exclusion, //W
+  __global ushort *particle_done, //RW
+  __global uint *particle_pdfs, //RW
+  __global ushort *particle_waypoints, //W
+  __global ushort *particle_exclusion, //W
+  __global float4 *particle_loopcheck_lastdir, //RW
 
   // Global Data
-  __global float* f_samples, //R
-  __global float* phi_samples, //R
-  __global float* theta_samples, //R
-  __global ushort* brain_mask, //R
-  __global ushort* waypoint_masks,  //R
-  __global ushort* termination_mask,  //R
-  __global ushort* exclusion_mask //R
+  __global float *f_samples, //R
+  __global float *phi_samples, //R
+  __global float *theta_samples, //R
+  __global ushort *brain_mask, //R
+  __global ushort *waypoint_masks,  //R
+  __global ushort *termination_mask,  //R
+  __global ushort *exclusion_mask //R
 )
 {
   uint glid = get_global_id(0);
@@ -355,6 +359,9 @@ __kernel void OclPtxInterpolate(
     }
 #endif  // WAYPOINTS
 
+#ifdef LOOPCHECK
+
+#endif  // LOOPCHECK
     // update current location
     particle_pos = temp_pos;
 
@@ -386,6 +393,3 @@ __kernel void OclPtxInterpolate(
     }
   }
 }
-
-
-//EOF

@@ -46,6 +46,7 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   // TODO(jeff) compute num_particles
   attrs_.particles_per_side = 2;
 
+  // TODO(jeff): set buffers to NULL if not used.  Careful of segfaults!
   gpu_data_ = new cl::Buffer(
       *context_,
       CL_MEM_READ_WRITE,
@@ -81,7 +82,7 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   gpu_local_pdf_ = new cl::Buffer(
       *context_,
       CL_MEM_READ_WRITE,
-      2 * attrs_.particles_per_side * ((entries / 32)+1));
+      2 * attrs_.particles_per_side * ((entries / 32)+1) * sizeof(cl_uint));
   if (!gpu_local_pdf_)
     abort();
 
@@ -89,15 +90,22 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   gpu_waypoints_ = new cl::Buffer(
       *context_,
       CL_MEM_READ_WRITE,
-      2 * attrs_.particles_per_side * attrs_.n_waypoint_masks);
+      2 * attrs_.particles_per_side * attrs_.n_waypoint_masks * sizeof(cl_ushort));
   if (!gpu_waypoints_)
     abort();
 
   gpu_exclusion_ = new cl::Buffer(
       *context_,
       CL_MEM_READ_WRITE,
-      2 * attrs_.particles_per_side);
+      2 * attrs_.particles_per_side * sizeof(cl_ushort));
   if (!gpu_exclusion_)
+    abort();
+
+  gpu_loopcheck_ = new cl::Buffer(
+      *context_,
+      CL_MEM_READ_WRITE,
+      2 * attrs_.particles_per_side * attrs_.lx * attrs_.ly * attrs_.lz * sizeof(float4));
+  if (!gpu_loopcheck_)
     abort();
 
   gpu_global_pdf_ = new cl::Buffer(
@@ -231,6 +239,23 @@ void OclPtxHandler::WriteParticle(
 
   delete[] temp_local_pdf;
 
+  // Initialize particle loopcheck
+  int loopcheck_entries_per_particle = (attrs_.lx
+                            * attrs_.ly
+                            * attrs_.lz);
+  cl_float4 *temp_loopcheck = new cl_float4[loopcheck_entries_per_particle];
+  for (int i = 0; i < loopcheck_entries_per_particle; ++i)
+    temp_loopcheck[i] = {0.,0.,0.,0.};
+
+  cq_->enqueueWriteBuffer(
+      *gpu_loopcheck_,
+      true,
+      offset * loopcheck_entries_per_particle * sizeof(cl_float4),
+      loopcheck_entries_per_particle * sizeof(cl_float4),
+      temp_loopcheck);
+
+  delete[] temp_loopcheck;
+
   //TODO(jeff): Can we allocate in Init?
   //TODO(jeff): Don't write if these are not used.
   cl_ushort *temp_waypoints = new cl_ushort[attrs_.n_waypoint_masks];
@@ -272,14 +297,15 @@ void OclPtxHandler::RunKernel(int side)
   ptx_kernel_->setArg(5, *gpu_local_pdf_);
   ptx_kernel_->setArg(6, *gpu_waypoints_);
   ptx_kernel_->setArg(7, *gpu_exclusion_);
+  ptx_kernel_->setArg(8, *gpu_loopcheck_);
 
-  ptx_kernel_->setArg(8, *env_dat_->f_samples_buffers[0]);
-  ptx_kernel_->setArg(9, *env_dat_->phi_samples_buffers[0]);
-  ptx_kernel_->setArg(10, *env_dat_->theta_samples_buffers[0]);
-  ptx_kernel_->setArg(11, *env_dat_->brain_mask_buffer);
-  ptx_kernel_->setArg(12, *env_dat_->waypoint_masks_buffer);
-  ptx_kernel_->setArg(13, *env_dat_->termination_mask_buffer);
-  ptx_kernel_->setArg(14, *env_dat_->exclusion_mask_buffer);
+  ptx_kernel_->setArg(9, *env_dat_->f_samples_buffers[0]);
+  ptx_kernel_->setArg(10, *env_dat_->phi_samples_buffers[0]);
+  ptx_kernel_->setArg(11, *env_dat_->theta_samples_buffers[0]);
+  ptx_kernel_->setArg(12, *env_dat_->brain_mask_buffer);
+  ptx_kernel_->setArg(13, *env_dat_->waypoint_masks_buffer);
+  ptx_kernel_->setArg(14, *env_dat_->termination_mask_buffer);
+  ptx_kernel_->setArg(15, *env_dat_->exclusion_mask_buffer);
 
   cq_->enqueueNDRangeKernel(
     *(ptx_kernel_),

@@ -129,7 +129,8 @@ struct EnvironmentData
   bool terminate_mask;
   bool prefdir;
   bool loopcheck;
-  uint32_t loopcheck_fraction;
+  uint32_t loopcheck_location_size;
+  uint32_t loopcheck_dir_size;
 
   // Interpolation Options
   uint32_t max_steps;
@@ -150,9 +151,10 @@ struct EnvironmentData
   cl_uint particle_uint_mem_size;
   cl_uint particles_prng_mem_size;
   cl_uint mask_mem_size;
-  cl_uint particle_loopcheck_mem_size;
   cl_uint particle_pdf_mask_mem_size;
   cl_uint global_pdf_mem_size;
+  cl_uint particle_loopcheck_location_mem_size;
+  cl_uint particle_loopcheck_dir_mem_size;
 
   uint32_t total_static_gpu_mem;
   //uint32_t dynamic_gpu_mem_left;
