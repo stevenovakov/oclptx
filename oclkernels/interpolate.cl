@@ -58,12 +58,7 @@ __kernel void OclPtxInterpolate(
   __global float* f_samples, //R
   __global float* phi_samples, //R
   __global float* theta_samples, //R
-  __global ushort* brain_mask, //R
-  __global ushort* waypoint_masks, //R //unsire if want double ptr
-  __global ushort* particle_exclusion, //W
-  __global ushort* termination_mask, //R
-  __global ushort* particle_waypoints, //W
-  __global ushort* exclusion_mask //R
+  __global ushort* brain_mask //R
 )
 {
   uint glid = get_global_id(0);
