@@ -134,6 +134,7 @@ struct EnvironmentData
   // Interpolation Options
   uint32_t max_steps;
   bool save_paths;
+  bool way_and;
   bool euler_streamline;
 
   // Particle Containers

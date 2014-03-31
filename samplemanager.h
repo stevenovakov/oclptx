@@ -78,7 +78,6 @@ class SampleManager
     const unsigned short int* GetTerminationMaskToArray();
     const std::vector<unsigned short int*> GetWayMasksToVector();
 
-
     // Getters:
     // Counts (Particles Default = 5000, Steps Default = 2000)
     int const GetNumParticles() {return _nParticles;}

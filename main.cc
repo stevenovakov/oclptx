@@ -107,7 +107,8 @@ int main(int argc, char **argv)
     env.GetEnvData()->nz,
     1, // num_samples
     0.2, // curvature threshold
-    env.GetEnvData()->n_waypts
+    env.GetEnvData()->n_waypts,
+    sample_manager->GetOclptxOptions().steplength.value()
     }; // num waymasks.
   int num_dev = env.HowManyDevices();
 

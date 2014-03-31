@@ -280,6 +280,10 @@ void OclEnv::CreateKernels( std::string kernel_name )
     define_list += " -D EXCLUSION";
   if (this->env_data.euler_streamline)
     define_list += " -D EULER_STREAMLINE";
+  if (this->env_data.way_and)
+    define_list += " -D WAYAND";
+  if (this->env_data.save_paths)
+    define_list += " -D PATH_SAVE";
 
   std::ifstream main_stream(interp_kernel_source);
   std::string main_code(  (std::istreambuf_iterator<char>(main_stream) ),
@@ -288,6 +292,8 @@ void OclEnv::CreateKernels( std::string kernel_name )
   std::ifstream sum_stream(sum_kernel_source);
   std::string sum_code(  (std::istreambuf_iterator<char>(sum_stream) ),
                             (std::istreambuf_iterator<char>()));
+
+  printf("Build Options: %s\n", define_list.c_str());
   //
   // Build Program files here
   //
@@ -306,7 +312,7 @@ void OclEnv::CreateKernels( std::string kernel_name )
 
   err = main_program.build(this->ocl_devices, define_list.c_str());
 
-  if( this->OclErrorStrings(err) != "CL_SUCCESS")
+  if(err != CL_SUCCESS)
   {
     std::cout<<"ERROR: " <<
       " ( " << this->OclErrorStrings(err) << ")\n";
@@ -326,7 +332,7 @@ void OclEnv::CreateKernels( std::string kernel_name )
 
   err = sum_program.build(this->ocl_devices, define_list.c_str());
 
-  if( this->OclErrorStrings(err) != "CL_SUCCESS")
+  if(err != CL_SUCCESS)
   {
     std::cout<<"ERROR: " <<
       " ( " << this->OclErrorStrings(err) << ")\n";
@@ -547,6 +553,11 @@ uint32_t OclEnv::AvailableGPUMem(
   else
     this->env_data.terminate_mask = false;
 
+  if (ptx_options.waycond.value() == "AND")
+    this->env_data.way_and = true;
+  else
+    this->env_data.way_and = false;
+
   this->env_data.n_waypts = n_waypoints;
 
 
@@ -613,9 +624,20 @@ uint32_t OclEnv::AvailableGPUMem(
 
   dynamic_mem_per_particle += sizeof(cl_ulong8);
 
+  // Modified Euler
+
+  this->env_data.euler_streamline = ptx_options.modeuler.value();
+  if (this->env_data.euler_streamline)
+    printf("\nUsing Modified Euler Integration Method\n");
+
+  printf("\nStep Length: %f\n", ptx_options.steplength.value());
+
   // paths?
   this->env_data.max_steps = ptx_options.nsteps.value();
   this->env_data.save_paths = ptx_options.save_paths.value();
+  
+  if (this->env_data.save_paths)
+    printf("\nSaving Path Data\n");
 
   if (ptx_options.save_paths.value())
   {
@@ -625,6 +647,7 @@ uint32_t OclEnv::AvailableGPUMem(
   // Compute Max Particles per Batch:
   r_particles = (dynamic_mem_left/dynamic_mem_per_particle) /2;
   this->env_data.max_particles_per_batch = r_particles;
+
 
   printf("/**************************************************\n");
   printf("\tOCLENV::AVAILABLEGPUMEM\n");

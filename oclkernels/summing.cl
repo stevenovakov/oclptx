@@ -52,6 +52,7 @@ __kernel void PdfSum( __global uint* total_pdf,
 
   for ( p = 0; p < num_particles; p++)
   {
+    
 #ifdef EXCLUSION
     particle_check = particle_exclusion[p];
 
@@ -63,7 +64,11 @@ __kernel void PdfSum( __global uint* total_pdf,
     particle_check = 1;
     for (uint w = 0; w < num_waypts; w++)
     {
-      particle_check *= particle_waypoints[p*num_waypts + w];
+#ifdef WAYAND
+      particle_check &= particle_waypoints[p*num_waypts + w];
+#else
+      particle_check |= particle_waypoints[p*num_waypts + w];
+#endif
     }
 
     if (particle_check == 0)
@@ -72,7 +77,7 @@ __kernel void PdfSum( __global uint* total_pdf,
 
     particle_check = particles_done[p];
 
-    if (particle_done > 0)
+    if (particle_check > 0)
     {
       particle_entry = particle_pdfs[p * entries_per_particle + entry_num];
     }
