@@ -386,7 +386,8 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
   else
   {
     this->_nParticles = seeds.Nrows();
-    _seedParticles = new Fifo<struct OclPtxHandler::particle_data>(_nParticles);
+    _seedParticles =
+        new Fifo<struct OclPtxHandler::particle_data>(2 * _nParticles);
     if (seeds.Ncols()!=3 && seeds.Nrows()==3)
     {
        seeds=seeds.t();
@@ -397,7 +398,10 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
       seed.s[1] = seeds(t,2);
       seed.s[2] = seeds(t,3);
       particle = new OclPtxHandler::particle_data;
-      *particle = {NewRng(), seed};
+      *particle = {NewRng(), seed, {1,0,0}};
+      _seedParticles->PushOrDie(particle);
+      particle = new OclPtxHandler::particle_data;
+      *particle = {NewRng(), seed, {-1,0,0}};
       _seedParticles->PushOrDie(particle);
     // TODO @STEVE
     // Implement Jittering on seed file.
@@ -410,7 +414,8 @@ void SampleManager::GenerateSeedParticlesHelper(
   cl_float4 aSeed, float aSampleVoxel)
 {
  struct OclPtxHandler::particle_data *particle;
- _seedParticles = new Fifo<struct OclPtxHandler::particle_data>(_nParticles);
+ _seedParticles =
+     new Fifo<struct OclPtxHandler::particle_data>(2 * _nParticles);
  for (int p = 0; p<_nParticles; p++)
  {
   cl_float4 randomParticle = aSeed;
@@ -435,7 +440,10 @@ void SampleManager::GenerateSeedParticlesHelper(
   }
 
   particle = new OclPtxHandler::particle_data;
-  *particle = {NewRng(), randomParticle};
+  *particle = {NewRng(), randomParticle, {1,0,0}};
+  _seedParticles->PushOrDie(particle);
+  particle = new OclPtxHandler::particle_data;
+  *particle = {NewRng(), randomParticle, {-1,0,0}};
   _seedParticles->PushOrDie(particle);
  }
 }

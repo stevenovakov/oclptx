@@ -27,6 +27,7 @@ struct particle_data
 {
   rng_t rng; //RW
   float4 position;
+  float4 dr;
 } __attribute__((aligned(64)));
 
 struct particle_attrs
@@ -84,7 +85,6 @@ __kernel void OclPtxInterpolate(
   uint pdf_entries_per_particle = (attrs.sample_nx*attrs.sample_ny*attrs.sample_nz / 32) + 1;
   
   uint3 current_select_vertex;
-
   float3 volume_fraction;
   
   uint diffusion_index;
@@ -95,8 +95,7 @@ __kernel void OclPtxInterpolate(
   particle_pos.s3 = 0.0;
 
   float4 temp_pos = state[glid].position; //dx, dy, dz
-  float4 dr = (float4) (0.0f);
-  float4 last_dr = (float4) (0.0f);
+  float4 new_dr = (float4) (0.0f);
 
 #ifdef EULER_STREAMLINE
   float4 dr2 = (float4) (0.0f);
@@ -195,28 +194,24 @@ __kernel void OclPtxInterpolate(
     theta = theta_samples[diffusion_index];
     phi = phi_samples[diffusion_index];
     
-    dr.s0 = cos( phi ) * sin( theta );
-    dr.s1 = sin( phi ) * sin( theta );
-    dr.s2 = cos( theta );
+    new_dr.s0 = cos( phi ) * sin( theta );
+    new_dr.s1 = sin( phi ) * sin( theta );
+    new_dr.s2 = cos( theta );
     
-    // alternates initial direction of particle set
-    if( particle_steps[glid] == 0 && glid%2 == 0)
-      dr = dr*-1.0;
-    //
     // jump (aligns direction to prevent zig-zagging)
-    //
-    jump_dot = dr.s0*last_dr.s0 + dr.s1*last_dr.s1 +
-      dr.s2*last_dr.s2;
+    jump_dot = new_dr.s0 * state[glid].dr.s0
+             + new_dr.s1 * state[glid].dr.s1
+             + new_dr.s2 * state[glid].dr.s2;
 
     if (jump_dot < 0.0 )
     {
-      dr = dr*-1.0;
+      new_dr = new_dr*-1.0;
     }
 
-    dr = dr*attrs.step_length;
+    new_dr = new_dr * attrs.step_length;
 
     // update particle position
-    temp_pos += dr;
+    temp_pos += new_dr;
 
 #ifdef EULER_STREAMLINE
     current_select_vertex.s0 = floor(temp_pos.s0);
@@ -275,8 +270,8 @@ __kernel void OclPtxInterpolate(
     //
     // jump (aligns direction to prevent zig-zagging)
     //
-    jump_dot = dr2.s0*last_dr.s0 + dr2.s1*last_dr.s1 +
-      dr2.s2*last_dr.s2;
+    jump_dot = dr2.s0*state[glid].dr.s0 + dr2.s1*state[glid].dr.s1 +
+      dr2.s2*state[glid].dr.s2;
 
     if (jump_dot < 0.0 )
     {
@@ -285,20 +280,24 @@ __kernel void OclPtxInterpolate(
 
     dr2 = dr2*attrs.step_length;
 
-    dr = 0.5*(dr + dr2);
+    new_dr = 0.5*(new_dr + dr2);
 #endif
     // update particle position
-    temp_pos = particle_pos + dr;
+    temp_pos = particle_pos + new_dr;
 
     //
     // Curvature Threshold
     //
 
     // normalize for curvature threshold
-    dr = dr/ (dr.s0*dr.s0 + dr.s1*dr.s1 + dr.s2*dr.s2);
+    new_dr = new_dr /
+             (new_dr.s0 * new_dr.s0
+            + new_dr.s1 * new_dr.s1
+            + new_dr.s2 * new_dr.s2);
     
-    jump_dot = dr.s0*last_dr.s0 + dr.s1*last_dr.s1 +
-      dr.s2*last_dr.s2;
+    jump_dot = new_dr.s0 * state[glid].dr.s0
+             + new_dr.s1 * state[glid].dr.s1
+             + new_dr.s2 * state[glid].dr.s2;
 
     if (particle_steps[glid] > 1 && jump_dot < attrs.curvature_threshold)
     {
@@ -308,7 +307,7 @@ __kernel void OclPtxInterpolate(
     }
 
     // update last flow vector
-    last_dr = dr;
+    state[glid].dr = new_dr;
 
     //
     // Complete out of bounds test (just in case)

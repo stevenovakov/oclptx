@@ -21,6 +21,7 @@ class OclPtxHandler{
   {
     cl_ulong8 rng;
     cl_float4 position;
+    cl_float4 dr;
   } __attribute__((aligned(64)));
 
   struct particle_attrs
