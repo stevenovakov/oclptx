@@ -165,6 +165,7 @@ int main(int argc, char *argv[] )
             environment.GetKernel(d),
             environment.GetSumKernel(d),
             ptx_options.c_thr.value(),
+            ptx_options.steplength.value(),
             environment.GetEnvData()
           )
         );

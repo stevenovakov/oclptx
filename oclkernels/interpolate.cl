@@ -61,7 +61,8 @@ __kernel void OclPtxInterpolate(
   uint sample_nz,
   uint sample_ns,
   uint interval_steps,
-  float curvature_threshold
+  float curvature_threshold,
+  float delta_r
 #ifdef WAYPOINTS
   , __global ushort* waypoint_masks, //R //unsire if want double ptr
   __global ushort* particle_waypoints, //W
@@ -102,9 +103,13 @@ __kernel void OclPtxInterpolate(
   float4 particle_pos = particle_paths[current_path_index];
   particle_pos.s3 = 0.0;
 
-  float4 temp_pos = (float4) (0.0f); //dx, dy, dz
+  float4 temp_pos = particle_pos; //dx, dy, dz
   float4 dr = (float4) (0.0f);
   float4 last_dr = (float4) (0.0f);
+
+#ifdef EULER_STREAMLINE
+  float4 dr2 = (float4) (0.0f);
+#endif
   
   float xmin, xmax, ymin, ymax, zmin, zmax;
   xmin = 0.0; ymin = 0.0; zmin = 0.0;
@@ -113,11 +118,11 @@ __kernel void OclPtxInterpolate(
   float f, phi, theta;
   float jump_dot;
 
+#ifdef PRNG
   ulong rng_output;
   float vol_frac;
-
   float rand_max = 18446744073709551616.; //0xFFFFFFFFFFFFFFFF;
-        
+#endif
   uint mask_index;
   //unsigned int termination_mask_index;
   ushort bounds_test;
@@ -138,20 +143,8 @@ __kernel void OclPtxInterpolate(
     volume_fraction.s0 = particle_pos.s0 - (float) current_select_vertex.s0;
     volume_fraction.s1 = particle_pos.s1 - (float) current_select_vertex.s1;
     volume_fraction.s2 = particle_pos.s2 - (float) current_select_vertex.s2;
-
-#ifdef EULER_STREAMLINE
-    // not yet!
     //
-    // TODO @STEVE
-    // Maybe Implement a function that encapsulates "stepping" so that
-    // we don't have to duplicate code
-    //
-#else
     // Pick Sample
-    //
-    // TODO @STEVE
-    // Implement multiple direction selection if more than one direction of
-    // bedpost data being used
     //
 #ifdef PRNG
     rng_output = Rand(rng  + particle_index);
@@ -161,9 +154,85 @@ __kernel void OclPtxInterpolate(
 #endif
     // Volume Fraction Selection
 #ifdef PRNG
+    rng_output = Rand(rng  + particle_index);
+    vol_frac = volume_fraction.s0 * rand_max;
+
+    if (rng_output > vol_frac)
+    {
+      current_select_vertex.s0 += 1;
+    }
+
+    rng_output = Rand(rng  + particle_index);
+    vol_frac = volume_fraction.s1 * rand_max;
+
+    if (rng_output > vol_frac)
+    {
+      current_select_vertex.s1 += 1;
+    }
+
+    rng_output = Rand(rng  + particle_index);
+    vol_frac = volume_fraction.s2 * rand_max;
+
+    if (rng_output > vol_frac)
+    {
+      current_select_vertex.s2 += 1;
+    }
+#endif
+
+    // pick flow vertex
+    diffusion_index =
+      sample*(sample_nz*sample_ny*sample_nx)+
+      current_select_vertex.s0*(sample_nz*sample_ny) +
+      current_select_vertex.s1*(sample_nz) +
+      current_select_vertex.s2;
+    
+    // find next step location
+    f = f_samples[diffusion_index];
+    theta = theta_samples[diffusion_index];
+    phi = phi_samples[diffusion_index];
+    
+    dr.s0 = cos( phi ) * sin( theta );
+    dr.s1 = sin( phi ) * sin( theta );
+    dr.s2 = cos( theta );
+    
+    // alternates initial direction of particle set
+    if( steps_taken == 0 && glid%2 == 0)
+      dr = dr*-1.0;
     //
-    // Steve; Should I convert rng_output to float before compare? Ask jeff...
+    // jump (aligns direction to prevent zig-zagging)
     //
+    jump_dot = dr.s0*last_dr.s0 + dr.s1*last_dr.s1 +
+      dr.s2*last_dr.s2;
+
+    if (jump_dot < 0.0 )
+    {
+      dr = dr*-1.0;
+    }
+
+    dr = dr*delta_r;
+
+    // update particle position
+    temp_pos += dr;
+
+#ifdef EULER_STREAMLINE
+    current_select_vertex.s0 = floor(temp_pos.s0);
+    current_select_vertex.s1 = floor(temp_pos.s1);
+    current_select_vertex.s2 = floor(temp_pos.s2);
+
+    volume_fraction.s0 = temp_pos.s0 - (float) current_select_vertex.s0;
+    volume_fraction.s1 = temp_pos.s1 - (float) current_select_vertex.s1;
+    volume_fraction.s2 = temp_pos.s2 - (float) current_select_vertex.s2;
+    //
+    // Pick Sample
+    //
+#ifdef PRNG
+    rng_output = Rand(rng  + particle_index);
+    sample = rng_output % sample_ns;
+#else
+    sample = 0;
+#endif
+    // Volume Fraction Selection
+#ifdef PRNG
     rng_output = Rand(rng  + particle_index);
     vol_frac = volume_fraction.s0 * rand_max;
 
@@ -200,32 +269,38 @@ __kernel void OclPtxInterpolate(
     theta = theta_samples[diffusion_index];
     phi = phi_samples[diffusion_index];
     
-    dr.s0 = cos( phi ) * sin( theta );
-    dr.s1 = sin( phi ) * sin( theta );
-    dr.s2 = cos( theta );
-    
-    // alternates initial direction of particle set
-    if( steps_taken == 0 && glid%2 == 0)
-      dr = dr*-1.0;
+    dr2.s0 = cos( phi ) * sin( theta );
+    dr2.s1 = sin( phi ) * sin( theta );
+    dr2.s2 = cos( theta );
 
     //
     // jump (aligns direction to prevent zig-zagging)
     //
+    jump_dot = dr2.s0*last_dr.s0 + dr2.s1*last_dr.s1 +
+      dr2.s2*last_dr.s2;
+
+    if (jump_dot < 0.0 )
+    {
+      dr2 = dr2*-1.0;
+    }
+
+    dr2 = dr2*delta_r;
+
+    dr = 0.5*(dr + dr2);
+#endif
+    // update particle position
+    temp_pos = particle_pos + dr;
+
+    //
+    // Curvature Threshold
+    //
+
+    // normalize for curvature threshold
+    dr = dr/ (dr.s0*dr.s0 + dr.s1*dr.s2 + dr.s2*dr.s2);
     
     jump_dot = dr.s0*last_dr.s0 + dr.s1*last_dr.s1 +
       dr.s2*last_dr.s2;
 
-    if (jump_dot < 0.0 )
-    {
-      dr = dr*-1.0;
-      jump_dot = dr.s0*last_dr.s0 + dr.s1*last_dr.s1 +
-      dr.s2*last_dr.s2;
-    }
-    
-    //
-    // Curvature Threshold
-    //
-    
     if (steps_taken > 1 && jump_dot < curvature_threshold)
     {
       particle_done[particle_index] = 1;
@@ -234,11 +309,6 @@ __kernel void OclPtxInterpolate(
 
     // update last flow vector
     last_dr = dr;
-
-    dr = dr*0.25; // implement actual step length argument later
-#endif
-    // update particle position
-    temp_pos = particle_pos + dr;
 
     //
     // Complete out of bounds test (just in case)

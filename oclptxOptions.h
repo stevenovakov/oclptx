@@ -336,9 +336,8 @@ inline oclptxOptions::oclptxOptions():
    fibst(std::string("--fibst"),1,
    std::string("\tForce a starting fibre for tracking - default=1, i.e. first fibre orientation. Only works if randfib==0"),
    false, requires_argument),
-   rseed(std::string("--rseed"), 12345,
-   std::string("\tRandom seed"),
-   false, requires_argument),
+  rseed(std::string("--rseed"), 12345,
+    std::string("\tRandom seed"), false, requires_argument),
 
   mem_risk_frac(std::string("--memrisk"), 1.0,
     std::string("Threshold for fraction (0.0 to 1.0) of \

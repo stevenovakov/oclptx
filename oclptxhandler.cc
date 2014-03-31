@@ -74,6 +74,7 @@ OclPtxHandler::OclPtxHandler(
     cl::Kernel* ptx,
     cl::Kernel* sum,
     float curv_thresh,
+    float dr,
     EnvironmentData * env
 )
 {
@@ -85,6 +86,7 @@ OclPtxHandler::OclPtxHandler(
   this->sum_kernel = sum;
   
   this->curvature_threshold = curv_thresh;
+  this->delta_r = dr;
 
   this->env_dat = env;
 
@@ -180,8 +182,11 @@ void OclPtxHandler::ParticlePathsToFile(std::string path_filename)
   {
     unsigned int p_steps = particle_steps[n];
 
-    if (particle_exclusion[n] > 0)
-      continue;
+    if (this->env_dat->exclusion_mask)
+    {
+      if (particle_exclusion[n] > 0)
+        waybreak = 0;
+    }
 
     if (waypts > 0)
     {
@@ -593,9 +598,10 @@ void OclPtxHandler::Interpolate()
 
   this->ptx_kernel->setArg(16, this->max_steps);
   this->ptx_kernel->setArg(17, this->curvature_threshold);
-  
+  this->ptx_kernel->setArg(18, this->delta_r);
+  printf("DR %f\n", this->delta_r);
   // optional buffers
-  uint32_t last_index = 17;
+  uint32_t last_index = 18;
 
   if (this->env_dat->n_waypts > 0)
   {

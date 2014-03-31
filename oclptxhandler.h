@@ -57,6 +57,7 @@ class OclPtxHandler{
                     cl::Kernel* ptx_kernel,
                     cl::Kernel* sum_kernel,
                     float curv_thresh,
+                    float dr,
                     EnvironmentData * env
                   );
 
@@ -153,6 +154,7 @@ class OclPtxHandler{
     //
 
     float curvature_threshold;
+    float delta_r;
 
     // TODO @STEVE:  Some of this stuff will be GPU memory limited
     // figure out which and how
