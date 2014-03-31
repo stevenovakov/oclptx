@@ -77,7 +77,12 @@ __kernel void OclPtxInterpolate(
 #endif
 #ifdef LOOPCHECK
   , __global uint* particle_loopcheck_location, //RW
-  __global float4* particle_loopcheck_lastdir //RW
+  __global float4* particle_loopcheck_lastdir,
+  uint loopcheck_loc_size,
+  uint loopcheck_dir_size,
+  uint lx,
+  uint ly,
+  uint lz //RW
 #endif
 )
 {
@@ -135,6 +140,34 @@ __kernel void OclPtxInterpolate(
   uint entry_num;
   uint shift_num;
   uint particle_entry;
+
+#ifdef LOOPCHECK
+  uint3 last_loopcheck_voxel;
+  uint3 new_loopcheck_voxel;
+  last_loopcheck_voxel.s0 = floor(particle_pos.s0)/5;
+  last_loopcheck_voxel.s1 = floor(particle_pos.s1)/5;
+  last_loopcheck_voxel.s2 = floor(particle_pos.s2)/5;
+
+  uint loopcheck_index = last_loopcheck_voxel.s0*(ly*lz) +
+    last_loopcheck_voxel.s1*lz + last_loopcheck_voxel.s2;
+
+  uint loopcheck_entry = loopcheck_index / 32;
+  uint loopcheck_shift = 31 - (loopcheck_index % 32);
+
+  uint loopcheck_entries =
+  particle_loopcheck_location[particle_index*loopcheck_loc_size +
+    loopcheck_entry];
+
+  particle_loopcheck_location[particle_index*loopcheck_loc_size +
+    loopcheck_entry] =
+      loopcheck_entries | (0x00000001 << loopcheck_shift);
+
+  float4 last_loopcheck_dr =
+    particle_loopcheck_lastdir[particle_index*loopcheck_dir_size +
+      loopcheck_index];
+  float loopcheck_product;
+#endif
+
   
   for (interval_steps_taken = 0; interval_steps_taken < interval_steps;
     interval_steps_taken++)
@@ -366,8 +399,46 @@ __kernel void OclPtxInterpolate(
 #endif
 
 #ifdef LOOPCHECK
+  new_loopcheck_voxel.s0 = floor(temp_pos.s0)/5;
+  new_loopcheck_voxel.s1 = floor(temp_pos.s1)/5;
+  new_loopcheck_voxel.s2 = floor(temp_pos.s2)/5;
 
+  if (all(new_loopcheck_voxel != last_loopcheck_voxel))
+  {
+    last_loopcheck_voxel = new_loopcheck_voxel;
 
+    loopcheck_index = last_loopcheck_voxel.s0*(ly*lz) +
+    last_loopcheck_voxel.s1*lz + last_loopcheck_voxel.s2;
+
+    loopcheck_entry = loopcheck_index / 32;
+    loopcheck_shift = 31 - (loopcheck_index % 32);
+
+    loopcheck_entries =
+      particle_loopcheck_location[particle_index*loopcheck_loc_size +
+        loopcheck_entry];
+
+    if ((loopcheck_entry >> loopcheck_shift) & 0x00000001)
+    {
+      last_loopcheck_dr =
+        particle_loopcheck_lastdir[particle_index*loopcheck_dir_size +
+          loopcheck_index];
+      loopcheck_product = last_loopcheck_dr.s0*last_dr.s0 +
+        last_loopcheck_dr.s1*last_dr.s1 + last_loopcheck_dr.s2*last_dr.s2;
+      if (loopcheck_product < 0) // loopcheck break
+      {
+        particle_done[particle_index] = 1;
+        break;
+      }
+    }
+    else
+    {
+      particle_loopcheck_location[particle_index*loopcheck_loc_size
+        + loopcheck_entry] =
+          loopcheck_entries | (0x00000001 << loopcheck_shift);
+    }
+    particle_loopcheck_lastdir[particle_index*loopcheck_dir_size +
+      loopcheck_index] = dr;
+  }
 #endif
     // update current location
     particle_pos = temp_pos;

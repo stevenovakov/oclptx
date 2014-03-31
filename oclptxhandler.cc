@@ -308,8 +308,12 @@ void OclPtxHandler::WriteInitialPosToDevice(
   {
     loopcheck_locs.resize(this->n_particles *
       this->env_dat->loopcheck_location_size);
+    loopcheck_locs = {0,};
     loopcheck_dirs.resize(this->n_particles *
       this->env_dat->loopcheck_dir_size);
+    float4 zero_vec;
+    zero_vec.x = 0.0; zero_vec.y = 0.0; zero_vec.z = 0.0; zero_vec.t = 0.0;
+    loopcheck_dirs = {zero_vec,};
   }
 
   // delete this at end of function always
@@ -365,6 +369,7 @@ void OclPtxHandler::WriteInitialPosToDevice(
     );
 
   if (this->env_dat->exclusion_mask)
+  {
     this->particle_exclusion_buffer =
       cl::Buffer(
         *(this->ocl_context),
@@ -373,8 +378,11 @@ void OclPtxHandler::WriteInitialPosToDevice(
         NULL,
         NULL
       );
+    this->total_gpu_mem_used += path_steps_mem_size;
+  }
 
   if (this->env_dat->n_waypts > 0)
+  {
     this->particle_waypoints_buffer =
       cl::Buffer(
         *(this->ocl_context),
@@ -383,6 +391,8 @@ void OclPtxHandler::WriteInitialPosToDevice(
         NULL,
         NULL
       );
+    this->total_gpu_mem_used += this->env_dat->n_waypts*path_steps_mem_size;
+  }
 
   if (this->env_dat->loopcheck)
   {
@@ -402,6 +412,9 @@ void OclPtxHandler::WriteInitialPosToDevice(
         NULL,
         NULL
       );
+    this->total_gpu_mem_used +=
+      this->env_dat->particle_loopcheck_location_mem_size * this->n_particles +
+        this->env_dat->particle_loopcheck_dir_mem_size * this->n_particles;
   }
 
   this->global_pdf_buffer =
@@ -692,6 +705,21 @@ void OclPtxHandler::Interpolate()
     last_index += 1;
     this->ptx_kernel->setArg(
       last_index, this->particle_loopcheck_dir_buffer);
+    last_index += 1;
+    this->ptx_kernel->setArg(
+      last_index, this->env_dat->loopcheck_location_size);
+    last_index += 1;
+    this->ptx_kernel->setArg(
+      last_index, this->env_dat->loopcheck_dir_size);
+    last_index += 1;
+    this->ptx_kernel->setArg(
+      last_index, this->env_dat->lx);
+    last_index += 1;
+    this->ptx_kernel->setArg(
+      last_index, this->env_dat->ly);
+    last_index += 1;
+    this->ptx_kernel->setArg(
+      last_index, this->env_dat->lz);
   }
 
   // execute

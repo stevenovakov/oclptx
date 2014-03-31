@@ -131,6 +131,9 @@ struct EnvironmentData
   bool loopcheck;
   uint32_t loopcheck_location_size;
   uint32_t loopcheck_dir_size;
+  uint32_t lx;
+  uint32_t ly;
+  uint32_t lz;
 
   // Interpolation Options
   uint32_t max_steps;
