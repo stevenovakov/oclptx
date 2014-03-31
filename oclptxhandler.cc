@@ -300,6 +300,18 @@ void OclPtxHandler::WriteInitialPosToDevice(
     this->section_size*this->env_dat->n_waypts, 0);
   std::vector<uint32_t> init_pdfs(pdfs_size, 0);
   std::vector<uint32_t> initial_global_pdf(this->env_dat->global_pdf_size, 0);
+
+  std::vector<uint32_t> loopcheck_locs;
+  std::vector<float4> loopcheck_dirs;
+
+  if (this->env_dat->loopcheck)
+  {
+    loopcheck_locs.resize(this->n_particles *
+      this->env_dat->loopcheck_location_size);
+    loopcheck_dirs.resize(this->n_particles *
+      this->env_dat->loopcheck_dir_size);
+  }
+
   // delete this at end of function always
   float4* pos_container;
   pos_container = new float4[this->section_size * this->particle_path_size];
@@ -372,6 +384,26 @@ void OclPtxHandler::WriteInitialPosToDevice(
         NULL
       );
 
+  if (this->env_dat->loopcheck)
+  {
+    this->particle_loopcheck_location_buffer =
+      cl::Buffer(
+        *(this->ocl_context),
+        CL_MEM_READ_WRITE,
+        this->env_dat->particle_loopcheck_location_mem_size * this->n_particles,
+        NULL,
+        NULL
+      );
+    this->particle_loopcheck_dir_buffer =
+      cl::Buffer(
+        *(this->ocl_context),
+        CL_MEM_READ_WRITE,
+        this->env_dat->particle_loopcheck_dir_mem_size * this->n_particles,
+        NULL,
+        NULL
+      );
+  }
+
   this->global_pdf_buffer =
     cl::Buffer(
       *(this->ocl_context),
@@ -443,6 +475,28 @@ void OclPtxHandler::WriteInitialPosToDevice(
       NULL,
       NULL
     );
+
+  if (this->env_dat->loopcheck)
+  {
+    this->ocl_cq->enqueueWriteBuffer(
+      this->particle_loopcheck_location_buffer,
+      CL_FALSE,
+      static_cast<uint32_t>(0),
+      this->env_dat->particle_loopcheck_location_mem_size*this->n_particles,
+      loopcheck_locs.data(),
+      NULL,
+      NULL
+    );
+    this->ocl_cq->enqueueWriteBuffer(
+      this->particle_loopcheck_dir_buffer,
+      CL_FALSE,
+      static_cast<uint32_t>(0),
+      this->env_dat->particle_loopcheck_dir_mem_size*this->n_particles,
+      loopcheck_dirs.data(),
+      NULL,
+      NULL
+    );
+  }
 
   this->ocl_cq->enqueueWriteBuffer(
     this->global_pdf_buffer,
@@ -628,6 +682,16 @@ void OclPtxHandler::Interpolate()
     last_index += 1;
     this->ptx_kernel->setArg(
       last_index, this->env_dat->termination_mask_buffer);
+  }
+
+  if (this->env_dat->loopcheck)
+  {
+    last_index += 1;
+    this->ptx_kernel->setArg(
+      last_index, this->particle_loopcheck_location_buffer);
+    last_index += 1;
+    this->ptx_kernel->setArg(
+      last_index, this->particle_loopcheck_dir_buffer);
   }
 
   // execute

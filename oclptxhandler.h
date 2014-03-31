@@ -175,6 +175,9 @@ class OclPtxHandler{
     cl::Buffer particle_exclusion_buffer;
     cl::Buffer particle_waypoints_buffer;
 
+    cl::Buffer particle_loopcheck_location_buffer;
+    cl::Buffer particle_loopcheck_dir_buffer;
+
     
     unsigned int particles_mem_size;
     unsigned int particle_uint_mem_size;

@@ -75,6 +75,10 @@ __kernel void OclPtxInterpolate(
 #ifdef TERMINATION
   , __global ushort* termination_mask //R
 #endif
+#ifdef LOOPCHECK
+  , __global uint* particle_loopcheck_location, //RW
+  __global float4* particle_loopcheck_lastdir //RW
+#endif
 )
 {
   uint glid = get_global_id(0);
@@ -359,6 +363,11 @@ __kernel void OclPtxInterpolate(
       bounds_test = waypoint_masks[w*mask_size + mask_index];
       particle_waypoints[particle_index*n_waypoint_masks + w] |= 1;
     }
+#endif
+
+#ifdef LOOPCHECK
+
+
 #endif
     // update current location
     particle_pos = temp_pos;
