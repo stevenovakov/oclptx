@@ -85,6 +85,7 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   if (!gpu_local_pdf_)
     abort();
 
+  // TODO(jeff): Check whether these are actually needed, otherwise, NULL
   gpu_waypoints_ = new cl::Buffer(
       *context_,
       CL_MEM_READ_WRITE,
@@ -231,6 +232,7 @@ void OclPtxHandler::WriteParticle(
   delete[] temp_local_pdf;
 
   //TODO(jeff): Can we allocate in Init?
+  //TODO(jeff): Don't write if these are not used.
   cl_ushort *temp_waypoints = new cl_ushort[attrs_.n_waypoint_masks];
   for (int i = 0; i < attrs_.n_waypoint_masks; ++i)
     temp_waypoints[i] = 0;
