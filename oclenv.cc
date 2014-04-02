@@ -101,7 +101,7 @@ OclEnv::~OclEnv()
     delete this->env_data.waypoint_masks_buffer;
 
   for (uint32_t i = 0; i < this->device_global_pdf_buffers.size(); i++)
-    delete device_global_pdf_buffers.at(i)
+    delete device_global_pdf_buffers.at(i);
 }
 
 //*********************************************************************
@@ -822,13 +822,13 @@ void OclEnv::AllocateSamples(
     for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
     {
       this->device_global_pdf_buffers.push_back(
-        cl::Buffer(
+        new cl::Buffer(
           this->ocl_context,
           CL_MEM_WRITE_ONLY,
           this->env_data.global_pdf_mem_size,
           NULL,
           NULL
-        );
+        )
       );
     }
 
@@ -951,7 +951,7 @@ void OclEnv::PdfsToFile(std::string filename)
   for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
   {
     this->ocl_device_queues.at(d).enqueueReadBuffer(
-      *(this->device_global_pdf_buffers.at(d))
+      *(this->device_global_pdf_buffers.at(d)),
       CL_TRUE,
       static_cast<unsigned int>(0),
       this->env_data.global_pdf_mem_size,
@@ -981,22 +981,25 @@ void OclEnv::PdfsToFile(std::string filename)
       {
         index =
           i*(this->env_data.ny*this->env_data.nz) + j*(this->env_data.nz) + k;
-        fprintf(pdf_file, "%u", global_pdf->at(index));
+        fprintf(pdf_file, "%u", total_pdf[index]);
 
-        if (i < nx - 1)
+        if (i < this->env_data.nx - 1)
           fprintf(pdf_file, " ");
       }
       fprintf(pdf_file, "\n");
 
-      if (j < ny - 1)
+      if (j < this->env_data.ny - 1)
         fprintf(pdf_file, " ");
     }
 
-    if (k < nz - 1)
+    if (k < this->env_data.nz - 1)
       fprintf(pdf_file, "\n\n");
   }
 
   fclose(pdf_file);
+
+  delete[] temp_pdf;
+  delete[] total_pdf;
 }
 
 //EOF
