@@ -66,6 +66,7 @@ int main(int argc, char **argv)
   }
 
   struct OclPtxHandler::particle_attrs attrs = {
+    sample_manager->brain_mask_dim(),
     kStepsPerKernel,
     sample_manager->GetOclptxOptions().nsteps.value(), // max_steps
     0, // Particles per side not determined here.

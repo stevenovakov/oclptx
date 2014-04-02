@@ -32,6 +32,7 @@ struct particle_data
 
 struct particle_attrs
 {
+  float4 brain_mask_dim;
   int steps_per_kernel;
   int max_steps;
   int particles_per_side;
@@ -45,7 +46,7 @@ struct particle_attrs
   uint lx;  // Loopcheck sizes
   uint ly;
   uint lz;
-} __attribute__((aligned(8)));
+} __attribute__((aligned(16)));
 
 __kernel void OclPtxInterpolate(
   struct particle_attrs attrs,  /* RO */
@@ -194,9 +195,11 @@ __kernel void OclPtxInterpolate(
     theta = theta_samples[diffusion_index];
     phi = phi_samples[diffusion_index];
     
-    new_dr.s0 = cos( phi ) * sin( theta );
-    new_dr.s1 = sin( phi ) * sin( theta );
-    new_dr.s2 = cos( theta );
+    new_dr.s0 = cos(phi) * sin(theta);
+    new_dr.s1 = sin(phi) * sin(theta);
+    new_dr.s2 = cos(theta);
+
+    new_dr = new_dr / attrs.brain_mask_dim;
     
     // jump (aligns direction to prevent zig-zagging)
     jump_dot = new_dr.s0 * state[glid].dr.s0

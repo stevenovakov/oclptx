@@ -26,6 +26,7 @@ class OclPtxHandler{
 
   struct particle_attrs
   {
+    cl_float4 brain_mask_dim;
     cl_int steps_per_kernel;
     cl_int max_steps;
     cl_int particles_per_side;
@@ -39,7 +40,7 @@ class OclPtxHandler{
     cl_uint lx;  // Loopcheck sizes
     cl_uint ly;
     cl_uint lz;
-  } __attribute__((aligned(8)));
+  } __attribute__((aligned(16)));
 
   OclPtxHandler() {}
   void Init(

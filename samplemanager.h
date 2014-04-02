@@ -103,7 +103,10 @@ class SampleManager
     
     //OclptxOptions and custom options
     const oclptxOptions& GetOclptxOptions(){return _oclptxOptions;}
-    
+
+    // Get scaling factors for brain mask.
+    cl_float4 brain_mask_dim();
+
   private:
     SampleManager();
     void LoadBedpostData(const std::string& aBasename);
