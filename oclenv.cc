@@ -101,6 +101,17 @@ OclEnv::~OclEnv()
     delete this->env_data.waypoint_masks_buffer;
 }
 
+void die(int reason)
+{
+  if (CL_MEM_OBJECT_ALLOCATION_FAILURE == reason)
+  {
+    puts("Ran out of device memory while allocating static buffers.");
+    exit(-1);
+  }
+  else
+    abort();
+}
+
 //*********************************************************************
 //
 // OclEnv Container Set/Get
@@ -731,6 +742,7 @@ void OclEnv::AllocateSamples(
 )
 {
   uint32_t n_dirs = this->env_data.bpx_dirs;
+  cl_int ret;
 
   this->env_data.f_samples_buffers = new cl::Buffer*[n_dirs];
   this->env_data.phi_samples_buffers = new cl::Buffer*[n_dirs];
@@ -744,8 +756,10 @@ void OclEnv::AllocateSamples(
         CL_MEM_READ_ONLY,
         this->env_data.single_sample_mem_size,
         NULL,
-        NULL
+        &ret
       );
+    if (CL_SUCCESS != ret)
+      die(ret);
 
     this->env_data.theta_samples_buffers[s] = new
       cl::Buffer(
@@ -753,8 +767,10 @@ void OclEnv::AllocateSamples(
         CL_MEM_READ_ONLY,
         this->env_data.single_sample_mem_size,
         NULL,
-        NULL
+        &ret
       );
+    if (CL_SUCCESS != ret)
+      die(ret);
 
     this->env_data.phi_samples_buffers[s] = new
       cl::Buffer(
@@ -762,8 +778,10 @@ void OclEnv::AllocateSamples(
         CL_MEM_READ_ONLY,
         this->env_data.single_sample_mem_size,
         NULL,
-        NULL
+        &ret
       );
+    if (CL_SUCCESS != ret)
+      die(ret);
   }
 
   this->env_data.brain_mask_buffer = new
@@ -772,8 +790,10 @@ void OclEnv::AllocateSamples(
       CL_MEM_READ_ONLY,
       this->env_data.mask_mem_size,
       NULL,
-      NULL
+      &ret
     );
+  if (CL_SUCCESS != ret)
+    die(ret);
 
     if (exclusion_mask != NULL)
     {
@@ -783,8 +803,10 @@ void OclEnv::AllocateSamples(
           CL_MEM_READ_ONLY,
           this->env_data.mask_mem_size,
           NULL,
-          NULL
+          &ret
         );
+      if (CL_SUCCESS != ret)
+        die(ret);
     }
 
     if (termination_mask != NULL)
@@ -795,8 +817,10 @@ void OclEnv::AllocateSamples(
           CL_MEM_READ_ONLY,
           this->env_data.mask_mem_size,
           NULL,
-          NULL
+          &ret
         );
+      if (CL_SUCCESS != ret)
+        die(ret);
     }
 
     if (this->env_data.n_waypts > 0)
@@ -807,8 +831,10 @@ void OclEnv::AllocateSamples(
           CL_MEM_READ_ONLY,
           this->env_data.n_waypts * this->env_data.mask_mem_size,
           NULL,
-          NULL
+          &ret
         );
+      if (CL_SUCCESS != ret)
+        die(ret);
     }
 
     //
@@ -820,7 +846,7 @@ void OclEnv::AllocateSamples(
     {
       for (uint32_t s = 0; s < n_dirs; s++)
       {
-        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
           *(this->env_data.f_samples_buffers[s]),
           CL_FALSE,
           static_cast<unsigned int>(0),
@@ -829,8 +855,10 @@ void OclEnv::AllocateSamples(
           NULL,
           NULL
         );
+        if (CL_SUCCESS != ret)
+          die(ret);
 
-        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
           *(this->env_data.theta_samples_buffers[s]),
           CL_FALSE,
           static_cast<unsigned int>(0),
@@ -839,8 +867,10 @@ void OclEnv::AllocateSamples(
           NULL,
           NULL
         );
+        if (CL_SUCCESS != ret)
+          die(ret);
 
-        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
           *(this->env_data.phi_samples_buffers[s]),
           CL_FALSE,
           static_cast<unsigned int>(0),
@@ -849,9 +879,11 @@ void OclEnv::AllocateSamples(
           NULL,
           NULL
         );
+        if (CL_SUCCESS != ret)
+          die(ret);
       }
 
-      this->ocl_device_queues.at(d).enqueueWriteBuffer(
+      ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
         *(this->env_data.brain_mask_buffer),
         CL_FALSE,
         static_cast<unsigned int>(0),
@@ -860,9 +892,12 @@ void OclEnv::AllocateSamples(
         NULL,
         NULL
       );
+      if (CL_SUCCESS != ret)
+        die(ret);
 
       if (exclusion_mask != NULL)
-        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+      {
+        ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
           *(this->env_data.exclusion_mask_buffer),
           CL_FALSE,
           static_cast<unsigned int>(0),
@@ -871,9 +906,13 @@ void OclEnv::AllocateSamples(
           NULL,
           NULL
         );
+        if (CL_SUCCESS != ret)
+          die(ret);
+      }
 
       if (termination_mask != NULL)
-        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+      {
+        ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
           *(this->env_data.termination_mask_buffer),
           CL_FALSE,
           static_cast<unsigned int>(0),
@@ -882,10 +921,13 @@ void OclEnv::AllocateSamples(
           NULL,
           NULL
         );
+        if (CL_SUCCESS != ret)
+          die(ret);
+      }
 
       for (uint32_t w = 0; w < this->env_data.n_waypts; w++)
       {
-        this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
           *(this->env_data.waypoint_masks_buffer),
           CL_FALSE,
           w * this->env_data.mask_mem_size,
@@ -894,15 +936,21 @@ void OclEnv::AllocateSamples(
           NULL,
           NULL
         );
+        if (CL_SUCCESS != ret)
+          die(ret);
       }
 
-      this->ocl_device_queues.at(d).flush();
+      ret = this->ocl_device_queues.at(d).flush();
+      if (CL_SUCCESS != ret)
+        die(ret);
     }
 
     // can maybe move this to oclptxhandler, for slight performance improvement
     for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
     {
-      this->ocl_device_queues.at(d).finish();
+      ret = this->ocl_device_queues.at(d).finish();
+      if (CL_SUCCESS != ret)
+        die(ret);
     }
 }
 
