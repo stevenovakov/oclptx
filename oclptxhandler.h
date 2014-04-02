@@ -34,6 +34,7 @@ class OclPtxHandler{
     cl_uint num_samples;
     cl_float curvature_threshold;
     cl_uint n_waypoint_masks;
+    cl_float step_length;
     cl_uint lx;  // Loopcheck sizes
     cl_uint ly;
     cl_uint lz;
@@ -65,6 +66,7 @@ class OclPtxHandler{
   void InitParticles(struct particle_attrs *attrs);
   void GetPdfData(cl_int* container);
   void PdfSum();
+  void SetKArg(int pos, cl::Buffer *buf);
 
   struct particle_attrs attrs_;
 
@@ -80,8 +82,8 @@ class OclPtxHandler{
   cl::Buffer *gpu_local_pdf_;
   cl::Buffer *gpu_waypoints_;
   cl::Buffer *gpu_exclusion_;
-  cl::Buffer *gpu_global_pdf_;
   cl::Buffer *gpu_loopcheck_;
+  cl::Buffer *gpu_global_pdf_;
 
   // Debug Data
   cl::Buffer *gpu_path_;  // Type ulong

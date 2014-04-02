@@ -44,7 +44,7 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   attrs_ = *attrs;
 
   // TODO(jeff) compute num_particles
-  attrs_.particles_per_side = 2;
+  attrs_.particles_per_side = 1000;
 
   // TODO(jeff): set buffers to NULL if not used.  Careful of segfaults!
   gpu_data_ = new cl::Buffer(
@@ -77,41 +77,55 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
 
   int entries = (attrs_.sample_nx
               * attrs_.sample_ny
-              * attrs_.sample_nz);
+              * attrs_.sample_nz / 32) + 1;
 
   gpu_local_pdf_ = new cl::Buffer(
       *context_,
       CL_MEM_READ_WRITE,
-      2 * attrs_.particles_per_side * ((entries / 32)+1) * sizeof(cl_uint));
+      2 * attrs_.particles_per_side * entries * sizeof(cl_uint));
   if (!gpu_local_pdf_)
     abort();
 
-  // TODO(jeff): Check whether these are actually needed, otherwise, NULL
-  gpu_waypoints_ = new cl::Buffer(
-      *context_,
-      CL_MEM_READ_WRITE,
-      2 * attrs_.particles_per_side * attrs_.n_waypoint_masks * sizeof(cl_ushort));
-  if (!gpu_waypoints_)
-    abort();
+  if (0 < env_dat_->n_waypts)
+  {
+    gpu_waypoints_ = new cl::Buffer(
+        *context_,
+        CL_MEM_READ_WRITE,
+        2 * attrs_.particles_per_side * attrs_.n_waypoint_masks * sizeof(cl_ushort));
+    if (!gpu_waypoints_)
+      abort();
+  }
+  else
+    gpu_waypoints_ = NULL;
 
-  gpu_exclusion_ = new cl::Buffer(
-      *context_,
-      CL_MEM_READ_WRITE,
-      2 * attrs_.particles_per_side * sizeof(cl_ushort));
-  if (!gpu_exclusion_)
-    abort();
+  if (env_dat_->exclusion_mask)
+  {
+    gpu_exclusion_ = new cl::Buffer(
+        *context_,
+        CL_MEM_READ_WRITE,
+        2 * attrs_.particles_per_side * sizeof(cl_ushort));
+    if (!gpu_exclusion_)
+      abort();
+  }
+  else
+    gpu_exclusion_ = NULL;
 
-  gpu_loopcheck_ = new cl::Buffer(
-      *context_,
-      CL_MEM_READ_WRITE,
-      2 * attrs_.particles_per_side * attrs_.lx * attrs_.ly * attrs_.lz * sizeof(float4));
-  if (!gpu_loopcheck_)
-    abort();
+  if (env_dat_->loopcheck)
+  {
+    gpu_loopcheck_ = new cl::Buffer(
+        *context_,
+        CL_MEM_READ_WRITE,
+        2 * attrs_.particles_per_side * attrs_.lx * attrs_.ly * attrs_.lz * sizeof(float4));
+    if (!gpu_loopcheck_)
+      abort();
+  }
+  else
+    gpu_loopcheck_ = NULL;
 
   gpu_global_pdf_ = new cl::Buffer(
       *context_,
       CL_MEM_READ_WRITE,
-      2 * entries);
+      2 * attrs_.sample_nx * attrs_.sample_ny * attrs_.sample_nz);
   if (!gpu_global_pdf_)
     abort();
 
@@ -133,7 +147,7 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
                      * attrs_.sample_ny
                      * attrs_.sample_nz;
 
-  cl_ushort *temp_global_pdf = new cl_ushort[2 * global_entries];
+  cl_uint *temp_global_pdf = new cl_uint[2 * global_entries];
   for (int i = 0; i < 2 * global_entries; ++i)
     temp_global_pdf[i] = 0;
 
@@ -150,11 +164,15 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
 
 OclPtxHandler::~OclPtxHandler()
 {
-  delete gpu_path_;
-  delete gpu_complete_;
   delete gpu_data_;
-  delete gpu_step_count_;
+  delete gpu_complete_;
   delete gpu_local_pdf_;
+  if (gpu_waypoints_)
+    delete gpu_waypoints_;
+  if (gpu_exclusion_)
+    delete gpu_exclusion_;
+  if (gpu_loopcheck_)
+    delete gpu_loopcheck_;
   delete gpu_global_pdf_;
 }
 
@@ -226,7 +244,7 @@ void OclPtxHandler::WriteParticle(
   int entries_per_particle = (attrs_.sample_nx
                             * attrs_.sample_ny
                             * attrs_.sample_nz / 32) + 1;
-  cl_ushort *temp_local_pdf = new cl_ushort[entries_per_particle];
+  cl_uint *temp_local_pdf = new cl_uint[entries_per_particle];
   for (int i = 0; i < entries_per_particle; ++i)
     temp_local_pdf[i] = 0;
 
@@ -240,44 +258,68 @@ void OclPtxHandler::WriteParticle(
   delete[] temp_local_pdf;
 
   // Initialize particle loopcheck
-  int loopcheck_entries_per_particle = (attrs_.lx
-                            * attrs_.ly
-                            * attrs_.lz);
-  cl_float4 *temp_loopcheck = new cl_float4[loopcheck_entries_per_particle];
-  for (int i = 0; i < loopcheck_entries_per_particle; ++i)
-    temp_loopcheck[i] = {0.,0.,0.,0.};
+  if (gpu_loopcheck_)
+  {
+    int loopcheck_entries_per_particle = (attrs_.lx
+                              * attrs_.ly
+                              * attrs_.lz);
+    cl_float4 *temp_loopcheck = new cl_float4[loopcheck_entries_per_particle];
+    cl_float4 zero_f4;
+    zero_f4.s[0] = 0.;
+    zero_f4.s[1] = 0.;
+    zero_f4.s[2] = 0.;
+    zero_f4.s[3] = 0.;
+    for (int i = 0; i < loopcheck_entries_per_particle; ++i)
+      temp_loopcheck[i] = zero_f4;
 
-  cq_->enqueueWriteBuffer(
-      *gpu_loopcheck_,
-      true,
-      offset * loopcheck_entries_per_particle * sizeof(cl_float4),
-      loopcheck_entries_per_particle * sizeof(cl_float4),
-      temp_loopcheck);
+    cq_->enqueueWriteBuffer(
+        *gpu_loopcheck_,
+        true,
+        offset * loopcheck_entries_per_particle * sizeof(cl_float4),
+        loopcheck_entries_per_particle * sizeof(cl_float4),
+        temp_loopcheck);
 
-  delete[] temp_loopcheck;
+    delete[] temp_loopcheck;
+  }
 
   //TODO(jeff): Can we allocate in Init?
   //TODO(jeff): Don't write if these are not used.
-  cl_ushort *temp_waypoints = new cl_ushort[attrs_.n_waypoint_masks];
-  for (int i = 0; i < attrs_.n_waypoint_masks; ++i)
-    temp_waypoints[i] = 0;
+  if (gpu_waypoints_)
+  {
+    cl_ushort *temp_waypoints = new cl_ushort[attrs_.n_waypoint_masks];
+    for (cl_uint i = 0; i < attrs_.n_waypoint_masks; ++i)
+      temp_waypoints[i] = 0;
 
-  cq_->enqueueWriteBuffer(
-      *gpu_waypoints_,
+    cq_->enqueueWriteBuffer(
+        *gpu_waypoints_,
+        true,
+        offset * attrs_.n_waypoint_masks * sizeof(cl_ushort),
+        attrs_.n_waypoint_masks * sizeof(cl_ushort),
+        temp_waypoints);
+
+    delete[] temp_waypoints;
+  }
+
+  if (gpu_exclusion_)
+  {
+    cl_ushort temp_zero = 0;
+
+    cq_->enqueueWriteBuffer(
+      *gpu_exclusion_,
       true,
-      offset * attrs_.n_waypoint_masks * sizeof(cl_ushort),
-      attrs.n_waypoint_masks * sizeof(cl_ushort),
-      temp_waypoints);
+      offset * sizeof(cl_ushort),
+      sizeof(cl_ushort),
+      &temp_zero
+    );
+  }
+}
 
-  delete[] temp_waypoints;
-
-  cl_ushort temp_zero = 0;
-
-  cq_->enqueueWriteBuffer(
-    *gpu_exclusion_,
-    true,
-    offset * sizeof(cl_ushort),
-    sizeof(cl_ushort));
+inline void OclPtxHandler::SetKArg(int pos, cl::Buffer *buf)
+{
+  if (buf)
+    ptx_kernel_->setArg(pos, *buf);
+  else
+    ptx_kernel_->setArg(pos, NULL);
 }
 
 void OclPtxHandler::RunKernel(int side)
@@ -290,22 +332,22 @@ void OclPtxHandler::RunKernel(int side)
       0,
       sizeof(struct OclPtxHandler::particle_attrs),
       reinterpret_cast<void*>(&attrs_));
-  ptx_kernel_->setArg(1, *gpu_data_);
-  ptx_kernel_->setArg(2, *gpu_path_);
-  ptx_kernel_->setArg(3, *gpu_step_count_);
-  ptx_kernel_->setArg(4, *gpu_complete_);
-  ptx_kernel_->setArg(5, *gpu_local_pdf_);
-  ptx_kernel_->setArg(6, *gpu_waypoints_);
-  ptx_kernel_->setArg(7, *gpu_exclusion_);
-  ptx_kernel_->setArg(8, *gpu_loopcheck_);
+  SetKArg(1, gpu_data_);
+  SetKArg(2, gpu_path_);
+  SetKArg(3, gpu_step_count_);
+  SetKArg(4, gpu_complete_);
+  SetKArg(5, gpu_local_pdf_);
+  SetKArg(6, gpu_waypoints_);
+  SetKArg(7, gpu_exclusion_);
+  SetKArg(8, gpu_loopcheck_);
 
-  ptx_kernel_->setArg(9, *env_dat_->f_samples_buffers[0]);
-  ptx_kernel_->setArg(10, *env_dat_->phi_samples_buffers[0]);
-  ptx_kernel_->setArg(11, *env_dat_->theta_samples_buffers[0]);
-  ptx_kernel_->setArg(12, *env_dat_->brain_mask_buffer);
-  ptx_kernel_->setArg(13, *env_dat_->waypoint_masks_buffer);
-  ptx_kernel_->setArg(14, *env_dat_->termination_mask_buffer);
-  ptx_kernel_->setArg(15, *env_dat_->exclusion_mask_buffer);
+  SetKArg(9, env_dat_->f_samples_buffers[0]);
+  SetKArg(10, env_dat_->phi_samples_buffers[0]);
+  SetKArg(11, env_dat_->theta_samples_buffers[0]);
+  SetKArg(12, env_dat_->brain_mask_buffer);
+  SetKArg(13, env_dat_->waypoint_masks_buffer);
+  SetKArg(14, env_dat_->termination_mask_buffer);
+  SetKArg(15, env_dat_->exclusion_mask_buffer);
 
   cq_->enqueueNDRangeKernel(
     *(ptx_kernel_),

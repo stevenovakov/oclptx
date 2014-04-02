@@ -20,13 +20,13 @@ cl_ulong8 rng_zero = {0,};
 
 int main(int argc, char **argv)
 {
-  const int kStepsPerKernel = 10;
+  const int kStepsPerKernel = 1000;
   const int kNumReducers = 1;
   FILE *global_fd;
   Fifo<struct OclPtxHandler::particle_data> *particles_fifo;
 
   // Create our oclenv
-  OclEnv env();
+  OclEnv env;
   env.OclInit();
   env.NewCLCommandQueues();
 
@@ -38,18 +38,19 @@ int main(int argc, char **argv)
   env.AvailableGPUMem(
     sample_manager->GetFDataPtr(),
     sample_manager->GetOclptxOptions(),
-    sample_manager->GetWayMasksToVector()->size(),
+    sample_manager->GetWayMasksToVector().size(),
     NULL,
     NULL
   );
+  // todo(Steve) pass the masks
   env.AllocateSamples(
     sample_manager->GetFDataPtr(),
     sample_manager->GetPhiDataPtr(),
     sample_manager->GetThetaDataPtr(),
     sample_manager->GetBrainMaskToArray(),
-    NULL,
-    NULL,
-    NULL
+    sample_manager->GetExclusionMaskToArray(),
+    sample_manager->GetTerminationMaskToArray(),
+    NULL // todo(steve) fix way mask implementation and pass it
   );
 
   env.CreateKernels("standard");

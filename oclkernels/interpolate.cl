@@ -229,7 +229,7 @@ __kernel void OclPtxInterpolate(
     // Pick Sample
     //
     rng_output = Rand(&(state[glid].rng));
-    sample = rng_output % sample_ns;
+    sample = rng_output % attrs.num_samples;
 
     // Volume Fraction Selection
     rng_output = Rand(&(state[glid].rng));
@@ -372,9 +372,8 @@ __kernel void OclPtxInterpolate(
   loopcheck_voxel.s1 = round(temp_pos.s1)/5;
   loopcheck_voxel.s2 = round(temp_pos.s2)/5;
 
-
-  loopcheck_index = last_loopcheck_voxel.s0*(attrs.ly*attrs.lz) +
-    last_loopcheck_voxel.s1*attrs.lz + last_loopcheck_voxel.s2;
+  loopcheck_index = loopcheck_voxel.s0*(attrs.ly*attrs.lz) +
+    loopcheck_voxel.s1*attrs.lz + loopcheck_voxel.s2;
 
   last_loopcheck_dr =
       particle_loopcheck_lastdir[glid*loopcheck_dir_size +

@@ -61,13 +61,10 @@ uint64_t rand_64()
 cl_ulong8 SampleManager::NewRng()
 {
   cl_ulong8 rng = {0,};
-  fprintf(stderr, "Rng: ");
   for (int i = 0; i < 5; i++)
   {
     rng.s[i] = rand_64();
-    fprintf(stderr, "%lx,", rng.s[i]);
   }
-  fprintf(stderr, "\n");
 
   return rng;
 }
@@ -401,7 +398,7 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
       seed.s[2] = seeds(t,3);
       particle = new OclPtxHandler::particle_data;
       *particle = {NewRng(), seed};
-      _seedParticles.PushOrDie(seed);
+      _seedParticles->PushOrDie(particle);
     // TODO @STEVE
     // Implement Jittering on seed file.
     // GenerateSeedParticlesHelper(seed, aSampleVoxel);
@@ -439,7 +436,7 @@ void SampleManager::GenerateSeedParticlesHelper(
 
   particle = new OclPtxHandler::particle_data;
   *particle = {NewRng(), randomParticle};
-  _seedParticles.PushOrDie(randomParticle);
+  _seedParticles->PushOrDie(particle);
  }
 }
 
