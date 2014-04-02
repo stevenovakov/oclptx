@@ -193,7 +193,7 @@ void OclPtxHandler::WriteParticle(
   assert(offset < 2 * attrs_.particles_per_side);
 
   if (NULL != path_dump_fd_)
-    fprintf(path_dump_fd_, "%i:%f,%f,%f\n",
+    fprintf(path_dump_fd_, "%i:%f,%f,%fn\n",
         offset,
         data->position.s[0],
         data->position.s[1],

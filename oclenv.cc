@@ -507,7 +507,7 @@ uint32_t OclEnv::AvailableGPUMem(
   //  BPX Sample Parameters + Masks
   // ***********************************************
 
-  this->env_data.bpx_dirs = f_data->data.size();
+  this->env_data.bpx_dirs = 1; //f_data->data.size();
   this->env_data.nx = f_data->nx;
   this->env_data.ny = f_data->ny;
   this->env_data.nz = f_data->nz;

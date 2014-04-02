@@ -65,9 +65,6 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  printf("%u, %u, %u\n", env.GetEnvData()->nx, env.GetEnvData()->ny,
-    env.GetEnvData()->nz );
-
   struct OclPtxHandler::particle_attrs attrs = {
     kStepsPerKernel,
     sample_manager->GetOclptxOptions().nsteps.value(), // max_steps
@@ -75,7 +72,7 @@ int main(int argc, char **argv)
     env.GetEnvData()->nx,
     env.GetEnvData()->ny,
     env.GetEnvData()->nz,
-    1, // num_samples
+    env.GetEnvData()->ns, // num_samples
     sample_manager->GetOclptxOptions().c_thr.value(), // curv threshold
     env.GetEnvData()->n_waypts,
     sample_manager->GetOclptxOptions().steplength.value(),
