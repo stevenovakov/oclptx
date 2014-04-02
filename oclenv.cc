@@ -99,6 +99,9 @@ OclEnv::~OclEnv()
     delete this->env_data.termination_mask_buffer;
   if (this->env_data.waypoint_masks_buffer != NULL)
     delete this->env_data.waypoint_masks_buffer;
+
+  for (uint32_t i = 0; i < this->device_global_pdf_buffers.size(); i++)
+    delete device_global_pdf_buffers.at(i)
 }
 
 //*********************************************************************
@@ -135,6 +138,11 @@ void OclEnv::SetOclRoutine(std::string new_routine)
 EnvironmentData * OclEnv::GetEnvData()
 {
   return &(this->env_data);
+}
+
+cl::Buffer * OclEnv::GetDevicePdf(uint32_t device_num)
+{
+  return this->device_global_pdf_buffers.at(device_num);
 }
 
 
@@ -811,11 +819,24 @@ void OclEnv::AllocateSamples(
         );
     }
 
-    //
-    // TODO @STEVE
-    // I should instantiate/write globalpdf here, it has to go to each
-    // device anyways...
-    //
+    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+    {
+      this->device_global_pdf_buffers.push_back(
+        cl::Buffer(
+          this->ocl_context,
+          CL_MEM_WRITE_ONLY,
+          this->env_data.global_pdf_mem_size,
+          NULL,
+          NULL
+        );
+      );
+    }
+
+    uint32_t *global_init =
+      new uint32_t[this->env_data.global_pdf_size];
+    for (uint32_t j = 0; j < this->env_data.global_pdf_size; j++)
+      global_init[j] = 0;
+
     for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
     {
       for (uint32_t s = 0; s < n_dirs; s++)
@@ -896,6 +917,16 @@ void OclEnv::AllocateSamples(
         );
       }
 
+      this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        *(this->device_global_pdf_buffers.at(d)),
+        CL_FALSE,
+        static_cast<unsigned int>(0),
+        this->env_data.global_pdf_mem_size,
+        global_init,
+        NULL,
+        NULL
+      );
+
       this->ocl_device_queues.at(d).flush();
     }
 
@@ -906,9 +937,66 @@ void OclEnv::AllocateSamples(
     }
 }
 
-// void OclEnv::ProcessOptions( oclptxOptions* options)
-// {
+void OclEnv::PdfsToFile(std::string filename)
+{
+  uint32_t *temp_pdf = new uint32_t[this->env_data.global_pdf_size];
+  uint32_t *total_pdf = new uint32_t[this->env_data.global_pdf_size];
 
-// }
+  for (uint32_t i = 0; i < this->env_data.global_pdf_size; i++)
+  {
+    temp_pdf[i] = 0;
+    total_pdf[i] = 0;
+  }
+
+  for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+  {
+    this->ocl_device_queues.at(d).enqueueReadBuffer(
+      *(this->device_global_pdf_buffers.at(d))
+      CL_TRUE,
+      static_cast<unsigned int>(0),
+      this->env_data.global_pdf_mem_size,
+      temp_pdf
+    );
+    for (uint32_t i = 0; i < this->env_data.global_pdf_size; i++)
+    {
+      total_pdf[i] += temp_pdf[i];
+    }
+  }
+
+  //
+  // now write to file
+  //
+
+  FILE * pdf_file;
+  pdf_file = fopen(filename.c_str(), "wb");
+
+  uint32_t index = 0;
+
+  for (uint32_t k = 0; k < this->env_data.nz; k++)
+  {
+    for (uint32_t j = 0; j < this->env_data.ny; j++)
+    {
+      fprintf(pdf_file, "[");
+      for (uint32_t i = 0; i < this->env_data.nx; i++)
+      {
+        index =
+          i*(this->env_data.ny*this->env_data.nz) + j*(this->env_data.nz) + k;
+        fprintf(pdf_file, "%u", global_pdf->at(index));
+
+        if (i < nx - 1)
+          fprintf(pdf_file, " ");
+      }
+      fprintf(pdf_file, "\n");
+
+      if (j < ny - 1)
+        fprintf(pdf_file, " ");
+    }
+
+    if (k < nz - 1)
+      fprintf(pdf_file, "\n\n");
+  }
+
+  fclose(pdf_file);
+}
 
 //EOF

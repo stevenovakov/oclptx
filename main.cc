@@ -97,7 +97,8 @@ int main(int argc, char **argv)
                     env.GetSumKernel(i),
                     &attrs,
                     global_fd,
-                    env.GetEnvData());
+                    env.GetEnvData(),
+                    env.GetDevicePdf(i));
 
     gpu_managers[i] = new std::thread(
         threading::RunThreads,
@@ -115,6 +116,9 @@ int main(int argc, char **argv)
     std::cout<< "Total Tracking Time (ns): " <<
         std::chrono::duration_cast<std::chrono::nanoseconds>(
           t_end-t_start).count() << std::endl;
+
+  env.PdfsToFile("pdf_out");
+
   delete[] handler;
 
   fclose(global_fd);

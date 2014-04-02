@@ -62,14 +62,16 @@ class OclEnv{
 
     cl::Context * GetContext();
     
-    cl::Device * GetDevice(unsigned int device_num);
-    unsigned int HowManyDevices();
+    cl::Device * GetDevice(uint32_t device_num);
+    uint32_t HowManyDevices();
     
-    cl::CommandQueue * GetCq(unsigned int device_num);
-    cl::Kernel * GetKernel(unsigned int kernel_num);
-    cl::Kernel * GetSumKernel(unsigned int kernel_num);
+    cl::CommandQueue * GetCq(uint32_t device_num);
+    cl::Kernel * GetKernel(uint32_t kernel_num);
+    cl::Kernel * GetSumKernel(uint32_t kernel_num);
 
     EnvironmentData * GetEnvData();
+
+    cl::Buffer *GetDevicePdf(uint32_t device_num);
     // TODO:
     // not sure if better to generate new cl::kernel  object for
     // every oclptxhandler object, or if can just point to this->kernels
@@ -112,6 +114,11 @@ class OclEnv{
       std::vector<unsigned short int*>* waypoint_masks
     );
 
+    //
+    // Processing
+    //
+
+    void PdfsToFile(std::string filename);
     //void ProcessOptions( oclptxOptions* options);
 
   private:
@@ -134,6 +141,8 @@ class OclEnv{
     std::string ocl_routine_name;
 
     EnvironmentData env_data;
+
+    std::vector<cl::Buffer*> device_global_pdf_buffers;
 };
 
 #endif

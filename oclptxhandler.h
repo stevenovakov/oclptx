@@ -48,7 +48,8 @@ class OclPtxHandler{
       cl::Kernel* sum_kernel,
       struct particle_attrs *attrs,
       FILE *path_dump_fd,
-      EnvironmentData *env_dat);
+      EnvironmentData *env_dat,
+      cl::Buffer *global_pdf);
   ~OclPtxHandler();
 
   int particles_per_side();
