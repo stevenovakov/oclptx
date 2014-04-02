@@ -73,7 +73,7 @@ int main(int argc, char **argv)
     env.GetEnvData()->nx,
     env.GetEnvData()->ny,
     env.GetEnvData()->nz,
-    1, // num_samples
+    env.GetEnvData()->ns, // num_samples
     sample_manager->GetOclptxOptions().c_thr.value(), // curv threshold
     env.GetEnvData()->n_waypts,
     sample_manager->GetOclptxOptions().steplength.value(),
