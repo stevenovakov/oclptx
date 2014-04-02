@@ -67,13 +67,13 @@ int main(int argc, char **argv)
 
   struct OclPtxHandler::particle_attrs attrs = {
     kStepsPerKernel,
-    10, // max_steps
+    sample_manager->GetOclptxOptions().nsteps.value(), // max_steps
     0, // Particles per side not determined here.
     env.GetEnvData()->nx,
     env.GetEnvData()->ny,
     env.GetEnvData()->nz,
     1, // num_samples
-    0.2, // curvature threshold
+    sample_manager->GetOclptxOptions().c_thr.value(), // curv threshold
     env.GetEnvData()->n_waypts,
     sample_manager->GetOclptxOptions().steplength.value(),
     env.GetEnvData()->lx,
