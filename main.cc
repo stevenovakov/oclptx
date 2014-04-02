@@ -70,6 +70,7 @@ int main(int argc, char **argv)
     kStepsPerKernel,
     sample_manager->GetOclptxOptions().nsteps.value(), // max_steps
     0, // Particles per side not determined here.
+    env.GetEnvData()->pdf_entries_per_particle,
     env.GetEnvData()->nx,
     env.GetEnvData()->ny,
     env.GetEnvData()->nz,
