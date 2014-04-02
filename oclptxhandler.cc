@@ -19,6 +19,19 @@
 #include <CL/cl.hpp>
 #endif
 
+static void die(int reason)
+{
+  if (CL_MEM_OBJECT_ALLOCATION_FAILURE == reason)
+  {
+    puts("Ran out of device memory while allocating particle buffers."
+         "  It should be possible to recover by making particles_per_side"
+         " smaller and rerunning.");
+    exit(-1);
+  }
+  else
+    abort();
+}
+
 void OclPtxHandler::Init(
   cl::Context *cc,
   cl::CommandQueue *cq,
@@ -41,6 +54,7 @@ void OclPtxHandler::Init(
 
 void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
 {
+  cl_int ret;
   attrs_ = *attrs;
 
   // TODO(jeff) compute num_particles
@@ -134,12 +148,14 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   for (int i = 0; i < 2 * attrs_.particles_per_side; ++i)
     temp_completion[i] = 1;
 
-  cq_->enqueueWriteBuffer(
+  ret = cq_->enqueueWriteBuffer(
       *gpu_complete_,
       true,
       0,
       2 * attrs_.particles_per_side * sizeof(cl_ushort),
       reinterpret_cast<void*>(temp_completion));
+  if (CL_SUCCESS != ret)
+    die(ret);
 
   delete[] temp_completion;
 
@@ -158,6 +174,8 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
       0,
       global_entries * sizeof(cl_uint),
       reinterpret_cast<void*>(temp_global_pdf));
+  if (CL_SUCCESS != ret)
+    die(ret);
 
   delete[] temp_global_pdf;
 }
@@ -209,7 +227,7 @@ void OclPtxHandler::WriteParticle(
   if (CL_SUCCESS != ret)
   {
     puts("Write failed!");
-    abort();
+    die(ret);
   }
 
   // gpu_complete_ = 0
@@ -222,7 +240,7 @@ void OclPtxHandler::WriteParticle(
   if (CL_SUCCESS != ret)
   {
     puts("Write failed!");
-    abort();
+    die(ret);
   }
 
   // step_count = 0
@@ -235,7 +253,7 @@ void OclPtxHandler::WriteParticle(
   if (CL_SUCCESS != ret)
   {
     puts("Write failed!");
-    abort();
+    die(ret);
   }
 
   // Fill in the "particle pdf" buffer.
@@ -272,12 +290,14 @@ void OclPtxHandler::WriteParticle(
     for (int i = 0; i < loopcheck_entries_per_particle; ++i)
       temp_loopcheck[i] = zero_f4;
 
-    cq_->enqueueWriteBuffer(
+    ret = cq_->enqueueWriteBuffer(
         *gpu_loopcheck_,
         true,
         offset * loopcheck_entries_per_particle * sizeof(cl_float4),
         loopcheck_entries_per_particle * sizeof(cl_float4),
         temp_loopcheck);
+    if (CL_SUCCESS != ret)
+      die(ret);
 
     delete[] temp_loopcheck;
   }
@@ -290,12 +310,14 @@ void OclPtxHandler::WriteParticle(
     for (cl_uint i = 0; i < attrs_.n_waypoint_masks; ++i)
       temp_waypoints[i] = 0;
 
-    cq_->enqueueWriteBuffer(
+    ret = cq_->enqueueWriteBuffer(
         *gpu_waypoints_,
         true,
         offset * attrs_.n_waypoint_masks * sizeof(cl_ushort),
         attrs_.n_waypoint_masks * sizeof(cl_ushort),
         temp_waypoints);
+    if (CL_SUCCESS != ret)
+      die(ret);
 
     delete[] temp_waypoints;
   }
@@ -304,13 +326,15 @@ void OclPtxHandler::WriteParticle(
   {
     cl_ushort temp_zero = 0;
 
-    cq_->enqueueWriteBuffer(
+    ret = cq_->enqueueWriteBuffer(
       *gpu_exclusion_,
       true,
       offset * sizeof(cl_ushort),
       sizeof(cl_ushort),
       &temp_zero
     );
+    if (CL_SUCCESS != ret)
+      die(ret);
   }
 }
 
@@ -324,6 +348,7 @@ inline void OclPtxHandler::SetKArg(int pos, cl::Buffer *buf)
 
 void OclPtxHandler::RunKernel(int side)
 {
+  cl_int ret;
   cl::NDRange particles_to_compute(attrs_.particles_per_side);
   cl::NDRange particle_offset(attrs_.particles_per_side * side);
   cl::NDRange local_range(1);
@@ -349,25 +374,29 @@ void OclPtxHandler::RunKernel(int side)
   SetKArg(14, env_dat_->termination_mask_buffer);
   SetKArg(15, env_dat_->exclusion_mask_buffer);
 
-  cq_->enqueueNDRangeKernel(
+  ret = cq_->enqueueNDRangeKernel(
     *(ptx_kernel_),
     particle_offset,
     particles_to_compute,
     local_range,
     NULL,
     NULL);
+  if (CL_SUCCESS != ret)
+    die(ret);
 
   cq_->finish();
 }
 
 void OclPtxHandler::ReadStatus(int offset, int count, cl_ushort *ret)
 {
-  cq_->enqueueReadBuffer(
+  cl_int err = cq_->enqueueReadBuffer(
       *gpu_complete_,
       true,
       offset * sizeof(cl_ushort),
       count * sizeof(cl_ushort),
       reinterpret_cast<cl_ushort*>(ret));
+  if (CL_SUCCESS != err)
+    die(err);
 }
 
 void OclPtxHandler::DumpPath(int offset, int count)
@@ -399,7 +428,7 @@ void OclPtxHandler::DumpPath(int offset, int count)
   if (CL_SUCCESS != ret)
   {
     puts("Failed to read back path");
-    abort();
+    die(ret);
   }
 
   ret = cq_->enqueueReadBuffer(
@@ -411,7 +440,7 @@ void OclPtxHandler::DumpPath(int offset, int count)
   if (CL_SUCCESS != ret)
   {
     puts("Failed to read back path");
-    abort();
+    die(ret);
   }
 
   // Now dumpify.
@@ -440,6 +469,7 @@ void OclPtxHandler::DumpPath(int offset, int count)
 // May need to be done in kernel itself.
 void OclPtxHandler::PdfSum()
 {
+  cl_int ret;
   cl::NDRange global_range(this->env_dat_->pdf_entries_per_particle);
   cl::NDRange local_range(1);
 
@@ -449,7 +479,7 @@ void OclPtxHandler::PdfSum()
   sum_kernel_->setArg(3, attrs_.particles_per_side);
   sum_kernel_->setArg(4, this->env_dat_->pdf_entries_per_particle);
 
-  cq_->enqueueNDRangeKernel(
+  ret = cq_->enqueueNDRangeKernel(
     *(sum_kernel_),
     cl::NullRange,
     global_range,
@@ -457,21 +487,31 @@ void OclPtxHandler::PdfSum()
     NULL,
     NULL
   );
+  if (CL_SUCCESS != ret)
+    die(ret);
 
-  cq_->finish();
+  ret = cq_->finish();
+  if (CL_SUCCESS != ret)
+    die(ret);
 }
 
 // TODO(jeff): needs work.  Offset, count would be nice, even if only used to
 // assert.
 void OclPtxHandler::GetPdfData(cl_int* container)
 {
-  cq_->enqueueReadBuffer(
+  cl_int ret;
+  ret = cq_->enqueueReadBuffer(
     *gpu_global_pdf_,
     CL_FALSE,
     0,
     this->env_dat_->global_pdf_mem_size,
     container
   );
-  cq_->finish();
+  if (CL_SUCCESS != ret)
+    die(ret);
+
+  ret = cq_->finish();
+  if (CL_SUCCESS != ret)
+    die(ret);
 }
 

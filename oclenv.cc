@@ -101,7 +101,7 @@ OclEnv::~OclEnv()
     delete this->env_data.waypoint_masks_buffer;
 }
 
-void die(int reason)
+static void die(int reason)
 {
   if (CL_MEM_OBJECT_ALLOCATION_FAILURE == reason)
   {
