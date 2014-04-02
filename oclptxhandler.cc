@@ -39,7 +39,8 @@ void OclPtxHandler::Init(
   cl::Kernel *sum_kernel,
   struct OclPtxHandler::particle_attrs *attrs,
   FILE *path_dump_fd,
-  EnvironmentData *env_dat)
+  EnvironmentData *env_dat,
+  cl::Buffer *global_pdf)
 {
   context_ = cc;
   cq_ = cq;
@@ -48,6 +49,8 @@ void OclPtxHandler::Init(
   first_time_ = 1;
   path_dump_fd_ = path_dump_fd;
   env_dat_ = env_dat;
+
+  this->gpu_global_pdf_ = global_pdf;
 
   InitParticles(attrs);
 }
@@ -136,13 +139,6 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   else
     gpu_loopcheck_ = NULL;
 
-  gpu_global_pdf_ = new cl::Buffer(
-      *context_,
-      CL_MEM_READ_WRITE,
-      2 * attrs_.sample_nx * attrs_.sample_ny * attrs_.sample_nz);
-  if (!gpu_global_pdf_)
-    abort();
-
   // Initialize "completion" buffer.
   cl_ushort *temp_completion = new cl_ushort[2*attrs_.particles_per_side];
   for (int i = 0; i < 2 * attrs_.particles_per_side; ++i)
@@ -158,26 +154,6 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
     die(ret);
 
   delete[] temp_completion;
-
-  int global_entries = attrs_.sample_nx
-                     * attrs_.sample_ny
-                     * attrs_.sample_nz;
-
-  cl_uint *temp_global_pdf = new cl_uint[2 * global_entries];
-  for (int i = 0; i < 2 * global_entries; ++i)
-    temp_global_pdf[i] = 0;
-
-  // This one is *not* a double buffer, nor related to number of particles.
-  cq_->enqueueWriteBuffer(
-      *gpu_global_pdf_,
-      true,
-      0,
-      global_entries * sizeof(cl_uint),
-      reinterpret_cast<void*>(temp_global_pdf));
-  if (CL_SUCCESS != ret)
-    die(ret);
-
-  delete[] temp_global_pdf;
 }
 
 OclPtxHandler::~OclPtxHandler()
@@ -494,24 +470,3 @@ void OclPtxHandler::PdfSum()
   if (CL_SUCCESS != ret)
     die(ret);
 }
-
-// TODO(jeff): needs work.  Offset, count would be nice, even if only used to
-// assert.
-void OclPtxHandler::GetPdfData(cl_int* container)
-{
-  cl_int ret;
-  ret = cq_->enqueueReadBuffer(
-    *gpu_global_pdf_,
-    CL_FALSE,
-    0,
-    this->env_dat_->global_pdf_mem_size,
-    container
-  );
-  if (CL_SUCCESS != ret)
-    die(ret);
-
-  ret = cq_->finish();
-  if (CL_SUCCESS != ret)
-    die(ret);
-}
-
