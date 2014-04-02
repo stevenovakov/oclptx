@@ -91,10 +91,10 @@ __kernel void OclPtxInterpolate(
   uint sample;
   
   // last location of particle
-  float4 particle_pos = state[glid].position;
+  float4 particle_pos;
   particle_pos.s3 = 0.0;
 
-  float4 temp_pos = particle_pos; //dx, dy, dz
+  float4 temp_pos = state[glid].position; //dx, dy, dz
   float4 dr = (float4) (0.0f);
   float4 last_dr = (float4) (0.0f);
 
@@ -137,6 +137,7 @@ __kernel void OclPtxInterpolate(
 
   for (step = 0; step < attrs.steps_per_kernel; ++step)
   {
+    particle_pos = state[glid].position;
     // calculate current index in diffusion space
     current_select_vertex.s0 = floor(particle_pos.s0);
     current_select_vertex.s1 = floor(particle_pos.s1);
@@ -301,7 +302,7 @@ __kernel void OclPtxInterpolate(
 
     if (particle_steps[glid] > 1 && jump_dot < attrs.curvature_threshold)
     {
-      particle_done[glid] = 1;
+      particle_done[glid] = 2;
       if (0 == step)
         particle_steps[glid] = 0;
     }
@@ -316,7 +317,7 @@ __kernel void OclPtxInterpolate(
       temp_pos.s1 > ymax || ymin > temp_pos.s1 ||
         temp_pos.s2 > zmax || zmin > temp_pos.s2)
     {
-      particle_done[glid] = 1;
+      particle_done[glid] = 4;
       if (0 == step)
         particle_steps[glid] = 0;
     }
@@ -339,7 +340,7 @@ __kernel void OclPtxInterpolate(
     bounds_test = termination_mask[mask_index];
     if (bounds_test == 0)
     {
-      particle_done[glid] = 1;
+      particle_done[glid] = 5;
       if (0 == step)
         particle_steps[glid] = 0;
       break;
@@ -384,7 +385,7 @@ __kernel void OclPtxInterpolate(
 
   if (loopcheck_product < 0) // loopcheck break
   {
-    particle_done[glid] = 1;
+    particle_done[glid] = 3;
     if (0 == step)
       particle_steps[glid] = 0;
     break;
@@ -395,15 +396,13 @@ __kernel void OclPtxInterpolate(
 
 #endif  // LOOPCHECK
 
-    particle_pos = temp_pos;
-
     // add to particle paths
     path_index = glid * attrs.steps_per_kernel + step;
-    particle_paths[path_index] = particle_pos;
+    particle_paths[path_index] = temp_pos;
   
     // update particle pdf
     vertex_num =
-      round(particle_pos.s0)*round(particle_pos.s1)*round(particle_pos.s2);
+      round(temp_pos.s0)*round(temp_pos.s1)*round(temp_pos.s2);
     entry_num = vertex_num / 32;
     shift_num = 31 - (vertex_num % 32);
 
@@ -418,6 +417,7 @@ __kernel void OclPtxInterpolate(
         particle_steps[glid] = 0;
     }
 
+    state[glid].position = temp_pos;
     // update step location
     if (!particle_done[glid])
     {
