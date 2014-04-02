@@ -67,7 +67,6 @@ int main(int argc, char **argv)
 
   printf("%u, %u, %u\n", env.GetEnvData()->nx, env.GetEnvData()->ny,
     env.GetEnvData()->nz );
-  std::cin.get();
 
   struct OclPtxHandler::particle_attrs attrs = {
     kStepsPerKernel,
