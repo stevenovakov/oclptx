@@ -35,6 +35,8 @@
 #include <cmath>
 
 #include "samplemanager.h"
+#include "oclptxhandler.h"
+#include "fifo.h"
 #include "oclptxOptions.h"
 
 //
@@ -60,7 +62,7 @@ uint64_t rand_64()
 
 cl_ulong8 SampleManager::NewRng()
 {
-  cl_ulong8 rng = {0,};
+  cl_ulong8 rng = {{0,}};
   for (int i = 0; i < 5; i++)
   {
     rng.s[i] = rand_64();
@@ -386,8 +388,13 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
   else
   {
     this->_nParticles = seeds.Nrows();
+
     _seedParticles =
         new Fifo<struct OclPtxHandler::particle_data>(2 * _nParticles);
+
+    cl_float4 forward = {{1.0, 0., 0., 0.}};
+    cl_float4 reverse = {{-1.0, 0., 0., 0.}};
+
     if (seeds.Ncols()!=3 && seeds.Nrows()==3)
     {
        seeds=seeds.t();
@@ -397,11 +404,17 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
       seed.s[0] = seeds(t,1);
       seed.s[1] = seeds(t,2);
       seed.s[2] = seeds(t,3);
+
       particle = new OclPtxHandler::particle_data;
-      *particle = {NewRng(), seed, {1,0,0}};
+      particle->rng = NewRng();
+      particle->position = seed;
+      particle->dr = forward;
       _seedParticles->PushOrDie(particle);
+
       particle = new OclPtxHandler::particle_data;
-      *particle = {NewRng(), seed, {-1,0,0}};
+      particle->rng = NewRng();
+      particle->position = seed;
+      particle->dr = reverse;
       _seedParticles->PushOrDie(particle);
     // TODO @STEVE
     // Implement Jittering on seed file.
@@ -413,26 +426,29 @@ void SampleManager::GenerateSeedParticles(float aSampleVoxel)
 void SampleManager::GenerateSeedParticlesHelper(
   cl_float4 aSeed, float aSampleVoxel)
 {
- struct OclPtxHandler::particle_data *particle;
- _seedParticles =
+  struct OclPtxHandler::particle_data *particle;
+  _seedParticles =
      new Fifo<struct OclPtxHandler::particle_data>(2 * _nParticles);
- for (int p = 0; p<_nParticles; p++)
- {
-  cl_float4 randomParticle = aSeed;
-  if(aSampleVoxel > 0)
+
+  cl_float4 forward = {{1.0, 0., 0., 0.}};
+  cl_float4 reverse = {{-1.0, 0., 0., 0.}};
+  for (int p = 0; p<_nParticles; p++)
   {
-    float dx,dy,dz;
-    float radSq = aSampleVoxel*aSampleVoxel;
-    
-    while(true)
+    cl_float4 randomParticle = aSeed;
+    if(aSampleVoxel > 0)
     {
-      dx=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
-      dy=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
-      dz=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
-      if(dx*dx + dy*dy + dz*dz <= radSq)
+      float dx,dy,dz;
+      float radSq = aSampleVoxel*aSampleVoxel;
+    
+      while(true)
       {
-         break;
-      }
+        dx=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
+        dy=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
+        dz=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
+        if(dx*dx + dy*dy + dz*dz <= radSq)
+        {
+          break;
+        }
     }
     randomParticle.s[0] += dx / _brainMask.xdim();
     randomParticle.s[1] += dy / _brainMask.ydim();
@@ -440,10 +456,14 @@ void SampleManager::GenerateSeedParticlesHelper(
   }
 
   particle = new OclPtxHandler::particle_data;
-  *particle = {NewRng(), randomParticle, {1,0,0}};
+  particle->rng = NewRng();
+  particle->position = randomParticle;
+  particle->dr = forward;
   _seedParticles->PushOrDie(particle);
   particle = new OclPtxHandler::particle_data;
-  *particle = {NewRng(), randomParticle, {-1,0,0}};
+  particle->rng = NewRng();
+  particle->position = randomParticle;
+  particle->dr = reverse;
   _seedParticles->PushOrDie(particle);
  }
 }

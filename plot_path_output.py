@@ -31,7 +31,7 @@ def PlotPath(fname):
                5 : 0} # 5: termination break
 
   for row in data:
-    split1 = row.replace("\n","").rstrip('n').split(":")
+    split1 = row.replace("\n","").replace("n", "").split(":")
 
     if split1[0] not in plotset.keys():
       plotset[split1[0]] = [[],[],[]]

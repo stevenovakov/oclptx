@@ -35,6 +35,7 @@ struct particle_attrs
   int steps_per_kernel;
   int max_steps;
   int particles_per_side;
+  uint pdf_mask_entries;
   uint sample_nx;
   uint sample_ny;
   uint sample_nz;
@@ -81,8 +82,6 @@ __kernel void OclPtxInterpolate(
 #endif
     
   uint step;
-
-  uint pdf_entries_per_particle = (attrs.sample_nx*attrs.sample_ny*attrs.sample_nz / 32) + 1;
   
   uint3 current_select_vertex;
   float3 volume_fraction;
@@ -270,8 +269,9 @@ __kernel void OclPtxInterpolate(
     //
     // jump (aligns direction to prevent zig-zagging)
     //
-    jump_dot = dr2.s0*state[glid].dr.s0 + dr2.s1*state[glid].dr.s1 +
-      dr2.s2*state[glid].dr.s2;
+    jump_dot = dr2.s0*state[glid].dr.s0 +
+                dr2.s1*state[glid].dr.s1 +
+                  dr2.s2*state[glid].dr.s2;
 
     if (jump_dot < 0.0 )
     {
@@ -305,9 +305,6 @@ __kernel void OclPtxInterpolate(
       if (0 == step)
         particle_steps[glid] = 0;
     }
-
-    // update last flow vector
-    state[glid].dr = new_dr;
 
     //
     // Complete out of bounds test (just in case)
@@ -379,8 +376,8 @@ __kernel void OclPtxInterpolate(
       particle_loopcheck_lastdir[glid*loopcheck_dir_size +
         loopcheck_index];
 
-  loopcheck_product = last_loopcheck_dr.s0*dr.s0 +
-    last_loopcheck_dr.s1*dr.s1 + last_loopcheck_dr.s2*dr.s2;
+  loopcheck_product = last_loopcheck_dr.s0*new_dr.s0 +
+    last_loopcheck_dr.s1*new_dr.s1 + last_loopcheck_dr.s2*new_dr.s2;
 
   if (loopcheck_product < 0) // loopcheck break
   {
@@ -391,9 +388,12 @@ __kernel void OclPtxInterpolate(
   }
 
   particle_loopcheck_lastdir[glid*loopcheck_dir_size +
-    loopcheck_index] = dr;
+    loopcheck_index] = new_dr;
 
 #endif  // LOOPCHECK
+
+    // update last flow vector
+    state[glid].dr = new_dr;
 
     // add to particle paths
     path_index = glid * attrs.steps_per_kernel + step;
@@ -405,10 +405,10 @@ __kernel void OclPtxInterpolate(
     entry_num = vertex_num / 32;
     shift_num = 31 - (vertex_num % 32);
 
-//    particle_entry =
-//      particle_pdfs[glid * pdf_entries_per_particle + entry_num];
-//    particle_pdfs[glid * pdf_entries_per_particle + entry_num] =
-//      particle_entry | (0x00000001 << shift_num);
+   particle_entry =
+     particle_pdfs[glid * attrs.pdf_mask_entries + entry_num];
+   particle_pdfs[glid * attrs.pdf_mask_entries + entry_num] =
+     particle_entry | (0x00000001 << shift_num);
     
     if (particle_steps[glid] + 1 == attrs.max_steps){
       particle_done[glid] = 1;

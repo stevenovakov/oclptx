@@ -151,7 +151,7 @@ OclPtxHandler::~OclPtxHandler()
     delete gpu_exclusion_;
   if (gpu_loopcheck_)
     delete gpu_loopcheck_;
-  delete gpu_global_pdf_;
+  // we let OclEnv delete gpu_global_pdf_
 }
 
 int OclPtxHandler::particles_per_side()
