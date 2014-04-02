@@ -295,7 +295,7 @@ __kernel void OclPtxInterpolate(
     //
 
     // normalize for curvature threshold
-    dr = dr/ (dr.s0*dr.s0 + dr.s1*dr.s2 + dr.s2*dr.s2);
+    dr = dr/ (dr.s0*dr.s0 + dr.s1*dr.s1 + dr.s2*dr.s2);
     
     jump_dot = dr.s0*last_dr.s0 + dr.s1*last_dr.s1 +
       dr.s2*last_dr.s2;
