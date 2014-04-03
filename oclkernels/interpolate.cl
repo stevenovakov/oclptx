@@ -293,7 +293,7 @@ __kernel void OclPtxInterpolate(
     bounds_test = brain_mask[mask_index];
     if (bounds_test == 0)
     {
-      particle_done[glid] = BREAK_MASK;
+      particle_done[glid] = BREAK_BRAIN_MASK;
       if (0 == step)
         particle_steps[glid] = 0;
     }
