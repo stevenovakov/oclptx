@@ -115,9 +115,9 @@ int main(int argc, char **argv)
   }
 
   t_end = std::chrono::high_resolution_clock::now();
-    std::cout<< "Total Tracking Time (ns): " <<
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-          t_end-t_start).count() << std::endl;
+
+  std::chrono::duration<float> delta_t = t_end - t_start;
+  printf("Time to track [s]: %f\n", delta_t.count());
 
   env.PdfsToFile("pdf_out");
 
