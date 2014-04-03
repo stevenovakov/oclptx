@@ -90,7 +90,7 @@ __kernel void PdfSum(
 
     for (int b = 0; b < 32; b++)
     {
-      to_total = (particle_entry >> (31 - b)) & 0x00000001;
+      to_total = (particle_entry >> b) & 1;
       running_total[b] += to_total;
     }
   }
