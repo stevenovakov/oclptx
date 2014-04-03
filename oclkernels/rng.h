@@ -4,6 +4,9 @@
  *  Steve Novakov
  */
 
+#ifndef RNG_H_
+#define RNG_H_
+
 typedef ulong8 rng_t;
 __constant float kRandMax = 18446744073709551616.;
 
@@ -46,3 +49,4 @@ ulong Rand(__global rng_t *z)
   return ret;
 }
 
+#endif  // RNG_H_

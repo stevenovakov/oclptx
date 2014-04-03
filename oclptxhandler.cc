@@ -314,12 +314,20 @@ void OclPtxHandler::WriteParticle(
   }
 }
 
-inline void OclPtxHandler::SetKArg(int pos, cl::Buffer *buf)
+void OclPtxHandler::SetInterpArg(int pos, cl::Buffer *buf)
 {
   if (buf)
     ptx_kernel_->setArg(pos, *buf);
   else
     ptx_kernel_->setArg(pos, NULL);
+}
+
+void OclPtxHandler::SetSumArg(int pos, cl::Buffer *buf)
+{
+  if (buf)
+    sum_kernel_->setArg(pos, *buf);
+  else
+    sum_kernel_->setArg(pos, NULL);
 }
 
 void OclPtxHandler::RunKernel(int side)
@@ -333,22 +341,22 @@ void OclPtxHandler::RunKernel(int side)
       0,
       sizeof(struct OclPtxHandler::particle_attrs),
       reinterpret_cast<void*>(&attrs_));
-  SetKArg(1, gpu_data_);
-  SetKArg(2, gpu_path_);
-  SetKArg(3, gpu_step_count_);
-  SetKArg(4, gpu_complete_);
-  SetKArg(5, gpu_local_pdf_);
-  SetKArg(6, gpu_waypoints_);
-  SetKArg(7, gpu_exclusion_);
-  SetKArg(8, gpu_loopcheck_);
+  SetInterpArg(1, gpu_data_);
+  SetInterpArg(2, gpu_path_);
+  SetInterpArg(3, gpu_step_count_);
+  SetInterpArg(4, gpu_complete_);
+  SetInterpArg(5, gpu_local_pdf_);
+  SetInterpArg(6, gpu_waypoints_);
+  SetInterpArg(7, gpu_exclusion_);
+  SetInterpArg(8, gpu_loopcheck_);
 
-  SetKArg(9, env_dat_->f_samples_buffers[0]);
-  SetKArg(10, env_dat_->phi_samples_buffers[0]);
-  SetKArg(11, env_dat_->theta_samples_buffers[0]);
-  SetKArg(12, env_dat_->brain_mask_buffer);
-  SetKArg(13, env_dat_->waypoint_masks_buffer);
-  SetKArg(14, env_dat_->termination_mask_buffer);
-  SetKArg(15, env_dat_->exclusion_mask_buffer);
+  SetInterpArg(9, env_dat_->f_samples_buffers[0]);
+  SetInterpArg(10, env_dat_->phi_samples_buffers[0]);
+  SetInterpArg(11, env_dat_->theta_samples_buffers[0]);
+  SetInterpArg(12, env_dat_->brain_mask_buffer);
+  SetInterpArg(13, env_dat_->waypoint_masks_buffer);
+  SetInterpArg(14, env_dat_->termination_mask_buffer);
+  SetInterpArg(15, env_dat_->exclusion_mask_buffer);
 
   ret = cq_->enqueueNDRangeKernel(
     *(ptx_kernel_),
@@ -360,7 +368,42 @@ void OclPtxHandler::RunKernel(int side)
   if (CL_SUCCESS != ret)
     die(ret);
 
-  cq_->finish();
+  ret = cq_->finish();
+  if (CL_SUCCESS != ret)
+    die(ret);
+
+  // Now run the summing kernel
+  cl::NDRange space_to_compute((attrs_.sample_nx
+                              * attrs_.sample_ny
+                              * attrs_.sample_nz / 32) + 1);
+  cl::NDRange space_offset(0);
+
+  sum_kernel_->setArg(
+      0,
+      sizeof(struct OclPtxHandler::particle_attrs),
+      reinterpret_cast<void*>(&attrs_));
+  sum_kernel_->setArg(1, side);
+  SetSumArg(2, gpu_complete_);
+  SetSumArg(3, gpu_local_pdf_);
+  SetSumArg(4, gpu_waypoints_);
+  SetSumArg(5, gpu_exclusion_);
+  SetSumArg(6, gpu_global_pdf_);
+
+  ret = cq_->enqueueNDRangeKernel(
+    *(sum_kernel_),
+    space_offset,
+    space_to_compute,
+    local_range,
+    NULL,
+    NULL);
+  if (CL_SUCCESS != ret)
+    die(ret);
+
+  // And wait for both to finish.  TODO(jeff): try making this a flush, and see
+  // if things run faster.
+  ret = cq_->finish();
+  if (CL_SUCCESS != ret)
+    die(ret);
 }
 
 void OclPtxHandler::ReadStatus(int offset, int count, cl_ushort *ret)
@@ -439,34 +482,4 @@ void OclPtxHandler::DumpPath(int offset, int count)
 
   delete path_buf;
   delete step_count_buf;
-}
-
-// TODO(jeff) Double buffer!  Add offsets to the two "particle" parameters.
-// May need to be done in kernel itself.
-void OclPtxHandler::PdfSum()
-{
-  cl_int ret;
-  cl::NDRange global_range(this->env_dat_->pdf_entries_per_particle);
-  cl::NDRange local_range(1);
-
-  sum_kernel_->setArg(0, gpu_global_pdf_);
-  sum_kernel_->setArg(1, gpu_local_pdf_);  // TODO: Add offset
-  sum_kernel_->setArg(2, gpu_complete_);  // TODO: Add offset
-  sum_kernel_->setArg(3, attrs_.particles_per_side);
-  sum_kernel_->setArg(4, this->env_dat_->pdf_entries_per_particle);
-
-  ret = cq_->enqueueNDRangeKernel(
-    *(sum_kernel_),
-    cl::NullRange,
-    global_range,
-    local_range,
-    NULL,
-    NULL
-  );
-  if (CL_SUCCESS != ret)
-    die(ret);
-
-  ret = cq_->finish();
-  if (CL_SUCCESS != ret)
-    die(ret);
 }

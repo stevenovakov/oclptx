@@ -30,7 +30,6 @@ class OclPtxHandler{
     cl_int steps_per_kernel;
     cl_int max_steps;
     cl_int particles_per_side;
-    cl_uint pdf_mask_entries;
     cl_uint sample_nx;
     cl_uint sample_ny;
     cl_uint sample_nz;
@@ -68,9 +67,8 @@ class OclPtxHandler{
 
  private:
   void InitParticles(struct particle_attrs *attrs);
-  void GetPdfData(cl_int* container);
-  void PdfSum();
-  void SetKArg(int pos, cl::Buffer *buf);
+  void SetInterpArg(int pos, cl::Buffer *buf);
+  void SetSumArg(int pos, cl::Buffer *buf);
 
   struct particle_attrs attrs_;
 

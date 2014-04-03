@@ -1,53 +1,19 @@
-/*  Copyright (C) 2004
- *    Afshin Haidari
- *    Steve Novakov
- *    Jeff Taylor
- */
+// Copyright (C) 2014
+//  Afshin Haidari
+//  Steve Novakov
+//  Jeff Taylor
+//
+//  This kernel traces out the paths taken by particles.  Each thread acts as a
+//  single particle.
  
-#include "rng.cl"
+#include "attrs.h"
+#include "rng.h"
 
-//*********************************************************************
-//
-// Main Kernel
-//
-//*********************************************************************
-//
 // sample data
 // Access x, y, z vertex:
 //    index = x*(ny*nz*ns*ndir) + y*(nz*ns*ndir) + z*(ns*ndir) + s*ndir
 //    here ndir = 1, and is not included
 //
-
-// TODO(jeff):
-//  - Double check that completion logic is similar to collatz, abstract if
-//  needed.
-//  - Check that we add to the particle path in the right place.
-
-struct particle_data
-{
-  rng_t rng; //RW
-  float4 position;
-  float4 dr;
-} __attribute__((aligned(64)));
-
-struct particle_attrs
-{
-  float4 brain_mask_dim;
-  int steps_per_kernel;
-  int max_steps;
-  int particles_per_side;
-  uint pdf_mask_entries;
-  uint sample_nx;
-  uint sample_ny;
-  uint sample_nz;
-  uint num_samples;
-  float curvature_threshold;
-  uint n_waypoint_masks;
-  float step_length;  // TODO(steve) figure out differences in steplength (why div 2)
-  uint lx;  // Loopcheck sizes
-  uint ly;
-  uint lz;
-} __attribute__((aligned(16)));
 
 __kernel void OclPtxInterpolate(
   struct particle_attrs attrs,  /* RO */

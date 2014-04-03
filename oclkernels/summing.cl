@@ -1,103 +1,104 @@
-/*  Copyright (C) 2004
- *    Afshin Haidari
- *    Steve Novakov
- *    Jeff Taylor
- */
-
+// Copyright 2014
+//  Afshin Haidari
+//  Steve Novakov
+//  Jeff Taylor
 //
+// Summing kernel.  This kernel adds up the paths tracked by finished particles
+// into a single global buffer.  Each thread takes on a small piece of physical
+// space, iterating through all the particles to see if they've crossed it.
+
+#include "attrs.h"
+
 // uint32_t list of particle_pdfs
 //          b=0             b=31
 // [ ... ], [0 1 2 3 .....  31], [ ... ]
 //
-// voxel = entry_num*num_entries_per_particle + b
+// voxel = glid*num_entries_per_particle + b
 //
 // Note, unpacking to a global NDRange(entries, 32)
 // was attempted, and was ~100x SLOWER than the 1D work range
-//
-//
-// TODO(jeff): Support double buffering.
+
+
 // TODO(jeff): Clear the local_pdf's when we finish with them, so host doesn't
 // have to copy over zeroes.
-__kernel void PdfSum( __global uint* total_pdf,
-                      __global uint* particle_pdfs,
-                      __global uint* particles_done,
-                      uint num_particles,
-                      uint entries_per_particle
-#ifdef EXCLUSION
-                      , __global uint* particle_exclusion
-#endif
-#ifdef WAYPOINTS
-                      , __global uint* particle_waypoints,
-                      uint num_waypts
-#endif
+__kernel void PdfSum(
+  struct particle_attrs attrs,  /* RO */
+  uint side,
+
+  // Particle data
+  __global uint* particles_done,
+  __global uint* particle_pdfs,
+  __global uint* particle_waypoints,
+  __global uint* particle_exclusion,
+
+  // Output
+  __global uint* global_pdf
 )
 {
-  uint entry_num = get_global_id(0);
+  uint glid = get_global_id(0);
 
-  uint vertex_num;
-  uint root_vertex = entry_num * 32;
-  uint p,b;
+  uint root_vertex = glid * 32;
+  uint entries_per_particle = (attrs.sample_nx * attrs.sample_ny * attrs.sample_nz / 32) + 1;
   uint particle_check = 0;
-
   uint particle_entry = 0;
+  uint to_total;
 
   __local uint running_total[32];
 
-  for (b = 0; b < 32; b++)
+  for (int b = 0; b < 32; b++)
   {
     running_total[b] = 0;
   }
 
-  uint to_total;
-
-  for ( p = 0; p < num_particles; p++)
+  int first_particle = side * attrs.particles_per_side;
+  int last_particle = (1 + side) * attrs.particles_per_side;
+  for (int p = first_particle; p < last_particle; ++p)
   {
     
-#ifdef EXCLUSION
+#if EXCLUSION
     particle_check = particle_exclusion[p];
 
     if (particle_check > 0)
       continue;
-#endif
+#endif  // EXCLUSION
 
-#ifdef WAYPOINTS
+#if WAYPOINTS
     particle_check = 1;
-    for (uint w = 0; w < num_waypts; w++)
+    for (uint w = 0; w < attrs.n_waypoint_masks; w++)
     {
-#ifdef WAYAND
-      particle_check &= particle_waypoints[p*num_waypts + w];
-#else
-      particle_check |= particle_waypoints[p*num_waypts + w];
-#endif
+#if WAYAND
+      particle_check &= particle_waypoints[p*attrs.n_waypoint_masks + w];
+#else  // WAYOR
+      particle_check |= particle_waypoints[p*attrs.n_waypoint_masks + w];
+#endif  // WAYAND
     }
 
     if (particle_check == 0)
       continue;
-#endif
+#endif  // WAYPOINTS
 
     particle_check = particles_done[p];
 
     if (particle_check > 0)
     {
-      particle_entry = particle_pdfs[p * entries_per_particle + entry_num];
+      particle_entry = particle_pdfs[p * entries_per_particle + glid];
     }
     else
     {
       continue;
     }
 
-    for (b = 0; b < 32; b++)
+    for (int b = 0; b < 32; b++)
     {
-     vertex_num = root_vertex + b;
-
       to_total = (particle_entry >> (31 - b)) & 0x00000001;
       running_total[b] += to_total;
     }
   }
 
-  for (b = 0; b < 32; b++)
+  int vertex_num;
+  for (int b = 0; b < 32; b++)
   {
     vertex_num = root_vertex + b;
-    total_pdf[vertex_num] = running_total[b];
+    global_pdf[vertex_num] = running_total[b];
   }
 }
