@@ -376,8 +376,10 @@ __kernel void OclPtxInterpolate(
     uint entries_per_particle =
       (attrs.sample_nx * attrs.sample_ny * attrs.sample_nz / 32) + 1;
 
-    if (temp_pos.x < attrs.sample_nx && temp_pos.y < attrs.sample_ny && temp_pos.z < attrs.sample_nz)
-      particle_pdfs[glid * entries_per_particle + entry_num] |= (1 << shift_num);
+    if (temp_pos.x < attrs.sample_nx
+      && temp_pos.y < attrs.sample_ny
+        && temp_pos.z < attrs.sample_nz)
+      particle_pdfs[glid*entries_per_particle + entry_num] |= (1 << shift_num);
     
     if (particle_steps[glid] + 1 == attrs.max_steps){
       particle_done[glid] = BREAK_MAXSTEPS;
