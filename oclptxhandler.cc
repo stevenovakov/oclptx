@@ -63,7 +63,6 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   // TODO(jeff) compute num_particles
   attrs_.particles_per_side = 1000;
 
-  // TODO(jeff): set buffers to NULL if not used.  Careful of segfaults!
   gpu_data_ = new cl::Buffer(
       *context_,
       CL_MEM_READ_WRITE,
@@ -279,7 +278,6 @@ void OclPtxHandler::WriteParticle(
   }
 
   //TODO(jeff): Can we allocate in Init?
-  //TODO(jeff): Don't write if these are not used.
   if (gpu_waypoints_)
   {
     cl_ushort *temp_waypoints = new cl_ushort[attrs_.n_waypoint_masks];

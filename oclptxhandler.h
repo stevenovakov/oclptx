@@ -94,11 +94,8 @@ class OclPtxHandler{
   FILE *path_dump_fd_;
   bool first_time_;
 
-  // TODO: Steve's
+  // TODO(jeff) avoid keeping this pointer, instead keep pointer to real env.
   EnvironmentData * env_dat_;
-
-  cl_ulong GpuMemUsed();
-  cl_ulong total_gpu_mem_used;
 };
 
 #endif  // OCLPTXHANDLER_H_
