@@ -19,6 +19,7 @@
 #define BREAK_TERMINATE 5
 #define BREAK_EXCLUSION 6
 #define BREAK_MAXSTEPS  7
+#define BREAK_INIT      8
 
 // Struct representing the persistent state of a single particle.
 struct particle_data

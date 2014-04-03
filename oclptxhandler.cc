@@ -141,7 +141,7 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   // Initialize "completion" buffer.
   cl_ushort *temp_completion = new cl_ushort[2*attrs_.particles_per_side];
   for (int i = 0; i < 2 * attrs_.particles_per_side; ++i)
-    temp_completion[i] = 1;
+    temp_completion[i] = 8;  // BREAK_INIT
 
   ret = cq_->enqueueWriteBuffer(
       *gpu_complete_,
