@@ -267,7 +267,7 @@ __kernel void OclPtxInterpolate(
 
     if (particle_steps[glid] > 1 && jump_dot < attrs.curvature_threshold)
     {
-      particle_done[glid] = 2;
+      particle_done[glid] = BREAK_CURV;
       if (0 == step)
         particle_steps[glid] = 0;
     }
@@ -279,7 +279,7 @@ __kernel void OclPtxInterpolate(
       temp_pos.s1 > ymax || ymin > temp_pos.s1 ||
         temp_pos.s2 > zmax || zmin > temp_pos.s2)
     {
-      particle_done[glid] = 4;
+      particle_done[glid] = BREAK_INVALID;
       if (0 == step)
         particle_steps[glid] = 0;
     }
@@ -293,7 +293,7 @@ __kernel void OclPtxInterpolate(
     bounds_test = brain_mask[mask_index];
     if (bounds_test == 0)
     {
-      particle_done[glid] = 1;
+      particle_done[glid] = BREAK_MASK;
       if (0 == step)
         particle_steps[glid] = 0;
     }
@@ -302,7 +302,7 @@ __kernel void OclPtxInterpolate(
     bounds_test = termination_mask[mask_index];
     if (bounds_test == 0)
     {
-      particle_done[glid] = 5;
+      particle_done[glid] = BREAK_TERM;
       if (0 == step)
         particle_steps[glid] = 0;
       break;
@@ -314,7 +314,7 @@ __kernel void OclPtxInterpolate(
     if (bounds_test == 0)
     {
       particle_exclusion[glid] = 1;
-      particle_done[glid] = 1;
+      particle_done[glid] = BREAK_EXCLUSION;
       if (0 == step)
         particle_steps[glid] = 0;
       break;
@@ -347,7 +347,7 @@ __kernel void OclPtxInterpolate(
 
   if (loopcheck_product < 0) // loopcheck break
   {
-    particle_done[glid] = 3;
+    particle_done[glid] = BREAK_LOOPCHECK;
     if (0 == step)
       particle_steps[glid] = 0;
     break;
@@ -380,7 +380,7 @@ __kernel void OclPtxInterpolate(
       particle_pdfs[glid * entries_per_particle + entry_num] |= (1 << shift_num);
     
     if (particle_steps[glid] + 1 == attrs.max_steps){
-      particle_done[glid] = 1;
+      particle_done[glid] = BREAK_MAXSTEPS;
       if (0 == step)
         particle_steps[glid] = 0;
     }
