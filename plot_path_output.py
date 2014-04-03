@@ -31,15 +31,22 @@ def PlotPath(fname):
                5 : 0} # 5: termination break
 
   for row in data:
-    split1 = row.replace("\n","").replace("n", "").split(":")
+    split1 = row.replace("\n","").split(":")
 
-    if split1[0] not in plotset.keys():
-      plotset[split1[0]] = [[],[],[]]
+    thread = split1[0]
+    coords = split1[1]
 
-    coords = [float(item) for item in split1[1].split(",")]
-    plotset[split1[0]][0].append(coords[0])
-    plotset[split1[0]][1].append(coords[1])
-    plotset[split1[0]][2].append(coords[2])
+    if thread not in plotset.keys():
+      plotset[thread] = [0,{}]
+
+    if "n" in coords:
+      plotset[thread][0] += 1
+      plotset[thread][1][plotset[thread][0]] = ([],[],[])
+
+    coords = [float(item) for item in split1[1].rstrip('n').split(",")]
+    plotset[thread][1][plotset[thread][0]][0].append(coords[0])
+    plotset[thread][1][plotset[thread][0]][1].append(coords[1])
+    plotset[thread][1][plotset[thread][0]][2].append(coords[2])
 
 
   fig = plt.figure()
@@ -47,7 +54,9 @@ def PlotPath(fname):
   ax = Axes3D(fig)
 
   for key in plotset.keys():
-    ax.plot(plotset[key][0], plotset[key][1], plotset[key][2])
+    for key2 in plotset[key][1].keys():
+      ax.plot(plotset[key][1][key2][0],
+        plotset[key][1][key2][1], plotset[key][1][key2][2])
 
   ax.set_xlim3d([0, 102])
   ax.set_ylim3d([0, 102])
