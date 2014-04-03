@@ -373,7 +373,8 @@ __kernel void OclPtxInterpolate(
     entry_num = vertex_num / 32;
     shift_num = 31 - (vertex_num % 32);
 
-    uint entries_per_particle = (attrs.sample_nx * attrs.sample_ny * attrs.sample_nz / 32) + 1;
+    uint entries_per_particle =
+      (attrs.sample_nx * attrs.sample_ny * attrs.sample_nz / 32) + 1;
 
     if (temp_pos.x < attrs.sample_nx && temp_pos.y < attrs.sample_ny && temp_pos.z < attrs.sample_nz)
       particle_pdfs[glid * entries_per_particle + entry_num] |= (1 << shift_num);
