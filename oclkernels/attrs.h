@@ -12,7 +12,7 @@
 #include "rng.h"
 
 // Completion codes
-#define BREAK_MASK      1
+#define BREAK_BRAIN_MASK      1
 #define BREAK_CURV      2
 #define BREAK_LOOPCHECK 3
 #define BREAK_INVALID   4
