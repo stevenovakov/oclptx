@@ -119,7 +119,6 @@ __kernel void OclPtxInterpolate(
   uint vertex_num;
   uint entry_num;
   uint shift_num;
-  uint particle_entry;
 
   // No new valid data.  Likely the host is out of data.  We need to avoid
   // screwing it up.
@@ -401,15 +400,17 @@ __kernel void OclPtxInterpolate(
     particle_paths[path_index] = temp_pos;
   
     // update particle pdf
-    vertex_num =
-      round(temp_pos.s0)*round(temp_pos.s1)*round(temp_pos.s2);
+    vertex_num = floor(temp_pos.s0) * attrs.sample_ny * attrs.sample_nz
+               + floor(temp_pos.s1) * attrs.sample_nz
+               + floor(temp_pos.s2);
+
     entry_num = vertex_num / 32;
     shift_num = 31 - (vertex_num % 32);
 
-   particle_entry =
-     particle_pdfs[glid * attrs.pdf_mask_entries + entry_num];
-   particle_pdfs[glid * attrs.pdf_mask_entries + entry_num] =
-     particle_entry | (0x00000001 << shift_num);
+    uint entries_per_particle = (attrs.sample_nx * attrs.sample_ny * attrs.sample_nz / 32) + 1;
+
+    if (temp_pos.x < attrs.sample_nx && temp_pos.y < attrs.sample_ny && temp_pos.z < attrs.sample_nz)
+      particle_pdfs[glid * entries_per_particle + entry_num] |= (1 << shift_num);
     
     if (particle_steps[glid] + 1 == attrs.max_steps){
       particle_done[glid] = 1;
