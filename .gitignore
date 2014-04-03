@@ -4,3 +4,4 @@ depend.mk
 oclptx
 lint
 *.swp
+core*
