@@ -421,6 +421,9 @@ void OclPtxHandler::ReadStatus(int offset, int count, cl_ushort *ret)
 
 void OclPtxHandler::DumpPath(int offset, int count)
 {
+  if (!env_dat_->save_paths)
+    return;
+
   cl_float4 *path_buf = new cl_float4[count * attrs_.steps_per_kernel];
   cl_ushort *step_count_buf = new cl_ushort[count];
   int ret;
