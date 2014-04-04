@@ -24,9 +24,9 @@ static void die(int reason)
 {
   if (CL_MEM_OBJECT_ALLOCATION_FAILURE == reason)
   {
-    puts("Ran out of device memory while allocating particle buffers."
-         "  It should be possible to recover by making particles_per_side"
-         " smaller and rerunning.");
+    puts("Ran out of device memory while allocating particle buffers.  "
+         "It should be possible to fix this by lowering memrisk "
+         "(eg --memrisk=.9) and rerunning.");
     exit(-1);
   }
   else
@@ -50,19 +50,47 @@ void OclPtxHandler::Init(
   first_time_ = 1;
   path_dump_fd_ = path_dump_fd;
   env_dat_ = env_dat;
-
-  this->gpu_global_pdf_ = global_pdf;
-
-  InitParticles(attrs);
-}
-
-void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
-{
-  cl_int ret;
   attrs_ = *attrs;
 
-  // TODO(jeff) compute num_particles
-  attrs_.particles_per_side = 1000;
+  gpu_global_pdf_ = global_pdf;
+
+  attrs_.particles_per_side = env_dat_->dynamic_mem_left / ParticleSize() / 2;
+  printf("Allocating %i particles\n", attrs_.particles_per_side * 2);
+
+  InitParticles();
+}
+
+size_t OclPtxHandler::ParticleSize()
+{
+  size_t size = 0;
+  size += sizeof(struct particle_data);
+  size += sizeof(cl_ushort);  // complete
+  size += sizeof(cl_ushort);  // step_count
+
+  // PDF
+  int entries = (attrs_.sample_nx * attrs_.sample_ny * attrs_.sample_nz / 32) + 1;
+  size += entries * sizeof(cl_int);
+
+  if (env_dat_->save_paths)
+    size += attrs_.steps_per_kernel * sizeof(cl_float4);
+
+  if (0 < env_dat_->n_waypts)
+    size += attrs_.n_waypoint_masks * sizeof(cl_ushort);
+
+  if (env_dat_->exclusion_mask)
+    size += sizeof(cl_ushort);
+
+  if (env_dat_->loopcheck)
+    size += attrs_.lx * attrs_.ly * attrs_.lz * sizeof(float4);
+
+  printf("Particle size %li\n", size);
+
+  return size;
+}
+
+void OclPtxHandler::InitParticles()
+{
+  cl_int ret;
 
   gpu_data_ = new cl::Buffer(
       *context_,
