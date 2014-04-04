@@ -68,8 +68,12 @@ __kernel void OclPtxInterpolate(
 #endif
   
   float xmin, xmax, ymin, ymax, zmin, zmax;
-  xmin = 0.0; ymin = 0.0; zmin = 0.0;
-  xmax = attrs.sample_nx*1.0; ymax = attrs.sample_ny*1.0; zmax = attrs.sample_nz*1.0;
+  xmin = 0.0;
+  ymin = 0.0;
+  zmin = 0.0;
+  xmax = attrs.sample_nx*1.0;
+  ymax = attrs.sample_ny*1.0;
+  zmax = attrs.sample_nz*1.0;
   
   float f, phi, theta;
   float jump_dot;
@@ -88,9 +92,14 @@ __kernel void OclPtxInterpolate(
 
   // No new valid data.  Likely the host is out of data.  We need to avoid
   // screwing it up.
-  if (particle_done[glid])
-    particle_steps[glid] = 0;
 
+  if (particle_done[glid])
+  {
+    particle_steps[glid] = 0;
+    return;
+  }
+
+#ifdef LOOPCHECK
   uint3 loopcheck_voxel;
 
   uint loopcheck_dir_size = attrs.lx * attrs.ly * attrs.lz;
@@ -98,6 +107,7 @@ __kernel void OclPtxInterpolate(
   uint loopcheck_index;
   float4 last_loopcheck_dr;
   float loopcheck_product;
+#endif // LOOPCHECK
 
   for (step = 0; step < attrs.steps_per_kernel; ++step)
   {
@@ -118,6 +128,7 @@ __kernel void OclPtxInterpolate(
     // Implement multiple direction selection if more than one direction of
     // bedpost data being used
     //
+
     rng_output = Rand(&(state[glid].rng));
     sample = rng_output % attrs.num_samples;
 
@@ -173,12 +184,13 @@ __kernel void OclPtxInterpolate(
       new_dr = new_dr*-1.0;
     }
 
-    new_dr = new_dr * attrs.step_length / attrs.brain_mask_dim;
+    new_dr = new_dr / attrs.brain_mask_dim;
+    new_dr = new_dr * attrs.step_length;
 
+#ifdef EULER_STREAMLINE
     // update particle position
     temp_pos += new_dr;
 
-#ifdef EULER_STREAMLINE
     current_select_vertex.s0 = floor(temp_pos.s0);
     current_select_vertex.s1 = floor(temp_pos.s1);
     current_select_vertex.s2 = floor(temp_pos.s2);
@@ -244,7 +256,8 @@ __kernel void OclPtxInterpolate(
       dr2 = dr2*-1.0;
     }
 
-    dr2 = dr2*attrs.step_length / attrs.brain_mask_dim;
+    dr2 = dr2 / attrs.brain_mask_dim;
+    dr2 = dr2 * attrs.step_length;
 
     new_dr = 0.5*(new_dr + dr2);
 #endif
@@ -270,18 +283,20 @@ __kernel void OclPtxInterpolate(
       particle_done[glid] = BREAK_CURV;
       if (0 == step)
         particle_steps[glid] = 0;
+      break;
     }
 
     //
     // Complete out of bounds test (just in case)
     //
-    if (temp_pos.s0 > xmax || xmin > temp_pos.s0 ||
-      temp_pos.s1 > ymax || ymin > temp_pos.s1 ||
-        temp_pos.s2 > zmax || zmin > temp_pos.s2)
+    if ((temp_pos.s0 > xmax) || (xmin > temp_pos.s0) ||
+        (temp_pos.s1 > ymax) || (ymin > temp_pos.s1) ||
+        (temp_pos.s2 > zmax) || (zmin > temp_pos.s2))
     {
       particle_done[glid] = BREAK_INVALID;
       if (0 == step)
         particle_steps[glid] = 0;
+      break;
     }
     //
     // Brain Mask Test - Checks NEAREST vertex.
@@ -296,6 +311,7 @@ __kernel void OclPtxInterpolate(
       particle_done[glid] = BREAK_BRAIN_MASK;
       if (0 == step)
         particle_steps[glid] = 0;
+      break;
     }
 
 #ifdef TERMINATION
@@ -376,15 +392,13 @@ __kernel void OclPtxInterpolate(
     uint entries_per_particle =
       (attrs.sample_nx * attrs.sample_ny * attrs.sample_nz / 32) + 1;
 
-    if (temp_pos.x < attrs.sample_nx
-      && temp_pos.y < attrs.sample_ny
-        && temp_pos.z < attrs.sample_nz)
-      particle_pdfs[glid*entries_per_particle + entry_num] |= (1 << shift_num);
+    particle_pdfs[glid*entries_per_particle + entry_num] |= (1 << shift_num);
     
     if (particle_steps[glid] + 1 == attrs.max_steps){
       particle_done[glid] = BREAK_MAXSTEPS;
       if (0 == step)
         particle_steps[glid] = 0;
+      break;
     }
 
     state[glid].position = temp_pos;
