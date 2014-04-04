@@ -154,6 +154,26 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
     die(ret);
 
   delete[] temp_completion;
+
+  // Fill in the "particle pdf" buffer.
+  // TODO(jeff): this is going to be horrendously slow.  This HAS to be done in
+  // the summing kernel.
+  int entries_per_particle = (attrs_.sample_nx
+                            * attrs_.sample_ny
+                            * attrs_.sample_nz / 32) + 1;
+  cl_uint *temp_local_pdf =
+      new cl_uint[2 * attrs_.particles_per_side * entries_per_particle];
+  for (int i = 0; i < 2 * attrs_.particles_per_side * entries_per_particle; ++i)
+    temp_local_pdf[i] = 0;
+
+  cq_->enqueueWriteBuffer(
+      *gpu_local_pdf_,
+      true,
+      0,
+      2 * attrs_.particles_per_side * entries_per_particle * sizeof(cl_uint),
+      temp_local_pdf);
+
+  delete[] temp_local_pdf;
 }
 
 OclPtxHandler::~OclPtxHandler()
@@ -231,25 +251,6 @@ void OclPtxHandler::WriteParticle(
     puts("Write failed!");
     die(ret);
   }
-
-  // Fill in the "particle pdf" buffer.
-  // TODO(jeff): this is going to be horrendously slow.  This HAS to be done in
-  // the summing kernel.
-  int entries_per_particle = (attrs_.sample_nx
-                            * attrs_.sample_ny
-                            * attrs_.sample_nz / 32) + 1;
-  cl_uint *temp_local_pdf = new cl_uint[entries_per_particle];
-  for (int i = 0; i < entries_per_particle; ++i)
-    temp_local_pdf[i] = 0;
-
-  cq_->enqueueWriteBuffer(
-      *gpu_local_pdf_,
-      true,
-      offset * entries_per_particle * sizeof(cl_uint),
-      entries_per_particle * sizeof(cl_uint),
-      temp_local_pdf);
-
-  delete[] temp_local_pdf;
 
   // Initialize particle loopcheck
   if (gpu_loopcheck_)

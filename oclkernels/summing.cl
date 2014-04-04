@@ -55,7 +55,7 @@ __kernel void PdfSum(
   int last_particle = (1 + side) * attrs.particles_per_side;
   for (int p = first_particle; p < last_particle; ++p)
   {
-    
+
 #if EXCLUSION
     particle_check = particle_exclusion[p];
 
@@ -86,9 +86,11 @@ __kernel void PdfSum(
      && (STILL_FINISHED != particle_check))
     {
       particle_entry = particle_pdfs[p * entries_per_particle + glid];
+      particle_pdfs[p * entries_per_particle + glid] = 0;
     }
     else
     {
+      particle_pdfs[p * entries_per_particle + glid] = 0;
       continue;
     }
 
