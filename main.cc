@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     NULL,
     NULL
   );
-  // todo(Steve) pass the masks
+  // TODO(Steve) pass the masks
   env.AllocateSamples(
     sample_manager->GetFDataPtr(),
     sample_manager->GetPhiDataPtr(),
@@ -50,7 +50,7 @@ int main(int argc, char **argv)
     sample_manager->GetBrainMaskToArray(),
     sample_manager->GetExclusionMaskToArray(),
     sample_manager->GetTerminationMaskToArray(),
-    NULL // todo(steve) fix way mask implementation and pass it
+    NULL // TODO(steve) fix way mask implementation and pass it
   );
 
   env.CreateKernels("standard");

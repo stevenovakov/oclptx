@@ -516,7 +516,6 @@ uint32_t OclEnv::AvailableGPUMem(
   cl_ulong max_buff_size;
   cl_ulong gl_mem_size;
   cl_ulong useful_gl_mem_size;
-  cl_ulong dynamic_mem_left;
   cl_ulong dynamic_mem_per_particle = 0;
   uint32_t r_particles;
 
@@ -596,7 +595,7 @@ uint32_t OclEnv::AvailableGPUMem(
   this->env_data.total_static_gpu_mem =
     total_mem_size + this->env_data.global_pdf_mem_size;
 
-  dynamic_mem_left = useful_gl_mem_size - this->env_data.total_static_gpu_mem;
+  this->env_data.dynamic_mem_left = useful_gl_mem_size - this->env_data.total_static_gpu_mem;
 
   // ***********************************************
   //  Dynamic Particle Containers/Parameters
@@ -605,8 +604,6 @@ uint32_t OclEnv::AvailableGPUMem(
   this->env_data.particle_pdf_mask_mem_size =
     single_pdf_mask_size * sizeof(uint32_t);
   this->env_data.pdf_entries_per_particle = single_pdf_mask_size;
-
-  dynamic_mem_per_particle += this->env_data.particle_pdf_mask_mem_size;
   
   // Loopcheck
   uint32_t loopcheck_x;
@@ -643,10 +640,6 @@ uint32_t OclEnv::AvailableGPUMem(
       single_loopcheck_mask_size * sizeof(uint32_t);
     this->env_data.particle_loopcheck_dir_mem_size =
       loopcheck_x * loopcheck_y *loopcheck_z * sizeof(float4);
-
-    dynamic_mem_per_particle +=
-      this->env_data.particle_loopcheck_location_mem_size +
-        this->env_data.particle_loopcheck_dir_mem_size;
   }
   else
   {
@@ -654,13 +647,6 @@ uint32_t OclEnv::AvailableGPUMem(
     this->env_data.particle_loopcheck_location_mem_size = 0;
     this->env_data.particle_loopcheck_dir_mem_size = 0;
   }
-
-  // particle_done, steps_taken
-  dynamic_mem_per_particle += 2 * sizeof(uint32_t);
-
-  // rng
-
-  dynamic_mem_per_particle += sizeof(cl_ulong8);
 
   // Modified Euler
 
@@ -686,46 +672,6 @@ uint32_t OclEnv::AvailableGPUMem(
   if (this->env_data.save_paths)
     printf("Saving Path Data\n\n");
 
-  if (ptx_options.save_paths.value())
-  {
-    dynamic_mem_per_particle += this->env_data.max_steps * sizeof(float4);
-  }
-
-  // Compute Max Particles per Batch:
-  r_particles = (dynamic_mem_left/dynamic_mem_per_particle) /2;
-  this->env_data.max_particles_per_batch = r_particles;
-
-  if (this->env_data.save_paths)
-  {
-    cl_ulong particle_path_mem =
-      this->env_data.max_steps * r_particles * sizeof(float4);
-    if (particle_path_mem > max_buff_size)
-    {
-      printf("WARNING: Particle Paths Exceed MAX BUFFER SIZE,\
-        REDUCING PARTICLES\n");
-      r_particles =
-        max_buff_size / (this->env_data.max_steps * sizeof(float4));
-    }
-  }
-
-  if (this->env_data.loopcheck)
-  {
-    printf("Using Loopcheck (1/5 grid size)\n\n");
-    cl_ulong r_particle_loopcheck_mem =
-      this->env_data.particle_loopcheck_dir_mem_size * r_particles;
-    if (r_particle_loopcheck_mem > max_buff_size)
-    {
-      printf("WARNING: Loopcheck Dirs Exceed MAX BUFFER SIZE,\
-        REDUCING PARTICLES\n");
-      r_particles =
-        max_buff_size / this->env_data.particle_loopcheck_dir_mem_size;
-    }
-    r_particle_loopcheck_mem =
-      this->env_data.particle_loopcheck_dir_mem_size * r_particles;
-    printf("Loopcheck Dirs MemSize: %lu\n\n", r_particle_loopcheck_mem);
-  }
-
-
   printf("/**************************************************\n");
   printf("\tOCLENV::AVAILABLEGPUMEM\n");
   printf("/**************************************************\n\n");
@@ -738,12 +684,7 @@ uint32_t OclEnv::AvailableGPUMem(
   printf("Total USEFUL GPU Device Memory: %.4f (MB) \n", useful_gl_mem_size/1e6);
   printf("Total Static Data Memory Requirement: %.4f (MB) \n",
     this->env_data.total_static_gpu_mem/1e6);
-  printf("Remaining GPU Device Memory: %.4f (MB) \n", dynamic_mem_left/1e6);
-  printf("Dynamic GPU Memory per Particle: %.4f (kB)\n",
-    dynamic_mem_per_particle/1e3);
-  printf("Maximum Number of Particles per Batch: %u\n", r_particles);
-  printf("Total Dynamic Data Memory Requirement: %.4f (MB)\n\n",
-    2*r_particles*dynamic_mem_per_particle/1e6);
+  printf("Remaining GPU Device Memory: %.4f (MB) \n", this->env_data.dynamic_mem_left/1e6);
 
   if (single_direction_mem_size > max_buff_size){
     printf("ERROR: BPX DATA > MAX BUFFER SIZE: %.4f (MB) vs %.4f (MB)\n",
@@ -751,7 +692,15 @@ uint32_t OclEnv::AvailableGPUMem(
     printf("TERMINATING PROGRAM...\n");
     exit(EXIT_FAILURE);
   }
-  return r_particles;
+
+  // Check for OOM before going any further
+  if (this->env_data.dynamic_mem_left < 0)
+  {
+      printf("Not enough device memory to support static buffers.\n");
+      exit(-1);
+  }
+
+  return 1;
 }
 
 
@@ -905,6 +854,7 @@ void OclEnv::AllocateSamples(
         if (CL_SUCCESS != ret)
           die(ret);
 
+        printf("Theta: %f\n", theta_data->data.at(s)[30 * 102 * 102 + 51 * 102 + 51]);
         ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
           *(this->env_data.theta_samples_buffers[s]),
           CL_FALSE,

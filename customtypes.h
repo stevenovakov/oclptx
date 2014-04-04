@@ -160,6 +160,7 @@ struct EnvironmentData
   cl_uint global_pdf_mem_size;
   cl_uint particle_loopcheck_location_mem_size;
   cl_uint particle_loopcheck_dir_mem_size;
+  cl_long dynamic_mem_left;
 
   uint32_t total_static_gpu_mem;
   //uint32_t dynamic_gpu_mem_left;

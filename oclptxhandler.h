@@ -66,7 +66,8 @@ class OclPtxHandler{
   void DumpPath(int offset, int count);
 
  private:
-  void InitParticles(struct particle_attrs *attrs);
+  size_t ParticleSize();
+  void InitParticles();
   void SetInterpArg(int pos, cl::Buffer *buf);
   void SetSumArg(int pos, cl::Buffer *buf);
 
