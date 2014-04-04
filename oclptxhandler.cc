@@ -78,12 +78,18 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   if (!gpu_complete_)
     abort();
 
-  gpu_path_ = new cl::Buffer(
-      *context_,
-      CL_MEM_WRITE_ONLY,
-      2 * attrs_.particles_per_side * attrs_.steps_per_kernel * sizeof(cl_float4));
-  if (!gpu_path_)
-    abort();
+  if (env_dat_->save_paths)
+  {
+    gpu_path_ = new cl::Buffer(
+        *context_,
+        CL_MEM_WRITE_ONLY,
+        2 * attrs_.particles_per_side *
+          attrs_.steps_per_kernel * sizeof(cl_float4));
+    if (!gpu_path_)
+      abort();
+  }
+  else
+    gpu_path_ = NULL;
 
   gpu_step_count_ = new cl::Buffer(
       *context_,

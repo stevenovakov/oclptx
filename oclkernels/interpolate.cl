@@ -380,7 +380,9 @@ __kernel void OclPtxInterpolate(
 
     // add to particle paths
     path_index = glid * attrs.steps_per_kernel + step;
-    particle_paths[path_index] = temp_pos;
+
+    if (particle_paths)
+      particle_paths[path_index] = temp_pos;
   
     // update particle pdf
     vertex_num = floor(temp_pos.s0) * attrs.sample_ny * attrs.sample_nz
