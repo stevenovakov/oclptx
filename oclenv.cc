@@ -1041,9 +1041,6 @@ void OclEnv::PdfsToFile(std::string filename)
       }
       fprintf(pdf_file, "\n");
     }
-
-    if (k < this->env_data.nz - 1)
-      fprintf(pdf_file, "\n");
   }
 
   fclose(pdf_file);

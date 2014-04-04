@@ -388,7 +388,7 @@ __kernel void OclPtxInterpolate(
                + floor(temp_pos.s2);
 
     entry_num = vertex_num / 32;
-    shift_num = 31 - (vertex_num % 32);
+    shift_num = (vertex_num % 32);
 
     uint entries_per_particle =
       (attrs.sample_nx * attrs.sample_ny * attrs.sample_nz / 32) + 1;
