@@ -95,6 +95,7 @@ __kernel void OclPtxInterpolate(
 
   if (particle_done[glid])
   {
+    particle_done[glid] = STILL_FINISHED;
     particle_steps[glid] = 0;
     return;
   }

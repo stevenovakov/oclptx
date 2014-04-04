@@ -26,10 +26,10 @@ __kernel void PdfSum(
   uint side,
 
   // Particle data
-  __global uint* particles_done,
+  __global ushort* particles_done,
   __global uint* particle_pdfs,
-  __global uint* particle_waypoints,
-  __global uint* particle_exclusion,
+  __global ushort* particle_waypoints,
+  __global ushort* particle_exclusion,
 
   // Output
   __global uint* global_pdf
@@ -38,7 +38,8 @@ __kernel void PdfSum(
   uint glid = get_global_id(0);
 
   uint root_vertex = glid * 32;
-  uint entries_per_particle = (attrs.sample_nx * attrs.sample_ny * attrs.sample_nz / 32) + 1;
+  uint entries_per_particle =
+    (attrs.sample_nx * attrs.sample_ny * attrs.sample_nz / 32) + 1;
   uint particle_check = 0;
   uint particle_entry = 0;
   uint to_total;
@@ -79,7 +80,10 @@ __kernel void PdfSum(
 
     particle_check = particles_done[p];
 
-    if (particle_check > 0)
+    if ((BREAK_INIT != particle_check)
+     && (BREAK_INVALID != particle_check)
+     && (particle_check > 0)
+     && (STILL_FINISHED != particle_check))
     {
       particle_entry = particle_pdfs[p * entries_per_particle + glid];
     }
@@ -95,10 +99,10 @@ __kernel void PdfSum(
     }
   }
 
-  int vertex_num;
-  for (int b = 0; b < 32; b++)
+  uint vertex_num;
+  for (uint b = 0; b < 32; b++)
   {
     vertex_num = root_vertex + b;
-    global_pdf[vertex_num] = running_total[b];
+    global_pdf[vertex_num] += running_total[b];
   }
 }

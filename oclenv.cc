@@ -265,7 +265,7 @@ void OclEnv::CreateKernels( std::string kernel_name )
 
   std::string interp_kernel_source;
   std::string sum_kernel_source = fold + slash + "summing.cl";
-  std::string define_list =  "-I ./oclkernels -D PRNG";
+  std::string define_list =  "-I ./oclkernels";
 
   if (kernel_name == "standard")
   {
@@ -289,6 +289,8 @@ void OclEnv::CreateKernels( std::string kernel_name )
     exit(EXIT_FAILURE);
   }
 
+  if (!(this->env_data.deterministic))
+    define_list += " -D PRNG";
   if (this->env_data.bpx_dirs > 1)
     define_list += " -D TWO_DIR";
   if (this->env_data.bpx_dirs > 2)
@@ -537,8 +539,7 @@ uint32_t OclEnv::AvailableGPUMem(
   cl_uint single_direction_size =
     f_data->nx * f_data->ny * f_data->nz;
 
-  cl_uint single_pdf_mask_size = (single_direction_size / 32)  +
-    ((single_direction_size%32 > 0)? 1 : 0);
+  cl_uint single_pdf_mask_size = (single_direction_size / 32)  + 1;
 
   cl_uint brain_mem_size =
     single_direction_size * sizeof(unsigned short int);
@@ -578,7 +579,6 @@ uint32_t OclEnv::AvailableGPUMem(
     this->env_data.way_and = false;
 
   this->env_data.n_waypts = n_waypoints;
-
 
   // ***********************************************
   //  PDFS
@@ -664,6 +664,10 @@ uint32_t OclEnv::AvailableGPUMem(
     printf("\nUsing Modified Euler Integration Method\n\n");
 
   printf("Step Length: %f\n\n", ptx_options.steplength.value());
+
+  // PRNG?
+
+  this->env_data.deterministic = ptx_options.norng.value();
 
   // paths?
   this->env_data.max_steps = ptx_options.nsteps.value();
@@ -1026,7 +1030,6 @@ void OclEnv::PdfsToFile(std::string filename)
   {
     for (uint32_t j = 0; j < this->env_data.ny; j++)
     {
-      fprintf(pdf_file, "[");
       for (uint32_t i = 0; i < this->env_data.nx; i++)
       {
         index =
@@ -1037,13 +1040,10 @@ void OclEnv::PdfsToFile(std::string filename)
           fprintf(pdf_file, " ");
       }
       fprintf(pdf_file, "\n");
-
-      if (j < this->env_data.ny - 1)
-        fprintf(pdf_file, " ");
     }
 
     if (k < this->env_data.nz - 1)
-      fprintf(pdf_file, "\n\n");
+      fprintf(pdf_file, "\n");
   }
 
   fclose(pdf_file);

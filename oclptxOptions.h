@@ -146,7 +146,8 @@ class oclptxOptions {
     Option<int>              fibst;
     Option<int>              rseed;
 
-    Option<float>            mem_risk_frac;
+    Option<float>             mem_risk_frac;
+    Option<bool>              norng;
 
     // hidden options
     FmribOption<std::string>      prefdirfile;
@@ -360,6 +361,9 @@ inline oclptxOptions::oclptxOptions():
     CL_DEVICE_GLOBAL_MEM_SIZE the application will attempt to \
       use per device"), false, optional_argument),
 
+  norng(std::string("--norng"), false,
+  std::string("Deterministic tracking only (zero sample, no vol frac."),
+    false, no_argument),
 
   prefdirfile(std::string("--prefdir"), std::string(""),
        std::string("Prefered orientation preset in a 4D mask"),
@@ -471,6 +475,7 @@ inline oclptxOptions::oclptxOptions():
     options.add(targetpaths);
 
     options.add(mem_risk_frac);
+    options.add(norng);
   }
   catch(X_OptionError& e)
   {

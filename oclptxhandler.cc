@@ -19,6 +19,7 @@
 #include <CL/cl.hpp>
 #endif
 
+
 static void die(int reason)
 {
   if (CL_MEM_OBJECT_ALLOCATION_FAILURE == reason)
@@ -334,6 +335,8 @@ void OclPtxHandler::RunKernel(int side)
   cl::NDRange particles_to_compute(attrs_.particles_per_side);
   cl::NDRange particle_offset(attrs_.particles_per_side * side);
   cl::NDRange local_range(1);
+
+  printf("RunKernel: %i\n", side);
 
   ptx_kernel_->setArg(
       0,

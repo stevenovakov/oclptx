@@ -12,14 +12,15 @@
 #include "rng.h"
 
 // Completion codes
-#define BREAK_BRAIN_MASK      1
-#define BREAK_CURV      2
-#define BREAK_LOOPCHECK 3
-#define BREAK_INVALID   4
-#define BREAK_TERMINATE 5
-#define BREAK_EXCLUSION 6
-#define BREAK_MAXSTEPS  7
-#define BREAK_INIT      8
+#define BREAK_BRAIN_MASK  1
+#define BREAK_CURV        2
+#define BREAK_LOOPCHECK   3
+#define BREAK_INVALID     4
+#define BREAK_TERMINATE   5
+#define BREAK_EXCLUSION   6
+#define BREAK_MAXSTEPS    7
+#define BREAK_INIT        8
+#define STILL_FINISHED    9
 
 // Struct representing the persistent state of a single particle.
 struct particle_data

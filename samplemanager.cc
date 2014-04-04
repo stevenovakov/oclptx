@@ -180,10 +180,6 @@ void SampleManager::PopulatePHI(
           t <= aLoadedData.maxt(); t++)
         {
             angle = aLoadedData[t](x+xoff,y+yoff,z+zoff);
-            angle = atan2(sin(angle), cos(angle));
-
-            if (angle < 0.)
-              angle = 2*M_PI + angle;
             
             aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
               x*nz*ny + y*nz + z] = angle;
@@ -227,7 +223,6 @@ void SampleManager::PopulateTHETA(
           t <= aLoadedData.maxt(); t++)
         {
             angle = aLoadedData[t](x+xoff,y+yoff,z+zoff);
-            angle = acos(cos(angle));
 
             aTargetContainer.data.at(aFiberNum)[t*nx*ny*nz +
               x*nz*ny + y*nz + z] = angle;
