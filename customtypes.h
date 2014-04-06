@@ -141,6 +141,7 @@ struct EnvironmentData
   bool way_and;
   bool euler_streamline;
   bool deterministic;
+  bool aniso_const;
 
   // Particle Containers
   uint32_t section_size;

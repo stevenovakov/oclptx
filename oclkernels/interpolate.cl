@@ -166,8 +166,19 @@ __kernel void OclPtxInterpolate(
       current_select_vertex.s1*(attrs.sample_nz) +
       current_select_vertex.s2;
     
-    // find next step location
+#ifdef ANISOTROPIC
     f = f_samples[diffusion_index];
+    rng_output = Rand(&(state[glid].rng));
+    if (f*kRandMax < rng_output)
+    {
+      particle_done[glid] = ANISO_BREAK;
+      if (0 == step)
+        particle_steps[glid] = 0;
+      break;
+    }
+#endif // ANISOTROPIC
+
+    // find next step location
     theta = theta_samples[diffusion_index];
     phi = phi_samples[diffusion_index];
     
@@ -236,8 +247,19 @@ __kernel void OclPtxInterpolate(
       current_select_vertex.s1*(attrs.sample_nz) +
       current_select_vertex.s2;
     
-    // find next step location
+#ifdef ANISOTROPIC
     f = f_samples[diffusion_index];
+    rng_output = Rand(&(state[glid].rng));
+    if (f*kRandMax < rng_output)
+    {
+      particle_done[glid] = ANISO_BREAK;
+      if (0 == step)
+        particle_steps[glid] = 0;
+      break;
+    }
+#endif // ANISOTROPIC
+
+    // find next step location
     theta = theta_samples[diffusion_index];
     phi = phi_samples[diffusion_index];
     
@@ -375,6 +397,9 @@ __kernel void OclPtxInterpolate(
 
 #endif  // LOOPCHECK
 
+    // update step location
+    state[glid].position = temp_pos;
+
     // update last flow vector
     state[glid].dr = new_dr;
 
@@ -404,8 +429,6 @@ __kernel void OclPtxInterpolate(
       break;
     }
 
-    state[glid].position = temp_pos;
-    // update step location
     if (!particle_done[glid])
     {
       particle_steps[glid] += 1;
