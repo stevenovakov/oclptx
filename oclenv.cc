@@ -169,7 +169,7 @@ cl::Buffer * OclEnv::GetDevicePdf(uint32_t device_num)
 // Currently ignores all other devices that arent GPU.
 //
 //
-void OclEnv::OclInit()
+void OclEnv::OclInit(uint32_t max_devices)
 {
   cl::Platform::get(&(this->ocl_platforms));
 
@@ -188,6 +188,9 @@ void OclEnv::OclInit()
   // this->oclContext = cl::Context(CL_DEVICE_TYPE_CPU, conProp);
 
   this->ocl_devices = this->ocl_context.getInfo<CL_CONTEXT_DEVICES>();
+  while (this->ocl_devices.size() > max_devices)
+    this->ocl_devices.pop_back();
+  printf("Using %u OpenCL Devices\n", this->ocl_devices.size());
 }
 
 void OclEnv::OclDeviceInfo()
@@ -768,6 +771,10 @@ void OclEnv::AllocateSamples(
   this->env_data.f_samples_buffers = new cl::Buffer*[n_dirs];
   this->env_data.phi_samples_buffers = new cl::Buffer*[n_dirs];
   this->env_data.theta_samples_buffers = new cl::Buffer*[n_dirs];
+  
+  //
+  // Instantiating Buffers
+  //
 
   for (uint32_t s = 0; s < n_dirs; s++)
   {
@@ -871,6 +878,10 @@ void OclEnv::AllocateSamples(
       );
     }
 
+    //
+    // Copying To Devices
+    //
+
     uint32_t *global_init =
       new uint32_t[this->env_data.global_pdf_size];
     for (uint32_t j = 0; j < this->env_data.global_pdf_size; j++)
@@ -878,6 +889,8 @@ void OclEnv::AllocateSamples(
 
     for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
     {
+      printf("Copying Samples - Device %u\n", d);
+
       for (uint32_t s = 0; s < n_dirs; s++)
       {
         ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
@@ -984,17 +997,10 @@ void OclEnv::AllocateSamples(
         NULL
       );
 
-      ret = this->ocl_device_queues.at(d).flush();
-      if (CL_SUCCESS != ret)
-        die(ret);
-    }
-
-    // can maybe move this to oclptxhandler, for slight performance improvement
-    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
-    {
       ret = this->ocl_device_queues.at(d).finish();
       if (CL_SUCCESS != ret)
         die(ret);
+      printf("Finished Copying Samples - Device %u\n", d);
     }
 }
 

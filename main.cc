@@ -16,7 +16,7 @@
 #include "threading.h"
 
 
-cl_ulong8 rng_zero = {0,};
+cl_ulong8 rng_zero = {{0,}};
 
 int main(int argc, char **argv)
 {
@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 
   // Create our oclenv
   OclEnv env;
-  env.OclInit();
+  env.OclInit(4);
   env.NewCLCommandQueues();
 
   // Startup the samplemanager
