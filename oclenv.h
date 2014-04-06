@@ -82,7 +82,7 @@ class OclEnv{
     // OpenCL API Interface/Helper Functions
     //
 
-    void OclInit();
+    void OclInit(uint32_t max_devices);
 
     void OclDeviceInfo();
 

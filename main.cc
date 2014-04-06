@@ -15,8 +15,9 @@
 #include "samplemanager.h"
 #include "threading.h"
 
+void showSamples(uint32_t x, uint32_t y, uint32_t z, SampleManager * s_man);
 
-cl_ulong8 rng_zero = {0,};
+cl_ulong8 rng_zero = {{0,}};
 
 int main(int argc, char **argv)
 {
@@ -27,7 +28,7 @@ int main(int argc, char **argv)
 
   // Create our oclenv
   OclEnv env;
-  env.OclInit();
+  env.OclInit(1); // can limit max devices used now
   env.NewCLCommandQueues();
 
   // Startup the samplemanager
@@ -83,6 +84,8 @@ int main(int argc, char **argv)
     }; // num waymasks.
   int num_dev = env.HowManyDevices();
 
+  showSamples(54, 54, 29, sample_manager);
+
   // Create a new oclptxhandler.
   OclPtxHandler *handler = new OclPtxHandler[num_dev];
   std::thread *gpu_managers[num_dev];
@@ -125,4 +128,27 @@ int main(int argc, char **argv)
   fclose(global_fd);
 
   return 0;
+}
+
+void showSamples(uint32_t x, uint32_t y, uint32_t z, SampleManager * s_man)
+{
+  uint32_t dx = 4;
+  uint32_t dy = 4;
+  uint32_t dz = 4;
+
+  for (uint32_t i = (x - dx); i < (x + dx); i++)
+  {
+    for (uint32_t j = (y - dy); j < (y + dy); j++)
+    {
+      for (uint32_t k = (z - dz); k < (z + dz); k++)
+      {
+        printf("[%u, %u, %u] : (%.6f, %.6f, %.6f)\n",
+          i, j, k,
+          s_man->GetfData(0, 0, i, j, k),
+          s_man->GetPhiData(0, 0, i, j, k),
+          s_man->GetThetaData(0, 0, i, j, k)
+        );
+      }
+    }
+  }
 }

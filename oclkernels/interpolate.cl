@@ -378,12 +378,19 @@ __kernel void OclPtxInterpolate(
     // update last flow vector
     state[glid].dr = new_dr;
 
+    // update step location
+    state[glid].position = temp_pos;
+    
     // add to particle paths
     path_index = glid * attrs.steps_per_kernel + step;
 
     if (particle_paths)
+    {
+      temp_pos.x = f;
+      temp_pos.y = phi;
+      temp_pos.z = theta;
       particle_paths[path_index] = temp_pos;
-  
+    }
     // update particle pdf
     vertex_num = floor(temp_pos.s0) * attrs.sample_ny * attrs.sample_nz
                + floor(temp_pos.s1) * attrs.sample_nz
@@ -404,8 +411,6 @@ __kernel void OclPtxInterpolate(
       break;
     }
 
-    state[glid].position = temp_pos;
-    // update step location
     if (!particle_done[glid])
     {
       particle_steps[glid] += 1;
