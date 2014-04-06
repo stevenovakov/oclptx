@@ -14,12 +14,12 @@ f = open(filePath, "wb")
 n = 100000
 
 print "Center"
-x = 51
-y = 51
-z = 30
-x_range = 10
-y_range = 10
-z_range = 10
+x = 160
+y = 129
+z = 111
+x_range = 5
+y_range = 5
+z_range = 5
 
 for i in xrange(0, n):
   newx = x + x_range*(random.random() - 0.5)

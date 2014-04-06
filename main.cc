@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 
   // Create our oclenv
   OclEnv env;
-  env.OclInit(4); // can limit max devices used now
+  env.OclInit(1); // can limit max devices used now
   env.NewCLCommandQueues();
 
   // Startup the samplemanager
@@ -83,8 +83,7 @@ int main(int argc, char **argv)
     env.GetEnvData()->lz
     }; // num waymasks.
   int num_dev = env.HowManyDevices();
-
-  showSamples(54, 54, 29, sample_manager);
+  showSamples(160, 192, 111, sample_manager);
 
   // Create a new oclptxhandler.
   OclPtxHandler *handler = new OclPtxHandler[num_dev];
