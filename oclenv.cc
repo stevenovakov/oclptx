@@ -309,6 +309,8 @@ void OclEnv::CreateKernels( std::string kernel_name )
     define_list += " -D PATH_SAVE";
   if (this->env_data.loopcheck)
     define_list += " -D LOOPCHECK";
+  if (this->env_data.aniso_const)
+    define_list += " -D ANISOTROPIC";
 
   std::ifstream main_stream(interp_kernel_source);
   std::string main_code(  (std::istreambuf_iterator<char>(main_stream) ),
@@ -649,6 +651,11 @@ uint32_t OclEnv::AvailableGPUMem(
   if (this->env_data.euler_streamline)
     printf("\nUsing Modified Euler Integration Method\n\n");
 
+  // Anisotropic Constraint
+  this->env_data.aniso_const = ptx_options.usef.value();
+  if (this->env_data.aniso_const)
+    printf("\nUsing Anisotropic Constraint for Tracking\n\n");
+  // Step Length
   printf("Step Length: %f\n\n", ptx_options.steplength.value());
 
   // PRNG?
