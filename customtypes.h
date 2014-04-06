@@ -69,13 +69,13 @@ struct IntVolume
   //                var_name.vol[z*(ny*nx) + y*8*nx + 8*x + v]
 };
 
-struct FloatVolume
-{
-  std::vector<float4> vol;
-  int nx, ny, nz;
-  // Access x, y, z:
-  //                var_name.vol[z*(ny*nx) + y*8*nx + 8*x + v]
-};
+//struct FloatVolume
+//{
+//  std::vector<float4> vol;
+//  int nx, ny, nz;
+//  // Access x, y, z:
+//  //                var_name.vol[z*(ny*nx) + y*8*nx + 8*x + v]
+//};
 
 //struct MutexWrapper {
     //std::mutex m;

@@ -135,12 +135,13 @@ class SampleManager
       const NEWIMAGE::volume<float> aMaskParams,
       const int aFiberNum,
       bool _16bit);
-    void GenerateSeedParticles(float aSampleVoxel);
-    void GenerateSeedParticlesHelper(
-      cl_float4 aSeed, float aSampleVoxel);
+    void GenerateSeedParticles();
     std::string IntTostring(const int& value);
     unsigned short int* GetMaskToArray(NEWIMAGE::volume<short int> aMask);
     cl_ulong8 NewRng();
+    void AddSeedParticle(float x, float y, float z, float xdim, float ydim, float zdim);
+    void GenerateSimpleSeeds();
+    void GenerateMaskSeeds();
 
     //Statics
     static SampleManager* _manager;
