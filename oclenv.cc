@@ -854,7 +854,6 @@ void OclEnv::AllocateSamples(
         if (CL_SUCCESS != ret)
           die(ret);
 
-        printf("Theta: %f\n", theta_data->data.at(s)[30 * 102 * 102 + 51 * 102 + 51]);
         ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
           *(this->env_data.theta_samples_buffers[s]),
           CL_FALSE,
