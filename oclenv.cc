@@ -191,6 +191,7 @@ void OclEnv::OclInit(uint32_t max_devices)
 
   while(this->ocl_devices.size() > max_devices)
     this->ocl_devices.pop_back();
+  printf("Using %u GPU Devices\n\n", this->ocl_devices.size());
 }
 
 void OclEnv::OclDeviceInfo()

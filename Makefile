@@ -15,7 +15,7 @@ INC_OPENCL=/usr/local/cuda-5.5/include
 USRINCFLAGS = -I${INC_NEWMAT} -I${INC_NEWRAN} -I${INC_CPROB} -I${INC_PROB} -I${INC_BOOST} -I${INC_ZLIB} -I${INC_OPENCL} -I..
 USRLDFLAGS = -L${LIB_NEWMAT} -L${LIB_NEWRAN} -L${LIB_CPROB} -L${LIB_PROB} -L${LIB_ZLIB} -L${LIB_OPENCL}
 
-DLIBS =	-lwarpfns -lbasisfield -lfslsurface	-lfslvtkio -lmeshclass -lnewimage -lutils -lmiscmaths -lnewmat -lnewran -lfslio -lgiftiio -lexpat -lfirst_lib -lniftiio -lznz -lcprob -lutils -lprob -lm -lz -lOpenCL
+DLIBS =	-lwarpfns -lbasisfield -lfslvtkio -lmeshclass -lnewimage -lutils -lmiscmaths -lnewmat -lnewran -lfslio -lfirst_lib -lniftiio -lznz -lcprob -lutils -lprob -lm -lz -lOpenCL
 
 OCLPTX=oclptx
 OCLPTXOBJ=main.o oclenv.o oclptxhandler.o threading.o samplemanager.o oclptxOptions.o

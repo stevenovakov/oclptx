@@ -386,11 +386,16 @@ __kernel void OclPtxInterpolate(
 
     if (particle_paths)
     {
-      temp_pos.x = f;
-      temp_pos.y = phi;
-      temp_pos.z = theta;
+      //temp_pos.x = f;
+      //temp_pos.y = phi;
+      //temp_pos.z = theta;
       particle_paths[path_index] = temp_pos;
     }
+
+    //remove when finished debugging
+    // this makes the pdf still valid
+    //temp_pos = state[glid].position;
+
     // update particle pdf
     vertex_num = floor(temp_pos.s0) * attrs.sample_ny * attrs.sample_nz
                + floor(temp_pos.s1) * attrs.sample_nz

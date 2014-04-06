@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 
   // Create our oclenv
   OclEnv env;
-  env.OclInit(1); // can limit max devices used now
+  env.OclInit(4); // can limit max devices used now
   env.NewCLCommandQueues();
 
   // Startup the samplemanager
