@@ -371,8 +371,6 @@ void OclPtxHandler::RunKernel(int side)
   cl::NDRange particle_offset(attrs_.particles_per_side * side);
   cl::NDRange local_range(1);
 
-  printf("RunKernel: %i\n", side);
-
   ptx_kernel_->setArg(
       0,
       sizeof(struct OclPtxHandler::particle_attrs),

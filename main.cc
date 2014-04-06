@@ -35,6 +35,9 @@ int main(int argc, char **argv)
   sample_manager->ParseCommandLine(argc, argv);
   particles_fifo = sample_manager->GetSeedParticles();
 
+  int total_particles = particles_fifo->count() / 2;
+  printf("Processing %i particles...\n", total_particles);
+
   env.AvailableGPUMem(
     sample_manager->GetFDataPtr(),
     sample_manager->GetOclptxOptions(),
@@ -106,6 +109,13 @@ int main(int argc, char **argv)
         &handler[i],
         particles_fifo,
         kNumReducers);
+  }
+
+  while (particles_fifo->count())
+  {
+    printf("Processed %i/%i.\r", particles_fifo->count()/2, total_particles);
+    fflush(stdout);
+    sleep(1);
   }
 
   for (int i = 0; i < num_dev; ++i)

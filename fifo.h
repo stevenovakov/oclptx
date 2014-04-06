@@ -55,6 +55,7 @@ template<typename T> class Fifo
   void PushOrDie(T *val);
   T *Pop();
   T *PopOrBlock();
+  int count();
  private:
   int order_;
   int head_;  // front of queue---points to open slot
@@ -64,7 +65,6 @@ template<typename T> class Fifo
   std::mutex head_mutex_;
   std::mutex tail_mutex_;
 };
-
 
 template<typename T> Fifo<T>::Fifo(int count):
   head_(0),
@@ -98,7 +98,7 @@ template<typename T> void Fifo<T>::PushOrDie(T *val)
   }
 
   fifo_[head_] = val;
-  head_ = (head_ + 1) & ((1 << order_)-1);
+  head_ = (head_ + 1) & ((1 << order_) - 1);
 
   // lock_guard releases head_mutex automatically
   return;
@@ -129,6 +129,11 @@ template<typename T> T *Fifo<T>::PopOrBlock()
       return ret;
     usleep(1000);  // TODO(jeff) don't poll
   }
+}
+
+template<typename T> int Fifo<T>::count()
+{
+  return (head_ - tail_) & ((1 << order_) - 1);
 }
 
 #endif  // FIFO_H_
