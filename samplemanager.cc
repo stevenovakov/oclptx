@@ -34,9 +34,10 @@
 #include <sstream>
 #include <cmath>
 
-#include "samplemanager.h"
-#include "oclptxhandler.h"
+#include "csv.h"
 #include "fifo.h"
+#include "oclptxhandler.h"
+#include "samplemanager.h"
 #include "oclptxOptions.h"
 
 //
@@ -58,6 +59,185 @@ uint64_t rand_64()
   uint64_t r = ((a << (16*3)) | (b << (16*2)) | (c << (16)) | d);
 
   return r;
+}
+
+void SampleManager::AddSeedParticle(
+    float x, float y, float z, float xdim, float ydim, float zdim)
+{
+  oclptxOptions& opts = oclptxOptions::getInstance();
+
+  float sampvox = opts.sampvox.value();
+  struct OclPtxHandler::particle_data *particle;
+
+  cl_float4 forward = {{ 1.0, 0., 0., 0.}};
+  cl_float4 reverse = {{-1.0, 0., 0., 0.}};
+  cl_float4 pos = {{x, y, z, 0.}};
+
+  for (int p = 0; p < opts.nparticles.value(); p++)
+  {
+    pos.s[0] = x;
+    pos.s[1] = y;
+    pos.s[2] = z;
+    // random jitter of seed point inside a sphere
+    if (sampvox > 0.)
+    {
+      bool rej = true;
+      float dx, dy, dz;
+      float r2 = sampvox * sampvox;
+      while(rej)
+      {
+        dx = 2.0 * sampvox * ((float)rand()/float(RAND_MAX)-.5);
+        dy = 2.0 * sampvox * ((float)rand()/float(RAND_MAX)-.5);
+        dz = 2.0 * sampvox * ((float)rand()/float(RAND_MAX)-.5);
+        if( dx * dx + dy * dy + dz * dz <= r2 )
+          rej=false;
+      }
+      pos.s[0] += dx / xdim;
+      pos.s[1] += dy / ydim;
+      pos.s[2] += dz / zdim;
+    }
+
+  
+    particle = new OclPtxHandler::particle_data;
+    particle->rng = NewRng();
+    particle->position = pos;
+    particle->dr = forward;
+    _seedParticles->PushOrDie(particle);
+
+    particle = new OclPtxHandler::particle_data;
+    particle->rng = NewRng();
+    particle->position = pos;
+    particle->dr = reverse;
+    _seedParticles->PushOrDie(particle);
+  }
+}
+
+void SampleManager::GenerateSimpleSeeds()
+{
+  oclptxOptions& opts = oclptxOptions::getInstance();
+  NEWIMAGE::volume<short int> seedref;
+
+  if (opts.seedref.value() != "")
+  {
+    read_volume(seedref,opts.seedref.value());
+  }
+  else
+  {
+    read_volume(seedref,opts.maskfile.value());
+  }
+
+  NEWMAT::Matrix Seeds = read_ascii_matrix(opts.seedfile.value());
+  if (Seeds.Ncols() != 3 && Seeds.Nrows() == 3)
+    Seeds = Seeds.t();
+
+  // convert coordinates from nifti (external) to newimage (internal)
+  //   conventions - Note: for radiological files this should do nothing
+  NEWMAT::Matrix newSeeds(Seeds.Nrows(), 3);
+  for (int n = 1; n<=Seeds.Nrows(); n++)
+  {
+    NEWMAT::ColumnVector v(4);
+    v << Seeds(n,1) << Seeds(n,2) << Seeds(n,3) << 1.0;
+    v = seedref.niftivox2newimagevox_mat() * v;
+    newSeeds.Row(n) << v(1) << v(2) << v(3);
+  }
+
+  int count = opts.nparticles.value() * newSeeds.Nrows();
+  _seedParticles =
+      new Fifo<struct OclPtxHandler::particle_data>(2 * count);
+
+  for (int SN = 1; SN <= newSeeds.Nrows(); SN++)
+  {
+    float xst = newSeeds(SN, 1);
+    float yst = newSeeds(SN, 2);
+    float zst = newSeeds(SN, 3);
+    AddSeedParticle(xst, yst, zst, seedref.xdim(), seedref.ydim(), seedref.zdim());
+  }
+}
+
+void SampleManager::GenerateMaskSeeds()
+{ 
+  oclptxOptions& opts =oclptxOptions::getInstance();
+  
+  // we need a reference volume for CSV
+  // (in case seeds are a list of surfaces)
+  NEWIMAGE::volume<short int> refvol;
+  if(opts.seedref.value()!="")
+    read_volume(refvol,opts.seedref.value());
+  else
+    read_volume(refvol,opts.maskfile.value());
+  
+  CSV seeds(refvol);
+  seeds.set_convention(opts.meshspace.value());
+  seeds.load_rois(opts.seedfile.value());
+  puts("done");
+
+  if (seeds.nSurfs() > 0) {
+    puts("OclPtx doesn't support surface seedmasks.  Sorry.");
+    exit(1);
+  }
+
+  if (seeds.nVols() == 0 && opts.seedref.value() == "")
+  {
+    printf("Warning: need to set a reference volume when defining a "
+           "surface-based seed\n");
+  }
+
+  // seed from volume-like ROIs
+  if (0 == seeds.nVols())
+  {
+    puts("No volumes specified.");
+    exit(1);
+  }
+
+  // Figure out how many particles we'll need to allocate our fifo.
+  int count = 0;
+  for (int roi = 1; roi <= seeds.nVols(); roi++)
+    for (int z = 0; z < seeds.zsize(); z++)
+      for (int y = 0; y < seeds.ysize(); y++)
+        for (int x = 0; x < seeds.xsize(); x++)
+          if(seeds.isInRoi(x,y,z,roi))
+            count += opts.nparticles.value();
+
+  _seedParticles =
+      new Fifo<struct OclPtxHandler::particle_data>(2 * count);
+
+  for (int roi = 1; roi <= seeds.nVols(); roi++) {
+    printf("Parsing volume %i\n", roi);
+
+    for (int z = 0; z < seeds.zsize(); z++) {
+      for (int y = 0; y < seeds.ysize(); y++) {
+        for (int x = 0; x < seeds.xsize(); x++) {
+          if(seeds.isInRoi(x,y,z,roi))
+            AddSeedParticle(x, y, z, seeds.xdim(), seeds.ydim(), seeds.zdim());
+        }
+      }
+    }
+  }
+}
+
+void SampleManager::GenerateSeedParticles()
+{
+  oclptxOptions& opts =oclptxOptions::getInstance();
+  if (opts.simple.value())
+  {
+    if (opts.matrix1out.value() || opts.matrix3out.value())
+    {
+      puts("Error: cannot use matrix1 and matrix3 in simple mode");
+      exit(1);
+    }
+    puts("Running in simple mode");
+    GenerateSimpleSeeds();
+  }
+  else if(opts.network.value())
+  {
+    puts("OclPtx doesn't support network mode.  Sorry");
+    exit(1);
+  }
+  else
+  {
+    puts("Running in seedmask mode");
+    GenerateMaskSeeds();
+  }
 }
 
 cl_ulong8 SampleManager::NewRng()
@@ -299,169 +479,52 @@ void SampleManager::ParseCommandLine(int argc, char** argv)
     _oclptxOptions.status();
   }
 
-  if (_oclptxOptions.simple.value())
+  if (_oclptxOptions.matrix1out.value() ||
+    _oclptxOptions.matrix3out.value())
   {
-      if (_oclptxOptions.matrix1out.value() ||
-        _oclptxOptions.matrix3out.value())
-      {
-        std::cout<<
-         "Error: cannot use matrix1 and matrix3 in simple mode"<<
-            std::endl;
-        exit(1);
-      }
-      std::cout<<"Running in simple mode"<<std::endl;
-      this->LoadBedpostData(_oclptxOptions.basename.value());
-      if(_oclptxOptions.seedref.value() == "")
-      {
-        NEWIMAGE::read_volume(_brainMask,
-          _oclptxOptions.maskfile.value());
-      }
-      else
-      {
-        NEWIMAGE::read_volume(_brainMask,
-          _oclptxOptions.seedref.value());
-      }
-      if(_oclptxOptions.rubbishfile.value() != "")
-      {
-         NEWIMAGE::read_volume(_exclusionMask,
-         _oclptxOptions.rubbishfile.value());
-         std::cout<<"Successfully loaded Exclusion Mask"<<endl;
-      }
-      if(_oclptxOptions.stopfile.value() != "")
-      {
-        NEWIMAGE::read_volume(_terminationMask,
-        _oclptxOptions.stopfile.value());
-        std::cout<<"Successfully loaded Termination Mask"<<endl;
-      }
-      if(_oclptxOptions.waypoints.set())
-      {
-        std::string waypoints = _oclptxOptions.waypoints.value();
-        std::istringstream ss(waypoints);
-        std::string wayMaskLocation;
-        while(std::getline(ss,wayMaskLocation,','))
-        {
-          NEWIMAGE::volume<short int> vol;
-          NEWIMAGE::read_volume(vol, wayMaskLocation);
-          _wayMasks.push_back(vol);
-        }
-        cout<<"Successfully loaded " << _wayMasks.size() << " WayMasks"<<endl;
-      }
-      this->GenerateSeedParticles(_oclptxOptions.sampvox.value());
-  }
-  else if (_oclptxOptions.network.value())
-  {
-    std::cout<<"Network mode unsupported. Terminating Application"<<std::endl;
+    std::cout<<
+     "Error: cannot use matrix1 and matrix3 in simple mode"<<
+        std::endl;
     exit(1);
   }
-  else
+  std::cout<<"Running in simple mode"<<std::endl;
+  this->LoadBedpostData(_oclptxOptions.basename.value());
+  if(_oclptxOptions.seedref.value() == "")
   {
-    std::cout<<"Running in seedmask mode"<<std::endl;
-  }
-}
-
-void SampleManager::GenerateSeedParticles(float aSampleVoxel)
-{
-  using namespace std;
-
-  Matrix seeds =
-  MISCMATHS::read_ascii_matrix(_oclptxOptions.seedfile.value());
-
-  srand(time(NULL));
-  srand(_oclptxOptions.rseed.value());
-
-  cl_float4 seed;
-  struct OclPtxHandler::particle_data *particle;
-
-  // If there is no seed file given with the -x CLI parameter,
-  // we use the middle of the mask as the seed.
-  if (seeds.Nrows() == 0)
-  {
-    seed.s[0] = floor((_brainMask.xsize())/2.0);
-    seed.s[1] = floor((_brainMask.ysize())/2.0);
-    seed.s[2] = floor((_brainMask.zsize())/2.0);
-    GenerateSeedParticlesHelper(seed,aSampleVoxel);
+    NEWIMAGE::read_volume(_brainMask,
+      _oclptxOptions.maskfile.value());
   }
   else
   {
-    this->_nParticles = seeds.Nrows();
-
-    _seedParticles =
-        new Fifo<struct OclPtxHandler::particle_data>(2 * _nParticles);
-
-    cl_float4 forward = {{1.0, 0., 0., 0.}};
-    cl_float4 reverse = {{-1.0, 0., 0., 0.}};
-
-    if (seeds.Ncols()!=3 && seeds.Nrows()==3)
-    {
-       seeds=seeds.t();
-    }
-    for (int t = 1; t<=seeds.Nrows(); t++)
-    {
-      seed.s[0] = seeds(t,1);
-      seed.s[1] = seeds(t,2);
-      seed.s[2] = seeds(t,3);
-
-      particle = new OclPtxHandler::particle_data;
-      particle->rng = NewRng();
-      particle->position = seed;
-      particle->dr = forward;
-      _seedParticles->PushOrDie(particle);
-
-      particle = new OclPtxHandler::particle_data;
-      particle->rng = NewRng();
-      particle->position = seed;
-      particle->dr = reverse;
-      _seedParticles->PushOrDie(particle);
-    // TODO @STEVE
-    // Implement Jittering on seed file.
-    // GenerateSeedParticlesHelper(seed, aSampleVoxel);
-    }
+    NEWIMAGE::read_volume(_brainMask,
+      _oclptxOptions.seedref.value());
   }
-}
-
-void SampleManager::GenerateSeedParticlesHelper(
-  cl_float4 aSeed, float aSampleVoxel)
-{
-  struct OclPtxHandler::particle_data *particle;
-  _seedParticles =
-     new Fifo<struct OclPtxHandler::particle_data>(2 * _nParticles);
-
-  cl_float4 forward = {{1.0, 0., 0., 0.}};
-  cl_float4 reverse = {{-1.0, 0., 0., 0.}};
-  for (int p = 0; p<_nParticles; p++)
+  if(_oclptxOptions.rubbishfile.value() != "")
   {
-    cl_float4 randomParticle = aSeed;
-    if(aSampleVoxel > 0)
-    {
-      float dx,dy,dz;
-      float radSq = aSampleVoxel*aSampleVoxel;
-    
-      while(true)
-      {
-        dx=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
-        dy=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
-        dz=2.0*aSampleVoxel*((float)rand()/float(RAND_MAX)-.5);
-        if(dx*dx + dy*dy + dz*dz <= radSq)
-        {
-          break;
-        }
-    }
-    randomParticle.s[0] += dx / _brainMask.xdim();
-    randomParticle.s[1] += dy / _brainMask.ydim();
-    randomParticle.s[2] += dz / _brainMask.zdim();
+     NEWIMAGE::read_volume(_exclusionMask,
+     _oclptxOptions.rubbishfile.value());
+     std::cout<<"Successfully loaded Exclusion Mask"<<endl;
   }
-
-  particle = new OclPtxHandler::particle_data;
-  particle->rng = NewRng();
-  particle->position = randomParticle;
-  particle->dr = forward;
-  _seedParticles->PushOrDie(particle);
-  particle = new OclPtxHandler::particle_data;
-  particle->rng = NewRng();
-  particle->position = randomParticle;
-  particle->dr = reverse;
-  _seedParticles->PushOrDie(particle);
- }
+  if(_oclptxOptions.stopfile.value() != "")
+  {
+    NEWIMAGE::read_volume(_terminationMask,
+    _oclptxOptions.stopfile.value());
+    std::cout<<"Successfully loaded Termination Mask"<<endl;
+  }
+  if(_oclptxOptions.waypoints.set())
+  {
+    std::string waypoints = _oclptxOptions.waypoints.value();
+    std::istringstream ss(waypoints);
+    std::string wayMaskLocation;
+    while(std::getline(ss,wayMaskLocation,','))
+    {
+      NEWIMAGE::volume<short int> vol;
+      NEWIMAGE::read_volume(vol, wayMaskLocation);
+      _wayMasks.push_back(vol);
+    }
+    cout<<"Successfully loaded " << _wayMasks.size() << " WayMasks"<<endl;
+  }
+  this->GenerateSeedParticles();
 }
 
 const unsigned short int* SampleManager::GetBrainMaskToArray()
@@ -596,10 +659,10 @@ const BedpostXData* SampleManager::GetFDataPtr()
 
 cl_float4 SampleManager::brain_mask_dim()
 {
-  return (cl_float4){{  _brainMask.xdim(),
-                        _brainMask.ydim(),
-                        _brainMask.zdim(),
-                        1.}};
+  return cl_float4{_brainMask.xdim(),
+                   _brainMask.ydim(),
+                   _brainMask.zdim(),
+                   1.};
 }
 //*********************************************************************
 // samplemanager Constructors/Destructors/Initializers
