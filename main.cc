@@ -24,6 +24,7 @@ int main(int argc, char **argv)
   const int kNumReducers = 1;
   FILE *global_fd;
   Fifo<struct OclPtxHandler::particle_data> *particles_fifo;
+  FILE *bench;
 
   // Create our oclenv
   OclEnv env;
@@ -117,6 +118,9 @@ int main(int argc, char **argv)
 
   std::chrono::duration<float> delta_t = t_end - t_start;
   printf("Time to track [s]: %f\n", delta_t.count());
+  bench = fopen("benchmark_run", "ab");
+  fprintf(bench, "%f\n", delta_t.count());
+  fclose(bench);
 
   env.PdfsToFile("pdf_out");
 
