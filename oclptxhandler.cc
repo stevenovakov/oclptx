@@ -62,7 +62,7 @@ void OclPtxHandler::InitParticles(struct OclPtxHandler::particle_attrs *attrs)
   attrs_ = *attrs;
 
   // TODO(jeff) compute num_particles
-  attrs_.particles_per_side = 1000;
+  attrs_.particles_per_side = 2000;
 
   gpu_data_ = new cl::Buffer(
       *context_,
