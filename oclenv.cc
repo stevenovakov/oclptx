@@ -83,9 +83,12 @@ OclEnv::~OclEnv()
   {
     for (uint32_t s = 0; s < n_dirs; s++)
     {
-      delete this->env_data.f_samples_buffers[s];
-      delete this->env_data.phi_samples_buffers[s];
-      delete this->env_data.theta_samples_buffers[s];
+      if(this->env_data.f_samples_buffers[s] != NULL)
+        delete this->env_data.f_samples_buffers[s];
+      if(this->env_data.phi_samples_buffers[s] != NULL)
+        delete this->env_data.phi_samples_buffers[s];
+      if(this->env_data.theta_samples_buffers[s] != NULL)
+        delete this->env_data.theta_samples_buffers[s];
     }
     
     delete[] this->env_data.f_samples_buffers;
@@ -513,8 +516,6 @@ uint32_t OclEnv::AvailableGPUMem(
   cl_ulong max_buff_size;
   cl_ulong gl_mem_size;
   cl_ulong useful_gl_mem_size;
-  cl_ulong dynamic_mem_per_particle = 0;
-  uint32_t r_particles;
 
   std::vector<cl::Device>::iterator dit = this->ocl_devices.begin();
 
@@ -531,7 +532,12 @@ uint32_t OclEnv::AvailableGPUMem(
   //  BPX Sample Parameters + Masks
   // ***********************************************
 
-  this->env_data.bpx_dirs = 1; //f_data->data.size();
+  this->env_data.bpx_dirs = 1;
+  // oclptx supports up to two fiber directions per vertex. Supporting 3
+  // is unpractical for the typical workstation GPUs.
+  if( f_data->data.size() > 1)
+    this->env_data.bpx_dirs = 2;
+
   this->env_data.nx = f_data->nx;
   this->env_data.ny = f_data->ny;
   this->env_data.nz = f_data->nz;
@@ -552,8 +558,17 @@ uint32_t OclEnv::AvailableGPUMem(
 
   this->env_data.single_sample_mem_size = single_direction_mem_size;
 
+  cl_uint num_samp = 2;
+  // Anisotropic Constraint
+  this->env_data.aniso_const = ptx_options.usef.value();
+  if (this->env_data.aniso_const)
+  {
+    printf("\nUsing Anisotropic Constraint for Tracking\n\n");
+    num_samp = 3;
+  }
+
   cl_uint total_mem_size =
-    3*single_direction_mem_size * this->env_data.bpx_dirs +
+    num_samp*single_direction_mem_size * this->env_data.bpx_dirs +
     brain_mem_size*(1 + n_waypoints);
 
   if (exclusion_mask != NULL)
@@ -651,10 +666,6 @@ uint32_t OclEnv::AvailableGPUMem(
   if (this->env_data.euler_streamline)
     printf("\nUsing Modified Euler Integration Method\n\n");
 
-  // Anisotropic Constraint
-  this->env_data.aniso_const = ptx_options.usef.value();
-  if (this->env_data.aniso_const)
-    printf("\nUsing Anisotropic Constraint for Tracking\n\n");
   // Step Length
   printf("Step Length: %f\n\n", ptx_options.steplength.value());
 
@@ -718,18 +729,28 @@ void OclEnv::AllocateSamples(
   this->env_data.phi_samples_buffers = new cl::Buffer*[n_dirs];
   this->env_data.theta_samples_buffers = new cl::Buffer*[n_dirs];
 
+  for (uint32_t n = 0; n < n_dirs; n++)
+  {
+    this->env_data.f_samples_buffers[n] = NULL;
+    this->env_data.phi_samples_buffers[n] = NULL;
+    this->env_data.theta_samples_buffers[n] = NULL;
+  }
+
   for (uint32_t s = 0; s < n_dirs; s++)
   {
-    this->env_data.f_samples_buffers[s] = new
-      cl::Buffer(
-        this->ocl_context,
-        CL_MEM_READ_ONLY,
-        this->env_data.single_sample_mem_size,
-        NULL,
-        &ret
-      );
-    if (CL_SUCCESS != ret)
-      die(ret);
+    if (this->env_data.aniso_const)
+    {
+      this->env_data.f_samples_buffers[s] = new
+        cl::Buffer(
+          this->ocl_context,
+          CL_MEM_READ_ONLY,
+          this->env_data.single_sample_mem_size,
+          NULL,
+          &ret
+        );
+      if (CL_SUCCESS != ret)
+        die(ret);
+    }
 
     this->env_data.theta_samples_buffers[s] = new
       cl::Buffer(
@@ -829,19 +850,21 @@ void OclEnv::AllocateSamples(
     {
       for (uint32_t s = 0; s < n_dirs; s++)
       {
-        ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
-          *(this->env_data.f_samples_buffers[s]),
-          CL_FALSE,
-          static_cast<unsigned int>(0),
-          this->env_data.single_sample_mem_size,
-          f_data->data.at(s),
-          NULL,
-          NULL
-        );
-        if (CL_SUCCESS != ret)
-          die(ret);
+        if (this->env_data.aniso_const)
+        {
+          ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
+            *(this->env_data.f_samples_buffers[s]),
+            CL_FALSE,
+            static_cast<unsigned int>(0),
+            this->env_data.single_sample_mem_size,
+            f_data->data.at(s),
+            NULL,
+            NULL
+          );
+          if (CL_SUCCESS != ret)
+            die(ret);
+        }
 
-        printf("Theta: %f\n", theta_data->data.at(s)[30 * 102 * 102 + 51 * 102 + 51]);
         ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
           *(this->env_data.theta_samples_buffers[s]),
           CL_FALSE,
