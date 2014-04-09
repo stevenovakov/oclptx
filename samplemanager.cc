@@ -272,7 +272,8 @@ void SampleManager::LoadBedpostData(const std::string& aBasename)
       fSampleNames = aBasename+"_f"+fiberNumAsstring+"samples";
 
       LoadBedpostDataHelper(
-       thetaSampleNames,phiSampleNames,fSampleNames);
+       thetaSampleNames,phiSampleNames,fSampleNames,
+       NEWIMAGE::volume<float>(), fiberNum-1);
 
       fiberNum++;
       fiberNumAsstring = IntTostring(fiberNum);
