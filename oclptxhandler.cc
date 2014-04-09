@@ -54,7 +54,7 @@ void OclPtxHandler::Init(
 
   gpu_global_pdf_ = global_pdf;
 
-  attrs_.particles_per_side = env_dat_->dynamic_mem_left / ParticleSize() / 2;
+  attrs_.particles_per_side = 2000;// env_dat_->dynamic_mem_left / ParticleSize() / 2;
   printf("Allocating %i particles\n", attrs_.particles_per_side * 2);
 
   InitParticles();
@@ -64,12 +64,13 @@ size_t OclPtxHandler::ParticleSize()
 {
   size_t size = 0;
   size += sizeof(struct particle_data);
+
   size += sizeof(cl_ushort);  // complete
   size += sizeof(cl_ushort);  // step_count
 
   // PDF
   int entries = (attrs_.sample_nx * attrs_.sample_ny * attrs_.sample_nz / 32) + 1;
-  size += entries * sizeof(cl_int);
+  size += entries * sizeof(cl_uint);
 
   if (env_dat_->save_paths)
     size += attrs_.steps_per_kernel * sizeof(cl_float4);
@@ -83,7 +84,7 @@ size_t OclPtxHandler::ParticleSize()
   if (env_dat_->loopcheck)
     size += attrs_.lx * attrs_.ly * attrs_.lz * sizeof(float4);
 
-  printf("Particle size %li\n", size);
+  printf("Particle size (B) %li\n", size);
 
   return size;
 }
@@ -387,10 +388,13 @@ void OclPtxHandler::RunKernel(int side)
   SetInterpArg(9, env_dat_->f_samples_buffers[0]);
   SetInterpArg(10, env_dat_->phi_samples_buffers[0]);
   SetInterpArg(11, env_dat_->theta_samples_buffers[0]);
-  SetInterpArg(12, env_dat_->brain_mask_buffer);
-  SetInterpArg(13, env_dat_->waypoint_masks_buffer);
-  SetInterpArg(14, env_dat_->termination_mask_buffer);
-  SetInterpArg(15, env_dat_->exclusion_mask_buffer);
+  SetInterpArg(12, env_dat_->f_samples_buffers[1]);
+  SetInterpArg(13, env_dat_->phi_samples_buffers[1]);
+  SetInterpArg(14, env_dat_->theta_samples_buffers[1]);
+  SetInterpArg(15, env_dat_->brain_mask_buffer);
+  SetInterpArg(16, env_dat_->waypoint_masks_buffer);
+  SetInterpArg(17, env_dat_->termination_mask_buffer);
+  SetInterpArg(18, env_dat_->exclusion_mask_buffer);
 
   ret = cq_->enqueueNDRangeKernel(
     *(ptx_kernel_),

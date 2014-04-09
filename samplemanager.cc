@@ -149,7 +149,8 @@ void SampleManager::GenerateSimpleSeeds()
     float xst = newSeeds(SN, 1);
     float yst = newSeeds(SN, 2);
     float zst = newSeeds(SN, 3);
-    AddSeedParticle(xst, yst, zst, seedref.xdim(), seedref.ydim(), seedref.zdim());
+    AddSeedParticle(xst, yst, zst,
+      seedref.xdim(), seedref.ydim(), seedref.zdim());
   }
 }
 

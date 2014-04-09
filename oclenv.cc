@@ -76,12 +76,9 @@ OclEnv::OclEnv()
 //
 OclEnv::~OclEnv()
 {
-  std::cout<<"~OclEnv\n";
-  uint32_t n_dirs = this->env_data.bpx_dirs;
-
   if (this->env_data.f_samples_buffers != NULL)
   {
-    for (uint32_t s = 0; s < n_dirs; s++)
+    for (uint32_t s = 0; s < 2; s++)
     {
       if(this->env_data.f_samples_buffers[s] != NULL)
         delete this->env_data.f_samples_buffers[s];
@@ -296,8 +293,6 @@ void OclEnv::CreateKernels( std::string kernel_name )
     define_list += " -D PRNG";
   if (this->env_data.bpx_dirs > 1)
     define_list += " -D TWO_DIR";
-  if (this->env_data.bpx_dirs > 2)
-    define_list += " -D THREE_DIR";
   if (this->env_data.n_waypts > 0)
     define_list += " -D WAYPOINTS";
   if (this->env_data.terminate_mask)
@@ -534,8 +529,8 @@ uint32_t OclEnv::AvailableGPUMem(
 
   this->env_data.bpx_dirs = 1;
   // oclptx supports up to two fiber directions per vertex. Supporting 3
-  // is unpractical for the typical workstation GPUs.
-  if( f_data->data.size() > 1)
+  // is unpractical for the typical workstation GPU.
+  if( f_data->data.size() > 1 )
     this->env_data.bpx_dirs = 2;
 
   this->env_data.nx = f_data->nx;
@@ -683,16 +678,19 @@ uint32_t OclEnv::AvailableGPUMem(
   printf("/**************************************************\n");
   printf("\tOCLENV::AVAILABLEGPUMEM\n");
   printf("/**************************************************\n\n");
-  printf("Voxel Dims (x,y,z): %u, %u, %u\n", f_data->nx, f_data->ny, f_data->nz);
+  printf("Voxel Dims (x,y,z): %u, %u, %u\n",
+    f_data->nx, f_data->ny, f_data->nz);
   printf("Num Samples: %u\n", f_data->ns);
   printf("Single Dir Sample Mem Size: %u (B), %.4f (MB), \n",
   single_direction_mem_size, single_direction_mem_size/1e6);
   printf("Num_directions: %u \n", this->env_data.bpx_dirs);
   printf("Total GPU Device Memory: %.4f (MB) \n", gl_mem_size/1e6);
-  printf("Total USEFUL GPU Device Memory: %.4f (MB) \n", useful_gl_mem_size/1e6);
+  printf("Total Attempted Use of GPU Device Memory: %.4f (MB) \n",
+    useful_gl_mem_size/1e6);
   printf("Total Static Data Memory Requirement: %.4f (MB) \n",
     this->env_data.total_static_gpu_mem/1e6);
-  printf("Remaining GPU Device Memory: %.4f (MB) \n", this->env_data.dynamic_mem_left/1e6);
+  printf("Remaining GPU Device Memory: %.4f (MB) \n",
+    this->env_data.dynamic_mem_left/1e6);
 
   if (single_direction_mem_size > max_buff_size){
     printf("ERROR: BPX DATA > MAX BUFFER SIZE: %.4f (MB) vs %.4f (MB)\n",
@@ -725,11 +723,11 @@ void OclEnv::AllocateSamples(
   uint32_t n_dirs = this->env_data.bpx_dirs;
   cl_int ret;
 
-  this->env_data.f_samples_buffers = new cl::Buffer*[n_dirs];
-  this->env_data.phi_samples_buffers = new cl::Buffer*[n_dirs];
-  this->env_data.theta_samples_buffers = new cl::Buffer*[n_dirs];
+  this->env_data.f_samples_buffers = new cl::Buffer*[2];
+  this->env_data.phi_samples_buffers = new cl::Buffer*[2];
+  this->env_data.theta_samples_buffers = new cl::Buffer*[2];
 
-  for (uint32_t n = 0; n < n_dirs; n++)
+  for (uint32_t n = 0; n < 2; n++)
   {
     this->env_data.f_samples_buffers[n] = NULL;
     this->env_data.phi_samples_buffers[n] = NULL;

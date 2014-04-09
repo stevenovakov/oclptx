@@ -49,6 +49,9 @@ struct particle_attrs
   uint lx;  // Loopcheck sizes
   uint ly;
   uint lz;
+  int fibst;
+  int randfib;
+  float fibthresh;
 } __attribute__((aligned(16)));
 
 #endif  // ATTRS_H_

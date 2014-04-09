@@ -41,6 +41,9 @@ class OclPtxHandler{
     cl_uint lx;  // Loopcheck sizes
     cl_uint ly;
     cl_uint lz;
+    cl_int fibst;
+    cl_int randfib;
+    cl_float fibthresh;
   } __attribute__((aligned(16)));
 
   OclPtxHandler() {}

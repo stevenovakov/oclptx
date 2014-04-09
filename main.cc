@@ -74,7 +74,11 @@ int main(int argc, char **argv)
     sample_manager->GetOclptxOptions().distthresh.value()
   * sample_manager->GetOclptxOptions().steplength.value()
   / dims.s[0]);
-  
+
+  int fibst = sample_manager->GetOclptxOptions().fibst.value() - 1;
+  if (fibst > 1);
+    fibst = 1;
+
   struct OclPtxHandler::particle_attrs attrs = {
     sample_manager->brain_mask_dim(),
     kStepsPerKernel,
@@ -90,7 +94,10 @@ int main(int argc, char **argv)
     sample_manager->GetOclptxOptions().steplength.value(),
     env.GetEnvData()->lx,
     env.GetEnvData()->ly,
-    env.GetEnvData()->lz
+    env.GetEnvData()->lz,
+    fibst,
+    sample_manager->GetOclptxOptions().randfib.value(),
+    sample_manager->GetOclptxOptions().fibthresh.value()
     }; // num waymasks.
   int num_dev = env.HowManyDevices();
 

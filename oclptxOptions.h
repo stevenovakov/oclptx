@@ -356,7 +356,7 @@ inline oclptxOptions::oclptxOptions():
   rseed(std::string("--rseed"), 12345,
     std::string("\tRandom seed"), false, requires_argument),
 
-  mem_risk_frac(std::string("--memrisk"), 1.0,
+  mem_risk_frac(std::string("--memrisk"), 0.8,
   std::string("Threshold for fraction (0.0 to 1.0) of \
     CL_DEVICE_GLOBAL_MEM_SIZE the application will attempt to \
       use per device"), false, optional_argument),
