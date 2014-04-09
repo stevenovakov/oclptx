@@ -30,6 +30,7 @@ __kernel void PdfSum(
   __global uint* particle_pdfs,
   __global ushort* particle_waypoints,
   __global ushort* particle_exclusion,
+  __global ushort* particle_steps,
 
   // Output
   __global uint* global_pdf
@@ -44,6 +45,8 @@ __kernel void PdfSum(
   uint particle_entry = 0;
   uint to_total;
 
+  ushort steps_taken;
+
   __local uint running_total[32];
 
   for (int b = 0; b < 32; b++)
@@ -55,6 +58,9 @@ __kernel void PdfSum(
   int last_particle = (1 + side) * attrs.particles_per_side;
   for (int p = first_particle; p < last_particle; ++p)
   {
+    steps_taken = particle_steps[p];
+    if (steps_taken < attrs.min_steps)
+      continue;
 
 #if EXCLUSION
     particle_check = particle_exclusion[p];

@@ -29,6 +29,7 @@ class OclPtxHandler{
     cl_float4 brain_mask_dim;
     cl_int steps_per_kernel;
     cl_int max_steps;
+    cl_int min_steps;
     cl_int particles_per_side;
     cl_uint sample_nx;
     cl_uint sample_ny;

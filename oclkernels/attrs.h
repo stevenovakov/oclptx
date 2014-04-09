@@ -37,6 +37,7 @@ struct particle_attrs
   float4 brain_mask_dim;
   int steps_per_kernel;
   int max_steps;
+  int min_steps;
   int particles_per_side;
   uint sample_nx;
   uint sample_ny;

@@ -8,6 +8,7 @@
 #include <cassert>
 #include <thread>
 #include <chrono>
+#include <cmath>
 
 #include "fifo.h"
 #include "oclenv.h"
@@ -16,7 +17,7 @@
 #include "threading.h"
 
 
-cl_ulong8 rng_zero = {0,};
+cl_ulong8 rng_zero = {{0,}};
 
 int main(int argc, char **argv)
 {
@@ -68,10 +69,17 @@ int main(int argc, char **argv)
     exit(1);
   }
 
+  cl_float4 dims = sample_manager->brain_mask_dim();
+  int min_steps = ceil(
+    sample_manager->GetOclptxOptions().distthresh.value()
+  * sample_manager->GetOclptxOptions().steplength.value()
+  / dims.s[0]);
+  
   struct OclPtxHandler::particle_attrs attrs = {
     sample_manager->brain_mask_dim(),
     kStepsPerKernel,
     sample_manager->GetOclptxOptions().nsteps.value(), // max_steps
+    min_steps,
     0, // Particles per side not determined here.
     env.GetEnvData()->nx,
     env.GetEnvData()->ny,

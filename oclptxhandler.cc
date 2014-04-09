@@ -421,7 +421,8 @@ void OclPtxHandler::RunKernel(int side)
   SetSumArg(3, gpu_local_pdf_);
   SetSumArg(4, gpu_waypoints_);
   SetSumArg(5, gpu_exclusion_);
-  SetSumArg(6, gpu_global_pdf_);
+  SetSumArg(6, gpu_step_count_);
+  SetSumArg(7, gpu_global_pdf_);
 
   ret = cq_->enqueueNDRangeKernel(
     *(sum_kernel_),

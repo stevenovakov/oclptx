@@ -154,7 +154,7 @@ void SampleManager::GenerateSimpleSeeds()
 }
 
 void SampleManager::GenerateMaskSeeds()
-{ 
+{
 // TODO(jeff): CSV causes us to enter dependency hell.  Try to make do without
 // it.
 #if 0
@@ -662,10 +662,10 @@ const BedpostXData* SampleManager::GetFDataPtr()
 
 cl_float4 SampleManager::brain_mask_dim()
 {
-  return cl_float4{_brainMask.xdim(),
-                   _brainMask.ydim(),
-                   _brainMask.zdim(),
-                   1.};
+  return cl_float4{{_brainMask.xdim(),
+                    _brainMask.ydim(),
+                    _brainMask.zdim(),
+                    1.}};
 }
 //*********************************************************************
 // samplemanager Constructors/Destructors/Initializers
