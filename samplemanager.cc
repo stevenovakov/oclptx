@@ -34,7 +34,6 @@
 #include <sstream>
 #include <cmath>
 
-#include "csv.h"
 #include "fifo.h"
 #include "oclptxhandler.h"
 #include "samplemanager.h"
@@ -156,6 +155,9 @@ void SampleManager::GenerateSimpleSeeds()
 
 void SampleManager::GenerateMaskSeeds()
 { 
+// TODO(jeff): CSV causes us to enter dependency hell.  Try to make do without
+// it.
+#if 0
   oclptxOptions& opts =oclptxOptions::getInstance();
   
   // we need a reference volume for CSV
@@ -213,6 +215,7 @@ void SampleManager::GenerateMaskSeeds()
       }
     }
   }
+#endif
 }
 
 void SampleManager::GenerateSeedParticles()
