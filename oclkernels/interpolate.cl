@@ -80,7 +80,7 @@ __kernel void OclPtxInterpolate(
   
   float f, phi, theta;
 #ifdef TWO_DIR
-  float f2, phi, theta;
+  float f2, phi2, theta2;
 #endif
   float jump_dot;
 
@@ -381,7 +381,7 @@ __kernel void OclPtxInterpolate(
 
 #ifdef TERMINATION
     bounds_test = termination_mask[mask_index];
-    if (bounds_test == 0)
+    if (bounds_test == 1)
     {
       particle_done[glid] = BREAK_TERM;
       if (0 == step)
@@ -392,7 +392,7 @@ __kernel void OclPtxInterpolate(
 
 #ifdef EXCLUSION
     bounds_test = exclusion_mask[mask_index];
-    if (bounds_test == 0)
+    if (bounds_test == 1)
     {
       particle_exclusion[glid] = 1;
       particle_done[glid] = BREAK_EXCLUSION;

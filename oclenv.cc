@@ -530,7 +530,7 @@ uint32_t OclEnv::AvailableGPUMem(
   this->env_data.bpx_dirs = 1;
   // oclptx supports up to two fiber directions per vertex. Supporting 3
   // is unpractical for the typical workstation GPU.
-  if( f_data->data.size() > 1 )
+  if( f_data->data.size() > 2)
     this->env_data.bpx_dirs = 2;
 
   this->env_data.nx = f_data->nx;
@@ -932,6 +932,7 @@ void OclEnv::AllocateSamples(
 
       for (uint32_t w = 0; w < this->env_data.n_waypts; w++)
       {
+	printf("w: %u, addr:  %hu\n", w, waypoint_masks->at(w));
         ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
           *(this->env_data.waypoint_masks_buffer),
           CL_FALSE,

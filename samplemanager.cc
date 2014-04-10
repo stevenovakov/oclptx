@@ -552,12 +552,13 @@ const unsigned short int* SampleManager::GetTerminationMaskToArray()
     return NULL;
 }
 
-const std::vector<unsigned short int*> SampleManager::GetWayMasksToVector()
+vector<unsigned short int*>* SampleManager::GetWayMasksToVector()
 {
-  vector<unsigned short int*> waymasks;
+  vector<unsigned short int*>* waymasks = 
+    new vector<unsigned short int*>;
   for (unsigned int i = 0; i < _wayMasks.size(); i++)
   {
-    waymasks.push_back(GetMaskToArray(_wayMasks.at(i)));
+    waymasks->push_back(GetMaskToArray(_wayMasks.at(i)));
   }
   return waymasks;
 }

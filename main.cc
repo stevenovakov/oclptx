@@ -36,28 +36,35 @@ int main(int argc, char **argv)
   sample_manager->ParseCommandLine(argc, argv);
   particles_fifo = sample_manager->GetSeedParticles();
 
+  const unsigned short int * rubbish_mask = 
+    sample_manager->GetExclusionMaskToArray();
+  const unsigned short int * stop_mask = 
+    sample_manager->GetTerminationMaskToArray();
+  std::vector<unsigned short int*>* waypoints = 
+    sample_manager->GetWayMasksToVector();
+
   int total_particles = particles_fifo->count() / 2;
   printf("Processing %i particles...\n", total_particles);
 
   env.AvailableGPUMem(
     sample_manager->GetFDataPtr(),
     sample_manager->GetOclptxOptions(),
-    sample_manager->GetWayMasksToVector().size(),
-    NULL,
-    NULL
+    waypoints->size(),
+    rubbish_mask,
+    stop_mask
   );
-  // TODO(Steve) pass the masks
+
+  env.CreateKernels("standard");
+
   env.AllocateSamples(
     sample_manager->GetFDataPtr(),
     sample_manager->GetPhiDataPtr(),
     sample_manager->GetThetaDataPtr(),
     sample_manager->GetBrainMaskToArray(),
-    sample_manager->GetExclusionMaskToArray(),
-    sample_manager->GetTerminationMaskToArray(),
-    NULL // TODO(steve) fix way mask implementation and pass it
+    rubbish_mask,
+    stop_mask,
+    waypoints
   );
-
-  env.CreateKernels("standard");
 
   auto t_end = std::chrono::high_resolution_clock::now();
   auto t_start = std::chrono::high_resolution_clock::now();

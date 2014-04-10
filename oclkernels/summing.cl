@@ -79,9 +79,13 @@ __kernel void PdfSum(
       particle_check |= particle_waypoints[p*attrs.n_waypoint_masks + w];
 #endif  // WAYAND
     }
+    //
+    // TODO (STEVE): Reset particle waypoint checks
+    //
 
     if (particle_check == 0)
       continue;
+
 #endif  // WAYPOINTS
 
     particle_check = particles_done[p];

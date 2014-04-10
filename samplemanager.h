@@ -75,7 +75,7 @@ class SampleManager
     const unsigned short int* GetBrainMaskToArray();
     const unsigned short int* GetExclusionMaskToArray();
     const unsigned short int* GetTerminationMaskToArray();
-    const std::vector<unsigned short int*> GetWayMasksToVector();
+    vector<unsigned short int*>* GetWayMasksToVector();
 
     // Getters:
     // Counts (Particles Default = 5000, Steps Default = 2000)

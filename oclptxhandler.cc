@@ -54,7 +54,7 @@ void OclPtxHandler::Init(
 
   gpu_global_pdf_ = global_pdf;
 
-  attrs_.particles_per_side = 2000;// env_dat_->dynamic_mem_left / ParticleSize() / 2;
+  attrs_.particles_per_side = env_dat_->dynamic_mem_left / ParticleSize() / 2;
   printf("Allocating %i particles\n", attrs_.particles_per_side * 2);
 
   InitParticles();
