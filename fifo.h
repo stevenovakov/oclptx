@@ -106,16 +106,19 @@ template<typename T> void Fifo<T>::PushOrDie(T *val)
 
 template<typename T> T *Fifo<T>::Pop()
 {
-  std::lock_guard<std::mutex> lock(tail_mutex_);
+  int tail = __sync_fetch_and_add(&tail_, 1);
 
-  if (head_ == tail_)  // FIFO Empty
+  // potential race: head can now overwrite tail before we read the value
+  // stored there.  Need a second counter to indicate which values are unused.
+  // Lucky for us we don't use the fifo this way.
+
+  tail = tail & ((1<<order_)-1);
+
+  if (head_ == tail)  // FIFO Empty
     return NULL;
 
-  T *retval = fifo_[tail_];
+  T *retval = fifo_[tail];
 
-  tail_ = (tail_ + 1) & ((1 << order_) - 1);
-
-  // lock_guard releases tail_mutex automatically
   return retval;
 }
 

@@ -1,7 +1,7 @@
 // Copyright 2014 Jeff Taylor
 // Test case for fifo
 
-#include "oclptx/fifo.h"
+#include "fifo.h"
 
 #include<cassert>
 #include<cstdio>
@@ -11,7 +11,7 @@ int main()
 {
   // First things first, does usage example work?
 
-  Fifo<int> myfifo(3);  // create a FIFO with room for 7 entries.
+  Fifo<int> myfifo(7);  // create a FIFO with room for 7 entries.
   int *in = new int;  // create an integer
   myfifo.PushOrDie(in);
   int *out;
