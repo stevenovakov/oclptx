@@ -44,3 +44,4 @@ lint:
 	bash -c 'python cpplint.py --extensions=cc,h,cl --filter=-whitespace/braces `find ./ -name \*.h -o -name \*.cc -o -name \*.cl` > lint 2>&1'
 
 -include $(OCLPTXOBJ:%.o=%.d)
+-include $(FIFOTESTOBJ:%.o=%.d)
