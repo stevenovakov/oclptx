@@ -400,7 +400,7 @@ void OclPtxHandler::RunKernel(int side)
     *(ptx_kernel_),
     particle_offset,
     particles_to_compute,
-    local_range,
+    cl::NullRange,
     NULL,
     NULL);
   if (CL_SUCCESS != ret)
