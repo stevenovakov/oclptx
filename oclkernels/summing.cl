@@ -47,7 +47,7 @@ __kernel void PdfSum(
 
   ushort steps_taken;
 
-  __local uint running_total[32];
+  __private uint running_total[32];
 
   for (int b = 0; b < 32; b++)
   {
