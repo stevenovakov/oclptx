@@ -370,7 +370,6 @@ void OclPtxHandler::RunKernel(int side)
   cl_int ret;
   cl::NDRange particles_to_compute(attrs_.particles_per_side);
   cl::NDRange particle_offset(attrs_.particles_per_side * side);
-  cl::NDRange local_range(1);
 
   ptx_kernel_->setArg(
       0,
@@ -432,7 +431,7 @@ void OclPtxHandler::RunKernel(int side)
     *(sum_kernel_),
     space_offset,
     space_to_compute,
-    local_range,
+    cl::NullRange,
     NULL,
     NULL);
   if (CL_SUCCESS != ret)
