@@ -365,7 +365,7 @@ void OclPtxHandler::SetSumArg(int pos, cl::Buffer *buf)
     sum_kernel_->setArg(pos, NULL);
 }
 
-void OclPtxHandler::RunKernel(int side)
+void OclPtxHandler::RunInterpKernel(int side)
 {
   cl_int ret;
   cl::NDRange particles_to_compute(attrs_.particles_per_side);
@@ -408,8 +408,12 @@ void OclPtxHandler::RunKernel(int side)
   ret = cq_->finish();
   if (CL_SUCCESS != ret)
     die(ret);
+}
 
-  // Now run the summing kernel
+void OclPtxHandler::RunSumKernel(int side)
+{
+  cl_int ret;
+
   cl::NDRange space_to_compute((attrs_.sample_nx
                               * attrs_.sample_ny
                               * attrs_.sample_nz / 32) + 1);
@@ -437,11 +441,16 @@ void OclPtxHandler::RunKernel(int side)
   if (CL_SUCCESS != ret)
     die(ret);
 
-  // And wait for both to finish.  TODO(jeff): try making this a flush, and see
-  // if things run faster.
+  // This line consumes >95% of our time.
   ret = cq_->finish();
   if (CL_SUCCESS != ret)
     die(ret);
+}
+
+void OclPtxHandler::RunKernel(int side)
+{
+  RunInterpKernel(side);
+  RunSumKernel(side);
 }
 
 void OclPtxHandler::ReadStatus(int offset, int count, cl_ushort *ret)

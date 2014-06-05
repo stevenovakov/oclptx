@@ -74,6 +74,8 @@ class OclPtxHandler{
   void InitParticles();
   void SetInterpArg(int pos, cl::Buffer *buf);
   void SetSumArg(int pos, cl::Buffer *buf);
+  void RunSumKernel(int side);
+  void RunInterpKernel(int side);
 
   struct particle_attrs attrs_;
 
