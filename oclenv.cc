@@ -383,7 +383,7 @@ void OclEnv::CreateKernels( std::string kernel_name )
   //
   // Compile Kernels from Program
   //
-  for( unsigned int k = 0; k < this->ocl_devices.size(); k++)
+  for( unsigned int k = 0; k < this->ocl_device_queues.size(); k++)
   {
     if (kernel_name == "standard" )
     {
@@ -829,7 +829,7 @@ void OclEnv::AllocateSamples(
         die(ret);
     }
 
-    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+    for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
     {
       this->device_global_pdf_buffers.push_back(
         new cl::Buffer(
@@ -847,7 +847,7 @@ void OclEnv::AllocateSamples(
     for (uint32_t j = 0; j < this->env_data.global_pdf_size; j++)
       global_init[j] = 0;
 
-    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+    for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
     {
       for (uint32_t s = 0; s < n_dirs; s++)
       {
@@ -935,7 +935,7 @@ void OclEnv::AllocateSamples(
 
       for (uint32_t w = 0; w < this->env_data.n_waypts; w++)
       {
-	printf("w: %u, addr:  %hu\n", w, waypoint_masks->at(w));
+        printf("w: %u, addr:  %hu\n", w, waypoint_masks->at(w));
         ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
           *(this->env_data.waypoint_masks_buffer),
           CL_FALSE,
@@ -965,7 +965,7 @@ void OclEnv::AllocateSamples(
     }
 
     // can maybe move this to oclptxhandler, for slight performance improvement
-    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+    for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
     {
       ret = this->ocl_device_queues.at(d).finish();
       if (CL_SUCCESS != ret)
@@ -984,7 +984,7 @@ void OclEnv::PdfsToFile(std::string filename)
     total_pdf[i] = 0;
   }
 
-  for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+  for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
   {
     this->ocl_device_queues.at(d).enqueueReadBuffer(
       *(this->device_global_pdf_buffers.at(d)),
