@@ -149,6 +149,8 @@ class oclptxOptions {
     Option<float>             mem_risk_frac;
     Option<bool>              norng;
 
+    Option<int>               singlegpu;
+
     // hidden options
     FmribOption<std::string>      prefdirfile;
     // inside this mask, pick orientation closest to whatever is in here
@@ -365,6 +367,10 @@ inline oclptxOptions::oclptxOptions():
   std::string("Deterministic tracking only (zero sample, no vol frac."),
     false, no_argument),
 
+  singlegpu(std::string("--singlegpu"), -1,
+  std::string("Run with only one gpu, specify which one it is."),
+    false, requires_argument),
+
   prefdirfile(std::string("--prefdir"), std::string(""),
        std::string("Prefered orientation preset in a 4D mask"),
        false, requires_argument),
@@ -476,6 +482,7 @@ inline oclptxOptions::oclptxOptions():
 
     options.add(mem_risk_frac);
     options.add(norng);
+    options.add(singlegpu);
   }
   catch(X_OptionError& e)
   {

@@ -229,23 +229,51 @@ unsigned int OclEnv::HowManyDevices()
 {
   return this->ocl_devices.size();
 }
+
+unsigned int OclEnv::HowManyCQ()
+{
+  return this->ocl_device_queues.size();
+}
 //
 //
 //
-void OclEnv::NewCLCommandQueues()
+void OclEnv::NewCLCommandQueues(int which_gpu)
 {
   this->ocl_device_queues.clear();
 
-  for (unsigned int k = 0; k < this->ocl_devices.size(); k++ )
+  if (which_gpu >= 0)
   {
-    std::cout<<"Create CommQueue, Kernel, Device: "<<k<<"\n";
+    if (which_gpu <= this->ocl_devices.size())
+    {
+      std::cout<<"Forcing Single GPU\n";
+      std::cout<<"Create CommQueue, Kernel, Device: "<<which_gpu<<"\n";
 
-    this->ocl_device_queues.push_back(
-      cl::CommandQueue(
-        this->ocl_context,
-        this->ocl_devices[k]
-      )
-    );
+      this->ocl_device_queues.push_back(
+        cl::CommandQueue(
+          this->ocl_context,
+          this->ocl_devices[which_gpu]
+        )
+      );
+    }
+    else{
+      std::cout<<"Specified GPU ("<<which_gpu<<
+        ") outside of available device range ("<<this->ocl_devices.size()<<
+          "). Exiting.\n";
+      exit(EXIT_FAILURE);
+    }
+  }
+  else{
+    for (unsigned int k = 0; k < this->ocl_devices.size(); k++ )
+    {
+      std::cout<<"Create CommQueue, Kernel, Device: "<<k<<"\n";
+
+      this->ocl_device_queues.push_back(
+        cl::CommandQueue(
+          this->ocl_context,
+          this->ocl_devices[k]
+        )
+      );
+    }
   }
 }
 
@@ -377,7 +405,7 @@ void OclEnv::CreateKernels( std::string kernel_name )
   //
   // Compile Kernels from Program
   //
-  for( unsigned int k = 0; k < this->ocl_devices.size(); k++)
+  for( unsigned int k = 0; k < this->ocl_device_queues.size(); k++)
   {
     if (kernel_name == "standard" )
     {
@@ -826,7 +854,7 @@ void OclEnv::AllocateSamples(
         die(ret);
     }
 
-    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+    for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
     {
       this->device_global_pdf_buffers.push_back(
         new cl::Buffer(
@@ -844,7 +872,7 @@ void OclEnv::AllocateSamples(
     for (uint32_t j = 0; j < this->env_data.global_pdf_size; j++)
       global_init[j] = 0;
 
-    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+    for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
     {
       for (uint32_t s = 0; s < n_dirs; s++)
       {
@@ -962,7 +990,7 @@ void OclEnv::AllocateSamples(
     }
 
     // can maybe move this to oclptxhandler, for slight performance improvement
-    for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+    for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
     {
       ret = this->ocl_device_queues.at(d).finish();
       if (CL_SUCCESS != ret)
@@ -981,7 +1009,7 @@ void OclEnv::PdfsToFile(std::string filename)
     total_pdf[i] = 0;
   }
 
-  for (uint32_t d = 0; d < this->ocl_devices.size(); d++)
+  for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
   {
     this->ocl_device_queues.at(d).enqueueReadBuffer(
       *(this->device_global_pdf_buffers.at(d)),
