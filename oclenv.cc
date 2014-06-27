@@ -173,6 +173,12 @@ void OclEnv::OclInit()
 {
   cl::Platform::get(&(this->ocl_platforms));
 
+  if (0 == this->ocl_platforms.size())
+  {
+    printf("No OpenCL platforms found.\n");
+    exit(-1);
+  }
+
   cl_context_properties con_prop[3] =
   {
     CL_CONTEXT_PLATFORM,
