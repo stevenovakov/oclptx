@@ -101,13 +101,13 @@ void SampleManager::AddSeedParticle(
     particle->rng = NewRng();
     particle->position = pos;
     particle->dr = forward;
-    _seedParticles->PushOrDie(particle);
+    _seedParticles->Push(particle);
 
     particle = new OclPtxHandler::particle_data;
     particle->rng = NewRng();
     particle->position = pos;
     particle->dr = reverse;
-    _seedParticles->PushOrDie(particle);
+    _seedParticles->Push(particle);
   }
 }
 
@@ -152,6 +152,7 @@ void SampleManager::GenerateSimpleSeeds()
     AddSeedParticle(xst, yst, zst,
       seedref.xdim(), seedref.ydim(), seedref.zdim());
   }
+  _seedParticles->Finish();
 }
 
 void SampleManager::GenerateMaskSeeds()

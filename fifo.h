@@ -1,43 +1,54 @@
 // Copyright 2014 Jeff Taylor
 //
 // A minimal atomic FIFO with thread safe operations.
-// The exclusion of a check_empty and check_full function is intentional, as
-// these encourage thread-unsafe behaviour.
 //
-// Order indicates how many entries, as a power of two, the fifo will include.
-// eg order 2 => 2^2-1 = 3 entries.
-//
-// It is intended that the FIFOs will be sized for maximum possible number of
+// It is intentional that the FIFOs will be sized for maximum possible number of
 // entries, and are not resizable.
 //
-// If the FIFO is empty, pop will return NULL.  If it is full, push will DIE.
+// If the FIFO is empty, `Pop()` will block until new data appears.  If it is
+// full, `Push()` will block until there is space.
 //
-// There's a reason for the latter.  I could include a IsFifoFull() method,
-// but this is likely to create races (check for full, and then push, but
-// something may have happened in between).  Alternatively, we could return
-// some error code.  This doesn't accomplish anything except to put the
-// responsibility on the caller, who must either abort(), or block.
+// This FIFO also includes a `Finish()` method.  This method signals that the
+// FIFO cannot accept any new data, and can only be popped.  When `Finish()` has
+// been called, and there is no data left, the popper will recieve a NULL
+// pointer.  This is a sign to them that no new data will appear (and they can
+// safely flush whatever data they have and then quit).
 //
-// In general, if you push an item onto the FIFO, you shouldn't touch its
-// contents anymore, and when you pull an item off the FIFO, it belongs to you.
-// It is your responsibility to either give the FIFO to someone else or delete
-// its contents.
+// Finish() is only meaningful if there is only one writer.  If there are two
+// writers, we need some different mechanism to indicate that *all* of them have
+// finished.
 //
-// Obviously, putting a pointer to local data on the FIFO is a really dumb
-// idea.  Don't do it.
+// Data should be allocated with `new` before being pushed onto the FIFO, and
+// not referenced after being pushed. Likewise, data popped off the FIFO should
+// be freed with `delete` (eventually---it is the popper's responsibility not to
+// forget).
 //
-// Sample Usage:
-//   Fifo myfifo(3); // create a FIFO with room for 7 entries.
+// Sample Usage::
+//
+//   Fifo myfifo<int>(13); // create a FIFO with room for >=13 entries.
 //   int *myint = new int(42); // create an integer
-//   myfifo.PushOrDie((void*) myint); // Put it onto the fifo (not mine anymore)
+//   myfifo.Push(myint); // Put it onto the fifo (not mine anymore)
 //
 //   // some other thread
 //   int *now_my_int;
-//   now_my_int = (int*)myfifo.Pop();
+//   now_my_int = myfifo.Pop();
 //
 //   // Do something with now_my_int...
 //
 //   delete now_my_int;
+//
+// Notes:
+//
+//  * Tail points to the next item to be popped.
+//  * Head points to the free space where the next item to be pushed will
+//  appear.
+//  * Size is a power of two, and all operations are modulo size.
+//  * If Head == Tail, we have an empty FIFO (The next item to be popped is an
+//  empty space.
+//  * If Head == Tail + 1, we can't fit any more items in the FIFO.  We
+//  technically have a free space, but adding one more item would cause head ==
+//  tail, confusing us.
+//  * Finish() is simply a NULL pointer in the FIFO.
 //
 #ifndef FIFO_H_
 #define FIFO_H_
@@ -45,6 +56,7 @@
 #include <unistd.h>
 
 #include <cstdlib>
+#include <condition_variable>
 #include <mutex>
 
 template<typename T> class Fifo
@@ -52,9 +64,9 @@ template<typename T> class Fifo
  public:
   explicit Fifo(int order);
   ~Fifo();
-  void PushOrDie(T *val);
+  void Push(T *val);
+  void Finish();
   T *Pop();
-  T *PopOrBlock();
   int count();
  private:
   int order_;
@@ -64,6 +76,8 @@ template<typename T> class Fifo
 
   std::mutex head_mutex_;
   std::mutex tail_mutex_;
+  std::condition_variable full_cv_;
+  std::condition_variable empty_cv_;
 };
 
 template<typename T> Fifo<T>::Fifo(int count):
@@ -87,53 +101,55 @@ template<typename T> Fifo<T>::~Fifo()
   delete[] fifo_;
 }
 
-template<typename T> void Fifo<T>::PushOrDie(T *val)
+template<typename T> void Fifo<T>::Push(T *val)
 {
-  std::lock_guard<std::mutex> lock(head_mutex_);
+  std::unique_lock<std::mutex> lock(head_mutex_);
 
-  if (1 == ((tail_ - head_) & ((1 << order_) - 1)))
-  {
-    puts("FIFO overflow");
-    abort();
-  }
+  while (1 == ((tail_ - head_) & ((1 << order_) - 1))) // FIFO Full
+    full_cv_.wait(lock);
 
   fifo_[head_] = val;
   head_ = (head_ + 1) & ((1 << order_) - 1);
 
   // lock_guard releases head_mutex automatically
+  empty_cv_.notify_one();
+  return;
+}
+
+template<typename T> void Fifo<T>::Finish()
+{
+  Push(NULL);
+  empty_cv_.notify_all();
   return;
 }
 
 template<typename T> T *Fifo<T>::Pop()
 {
-  std::lock_guard<std::mutex> lock(tail_mutex_);
+  std::unique_lock<std::mutex> lock(tail_mutex_);
 
-  if (head_ == tail_)  // FIFO Empty
-    return NULL;
+  while (head_ == tail_)  // FIFO Empty
+    empty_cv_.wait(lock);
 
   T *retval = fifo_[tail_];
+
+  if (!retval) // Finished.  Don't actually pop.
+    return NULL;
 
   tail_ = (tail_ + 1) & ((1 << order_) - 1);
 
   // lock_guard releases tail_mutex automatically
+  full_cv_.notify_one();
   return retval;
-}
-
-template<typename T> T *Fifo<T>::PopOrBlock()
-{
-  T *ret;
-  while (1)
-  {
-    ret = Pop();
-    if (ret)
-      return ret;
-    usleep(1000);  // TODO(jeff) don't poll
-  }
 }
 
 template<typename T> int Fifo<T>::count()
 {
-  return (head_ - tail_) & ((1 << order_) - 1);
+  int count = (head_ - tail_) & ((1 << order_) - 1);
+
+  if (count == 1 && fifo_[tail_] == NULL)
+    return 0;
+  else
+    return count;
 }
 
 #endif  // FIFO_H_
