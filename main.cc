@@ -13,6 +13,7 @@
 #include "fifo.h"
 #include "oclenv.h"
 #include "oclptxhandler.h"
+#include "particlegen.h"
 #include "samplemanager.h"
 #include "threading.h"
 
@@ -34,7 +35,9 @@ int main(int argc, char **argv)
   // Startup the samplemanager
   SampleManager sample_manager;
   sample_manager.ParseCommandLine(argc, argv);
-  particles_fifo = sample_manager.GetSeedParticles();
+
+  ParticleGenerator particle_gen;
+  particles_fifo = particle_gen.Init();
 
   const unsigned short int * rubbish_mask = 
     sample_manager.GetExclusionMaskToArray();

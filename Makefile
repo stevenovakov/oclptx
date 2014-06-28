@@ -18,7 +18,7 @@ USRLDFLAGS = -L${LIB_NEWMAT} -L${LIB_NEWRAN} -L${LIB_CPROB} -L${LIB_PROB} -L${LI
 DLIBS =	-lwarpfns -lbasisfield -lfslvtkio -lmeshclass -lnewimage -lutils -lmiscmaths -lnewmat -lnewran -lfslio -lfirst_lib -lniftiio -lznz -lcprob -lutils -lprob -lm -lz -lOpenCL
 
 OCLPTX=oclptx
-OCLPTXOBJ=main.o oclenv.o oclptxhandler.o threading.o samplemanager.o oclptxOptions.o
+OCLPTXOBJ=main.o oclenv.o oclptxhandler.o threading.o samplemanager.o oclptxOptions.o particlegen.o
 
 RNGTEST=rng_test
 RNGTESTOBJ=rng_test.o oclenv.o

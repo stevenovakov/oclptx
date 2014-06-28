@@ -44,218 +44,6 @@
 //
 
 
-uint64_t rand_64()
-{
-  // Assumption: rand() gives at least 16 bits.  It gives 31 on my system.
-  assert(RAND_MAX >= (1<<16));
-
-  uint64_t a,b,c,d;
-  a = rand() & ((1<<16)-1);
-  b = rand() & ((1<<16)-1);
-  c = rand() & ((1<<16)-1);
-  d = rand() & ((1<<16)-1);
-
-  uint64_t r = ((a << (16*3)) | (b << (16*2)) | (c << (16)) | d);
-
-  return r;
-}
-
-void SampleManager::AddSeedParticle(
-    float x, float y, float z, float xdim, float ydim, float zdim)
-{
-  oclptxOptions& opts = oclptxOptions::getInstance();
-
-  float sampvox = opts.sampvox.value();
-  struct OclPtxHandler::particle_data *particle;
-
-  cl_float4 forward = {{ 1.0, 0., 0., 0.}};
-  cl_float4 reverse = {{-1.0, 0., 0., 0.}};
-  cl_float4 pos = {{x, y, z, 0.}};
-
-  for (int p = 0; p < opts.nparticles.value(); p++)
-  {
-    pos.s[0] = x;
-    pos.s[1] = y;
-    pos.s[2] = z;
-    // random jitter of seed point inside a sphere
-    if (sampvox > 0.)
-    {
-      bool rej = true;
-      float dx, dy, dz;
-      float r2 = sampvox * sampvox;
-      while(rej)
-      {
-        dx = 2.0 * sampvox * ((float)rand()/float(RAND_MAX)-.5);
-        dy = 2.0 * sampvox * ((float)rand()/float(RAND_MAX)-.5);
-        dz = 2.0 * sampvox * ((float)rand()/float(RAND_MAX)-.5);
-        if( dx * dx + dy * dy + dz * dz <= r2 )
-          rej=false;
-      }
-      pos.s[0] += dx / xdim;
-      pos.s[1] += dy / ydim;
-      pos.s[2] += dz / zdim;
-    }
-
-  
-    particle = new OclPtxHandler::particle_data;
-    particle->rng = NewRng();
-    particle->position = pos;
-    particle->dr = forward;
-    _seedParticles->Push(particle);
-
-    particle = new OclPtxHandler::particle_data;
-    particle->rng = NewRng();
-    particle->position = pos;
-    particle->dr = reverse;
-    _seedParticles->Push(particle);
-  }
-}
-
-void SampleManager::GenerateSimpleSeeds()
-{
-  oclptxOptions& opts = oclptxOptions::getInstance();
-  NEWIMAGE::volume<short int> seedref;
-
-  if (opts.seedref.value() != "")
-  {
-    read_volume(seedref,opts.seedref.value());
-  }
-  else
-  {
-    read_volume(seedref,opts.maskfile.value());
-  }
-
-  NEWMAT::Matrix Seeds = read_ascii_matrix(opts.seedfile.value());
-  if (Seeds.Ncols() != 3 && Seeds.Nrows() == 3)
-    Seeds = Seeds.t();
-
-  // convert coordinates from nifti (external) to newimage (internal)
-  //   conventions - Note: for radiological files this should do nothing
-  NEWMAT::Matrix newSeeds(Seeds.Nrows(), 3);
-  for (int n = 1; n<=Seeds.Nrows(); n++)
-  {
-    NEWMAT::ColumnVector v(4);
-    v << Seeds(n,1) << Seeds(n,2) << Seeds(n,3) << 1.0;
-    v = seedref.niftivox2newimagevox_mat() * v;
-    newSeeds.Row(n) << v(1) << v(2) << v(3);
-  }
-
-  int count = opts.nparticles.value() * newSeeds.Nrows();
-  _seedParticles =
-      new Fifo<struct OclPtxHandler::particle_data>(2 * count);
-
-  for (int SN = 1; SN <= newSeeds.Nrows(); SN++)
-  {
-    float xst = newSeeds(SN, 1);
-    float yst = newSeeds(SN, 2);
-    float zst = newSeeds(SN, 3);
-    AddSeedParticle(xst, yst, zst,
-      seedref.xdim(), seedref.ydim(), seedref.zdim());
-  }
-  _seedParticles->Finish();
-}
-
-void SampleManager::GenerateMaskSeeds()
-{
-// TODO(jeff): CSV causes us to enter dependency hell.  Try to make do without
-// it.
-#if 0
-  oclptxOptions& opts =oclptxOptions::getInstance();
-  
-  // we need a reference volume for CSV
-  // (in case seeds are a list of surfaces)
-  NEWIMAGE::volume<short int> refvol;
-  if(opts.seedref.value()!="")
-    read_volume(refvol,opts.seedref.value());
-  else
-    read_volume(refvol,opts.maskfile.value());
-  
-  CSV seeds(refvol);
-  seeds.set_convention(opts.meshspace.value());
-  seeds.load_rois(opts.seedfile.value());
-  puts("done");
-
-  if (seeds.nSurfs() > 0) {
-    puts("OclPtx doesn't support surface seedmasks.  Sorry.");
-    exit(1);
-  }
-
-  if (seeds.nVols() == 0 && opts.seedref.value() == "")
-  {
-    printf("Warning: need to set a reference volume when defining a "
-           "surface-based seed\n");
-  }
-
-  // seed from volume-like ROIs
-  if (0 == seeds.nVols())
-  {
-    puts("No volumes specified.");
-    exit(1);
-  }
-
-  // Figure out how many particles we'll need to allocate our fifo.
-  int count = 0;
-  for (int roi = 1; roi <= seeds.nVols(); roi++)
-    for (int z = 0; z < seeds.zsize(); z++)
-      for (int y = 0; y < seeds.ysize(); y++)
-        for (int x = 0; x < seeds.xsize(); x++)
-          if(seeds.isInRoi(x,y,z,roi))
-            count += opts.nparticles.value();
-
-  _seedParticles =
-      new Fifo<struct OclPtxHandler::particle_data>(2 * count);
-
-  for (int roi = 1; roi <= seeds.nVols(); roi++) {
-    printf("Parsing volume %i\n", roi);
-
-    for (int z = 0; z < seeds.zsize(); z++) {
-      for (int y = 0; y < seeds.ysize(); y++) {
-        for (int x = 0; x < seeds.xsize(); x++) {
-          if(seeds.isInRoi(x,y,z,roi))
-            AddSeedParticle(x, y, z, seeds.xdim(), seeds.ydim(), seeds.zdim());
-        }
-      }
-    }
-  }
-#endif
-}
-
-void SampleManager::GenerateSeedParticles()
-{
-  oclptxOptions& opts =oclptxOptions::getInstance();
-  if (opts.simple.value())
-  {
-    if (opts.matrix1out.value() || opts.matrix3out.value())
-    {
-      puts("Error: cannot use matrix1 and matrix3 in simple mode");
-      exit(1);
-    }
-    puts("Running in simple mode");
-    GenerateSimpleSeeds();
-  }
-  else if(opts.network.value())
-  {
-    puts("OclPtx doesn't support network mode.  Sorry");
-    exit(1);
-  }
-  else
-  {
-    puts("Running in seedmask mode");
-    GenerateMaskSeeds();
-  }
-}
-
-cl_ulong8 SampleManager::NewRng()
-{
-  cl_ulong8 rng = {{0,}};
-  for (int i = 0; i < 5; i++)
-  {
-    rng.s[i] = rand_64();
-  }
-
-  return rng;
-}
-
 std::string SampleManager::IntTostring(const int& value)
 {
     std::stringstream s;
@@ -529,7 +317,6 @@ void SampleManager::ParseCommandLine(int argc, char** argv)
     }
     cout<<"Successfully loaded " << _wayMasks.size() << " WayMasks"<<endl;
   }
-  this->GenerateSeedParticles();
 }
 
 const unsigned short int* SampleManager::GetBrainMaskToArray()
@@ -673,15 +460,11 @@ cl_float4 SampleManager::brain_mask_dim()
 
 //Private Constructor.
 SampleManager::SampleManager():_oclptxOptions(
-  oclptxOptions::getInstance()),
-  _seedParticles(NULL)
+  oclptxOptions::getInstance())
 {}
 
 SampleManager::~SampleManager()
 {
-  if (NULL != _seedParticles)
-    delete _seedParticles;
-
   for (unsigned int i = 0; i < _thetaData.data.size(); i++)
   {
     delete[] _thetaData.data.at(i);

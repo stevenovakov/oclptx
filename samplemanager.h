@@ -82,13 +82,6 @@ class SampleManager
     int const GetNumParticles() {return _nParticles;}
     int const GetNumMaxSteps() {return _nMaxSteps;}
 
-    // Getters: Randomly seeded particles (uses midpoint
-    //  of _brainMask if no seedfile is specified)
-    Fifo<struct OclPtxHandler::particle_data> *GetSeedParticles()
-    {
-      return _seedParticles;
-    }
-
     // If you use these getters, you must access data from
     // the BedpostXData vector as follows:
     // Ex Theta: thetaData.data.at(aFiberNum)[(aSamp)*(nx*ny*nz) +
@@ -134,7 +127,6 @@ class SampleManager
       const NEWIMAGE::volume<float> aMaskParams,
       const int aFiberNum,
       bool _16bit);
-    void GenerateSeedParticles();
     std::string IntTostring(const int& value);
     unsigned short int* GetMaskToArray(NEWIMAGE::volume<short int> aMask);
     cl_ulong8 NewRng();
@@ -145,8 +137,6 @@ class SampleManager
     //Statics
     static SampleManager* _manager;
     oclptxOptions& _oclptxOptions;
-    //Seed Particles
-    Fifo<struct OclPtxHandler::particle_data> *_seedParticles;
     //BedpostData
     BedpostXData _thetaData;
     BedpostXData _phiData;
