@@ -46,7 +46,7 @@
 class SampleManager
 {
   public:
-    static SampleManager& GetInstance();
+    SampleManager();
     ~SampleManager();
 
     // CLI Example: ./oclptx -s bedpostXdata/merged --simple
@@ -108,7 +108,6 @@ class SampleManager
     cl_float4 brain_mask_dim();
 
   private:
-    SampleManager();
     void LoadBedpostData(const std::string& aBasename);
     void LoadBedpostDataHelper(
       const std::string& aThetaSampleName,

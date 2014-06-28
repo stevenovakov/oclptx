@@ -670,20 +670,6 @@ cl_float4 SampleManager::brain_mask_dim()
                     _brainMask.zdim(),
                     1.}};
 }
-//*********************************************************************
-// samplemanager Constructors/Destructors/Initializers
-//*********************************************************************
-
-//Use this to get the only instance of SampleManager in the program.
-
-SampleManager& SampleManager::GetInstance()
-{
-    if(_manager == NULL)
-    {
-        _manager = new SampleManager();
-    }
-    return *_manager;
-}SampleManager* SampleManager::_manager;
 
 //Private Constructor.
 SampleManager::SampleManager():_oclptxOptions(
@@ -710,6 +696,4 @@ SampleManager::~SampleManager()
   {
     delete[] _fData.data.at(i);
   }
-
-  delete _manager;
 }

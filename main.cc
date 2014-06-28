@@ -32,23 +32,23 @@ int main(int argc, char **argv)
   env.NewCLCommandQueues();
 
   // Startup the samplemanager
-  SampleManager *sample_manager = &SampleManager::GetInstance();
-  sample_manager->ParseCommandLine(argc, argv);
-  particles_fifo = sample_manager->GetSeedParticles();
+  SampleManager sample_manager;
+  sample_manager.ParseCommandLine(argc, argv);
+  particles_fifo = sample_manager.GetSeedParticles();
 
   const unsigned short int * rubbish_mask = 
-    sample_manager->GetExclusionMaskToArray();
+    sample_manager.GetExclusionMaskToArray();
   const unsigned short int * stop_mask = 
-    sample_manager->GetTerminationMaskToArray();
+    sample_manager.GetTerminationMaskToArray();
   std::vector<unsigned short int*>* waypoints = 
-    sample_manager->GetWayMasksToVector();
+    sample_manager.GetWayMasksToVector();
 
   int total_particles = particles_fifo->count() / 2;
   printf("Processing %i particles...\n", total_particles);
 
   env.AvailableGPUMem(
-    sample_manager->GetFDataPtr(),
-    sample_manager->GetOclptxOptions(),
+    sample_manager.GetFDataPtr(),
+    sample_manager.GetOclptxOptions(),
     waypoints->size(),
     rubbish_mask,
     stop_mask
@@ -57,10 +57,10 @@ int main(int argc, char **argv)
   env.CreateKernels("standard");
 
   env.AllocateSamples(
-    sample_manager->GetFDataPtr(),
-    sample_manager->GetPhiDataPtr(),
-    sample_manager->GetThetaDataPtr(),
-    sample_manager->GetBrainMaskToArray(),
+    sample_manager.GetFDataPtr(),
+    sample_manager.GetPhiDataPtr(),
+    sample_manager.GetThetaDataPtr(),
+    sample_manager.GetBrainMaskToArray(),
     rubbish_mask,
     stop_mask,
     waypoints
@@ -76,35 +76,35 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  cl_float4 dims = sample_manager->brain_mask_dim();
+  cl_float4 dims = sample_manager.brain_mask_dim();
   int min_steps = ceil(
-    sample_manager->GetOclptxOptions().distthresh.value()
-  * sample_manager->GetOclptxOptions().steplength.value()
+    sample_manager.GetOclptxOptions().distthresh.value()
+  * sample_manager.GetOclptxOptions().steplength.value()
   / dims.s[0]);
 
-  int fibst = sample_manager->GetOclptxOptions().fibst.value() - 1;
+  int fibst = sample_manager.GetOclptxOptions().fibst.value() - 1;
   if (fibst > 1);
     fibst = 1;
 
   struct OclPtxHandler::particle_attrs attrs = {
-    sample_manager->brain_mask_dim(),
+    sample_manager.brain_mask_dim(),
     kStepsPerKernel,
-    sample_manager->GetOclptxOptions().nsteps.value(), // max_steps
+    sample_manager.GetOclptxOptions().nsteps.value(), // max_steps
     min_steps,
     0, // Particles per side not determined here.
     env.GetEnvData()->nx,
     env.GetEnvData()->ny,
     env.GetEnvData()->nz,
     env.GetEnvData()->ns, // num_samples
-    sample_manager->GetOclptxOptions().c_thr.value(), // curv threshold
+    sample_manager.GetOclptxOptions().c_thr.value(), // curv threshold
     env.GetEnvData()->n_waypts,
-    sample_manager->GetOclptxOptions().steplength.value(),
+    sample_manager.GetOclptxOptions().steplength.value(),
     env.GetEnvData()->lx,
     env.GetEnvData()->ly,
     env.GetEnvData()->lz,
     fibst,
-    sample_manager->GetOclptxOptions().randfib.value(),
-    sample_manager->GetOclptxOptions().fibthresh.value()
+    sample_manager.GetOclptxOptions().randfib.value(),
+    sample_manager.GetOclptxOptions().fibthresh.value()
     }; // num waymasks.
   int num_dev = env.HowManyDevices();
 
