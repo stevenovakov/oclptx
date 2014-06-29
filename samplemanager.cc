@@ -207,7 +207,6 @@ void SampleManager::PopulateTHETA(
 
 void SampleManager::LoadBedpostData(const std::string& aBasename)
 {
-  std::cout<<"Loading Bedpost samples....."<<std::endl;
   if(aBasename == "")
   {
     std::cout<< "Bad File Name"<<std::endl;
@@ -259,7 +258,6 @@ void SampleManager::LoadBedpostData(const std::string& aBasename)
        "Could not find samples. Exiting Program..."<<std::endl;
       exit(1);
     }
-    std::cout<<"Finished Loading Samples from Bedpost"<<std::endl;
   }
 }
 
@@ -280,7 +278,6 @@ void SampleManager::ParseCommandLine(int argc, char** argv)
         std::endl;
     exit(1);
   }
-  std::cout<<"Running in simple mode"<<std::endl;
   this->LoadBedpostData(_oclptxOptions.basename.value());
   if(_oclptxOptions.seedref.value() == "")
   {
@@ -296,13 +293,11 @@ void SampleManager::ParseCommandLine(int argc, char** argv)
   {
      NEWIMAGE::read_volume(_exclusionMask,
      _oclptxOptions.rubbishfile.value());
-     std::cout<<"Successfully loaded Exclusion Mask"<<endl;
   }
   if(_oclptxOptions.stopfile.value() != "")
   {
     NEWIMAGE::read_volume(_terminationMask,
     _oclptxOptions.stopfile.value());
-    std::cout<<"Successfully loaded Termination Mask"<<endl;
   }
   if(_oclptxOptions.waypoints.set())
   {
@@ -315,7 +310,6 @@ void SampleManager::ParseCommandLine(int argc, char** argv)
       NEWIMAGE::read_volume(vol, wayMaskLocation);
       _wayMasks.push_back(vol);
     }
-    cout<<"Successfully loaded " << _wayMasks.size() << " WayMasks"<<endl;
   }
 }
 
@@ -458,7 +452,6 @@ cl_float4 SampleManager::brain_mask_dim()
                     1.}};
 }
 
-//Private Constructor.
 SampleManager::SampleManager():_oclptxOptions(
   oclptxOptions::getInstance())
 {}
