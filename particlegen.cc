@@ -66,32 +66,45 @@ Fifo<struct OclPtxHandler::particle_data> *ParticleGenerator::Init()
   if (Seeds.Ncols() != 3 && Seeds.Nrows() == 3)
     Seeds = Seeds.t();
 
+  float *newSeeds = new float[Seeds.Nrows() * 3];
+
   // convert coordinates from nifti (external) to newimage (internal)
   //   conventions - Note: for radiological files this should do nothing
-  NEWMAT::Matrix newSeeds(Seeds.Nrows(), 3);
-  for (int n = 1; n<=Seeds.Nrows(); n++)
+  for (int n = 0; n < Seeds.Nrows(); n++)
   {
     NEWMAT::ColumnVector v(4);
-    v << Seeds(n,1) << Seeds(n,2) << Seeds(n,3) << 1.0;
+    v << Seeds(1+n,1) << Seeds(1+n,2) << Seeds(1+n,3) << 1.0;
     v = seedref.niftivox2newimagevox_mat() * v;
-    newSeeds.Row(n) << v(1) << v(2) << v(3);
+
+    newSeeds[3*n]   = v(1);
+    newSeeds[3*n+1] = v(2);
+    newSeeds[3*n+2] = v(3);
   }
 
-  int count = opts.nparticles.value() * newSeeds.Nrows();
+  int count = opts.nparticles.value() * Seeds.Nrows();
   particle_fifo_ =
       new Fifo<struct OclPtxHandler::particle_data>(2 * count);
 
-  for (int SN = 1; SN <= newSeeds.Nrows(); SN++)
-  {
-    float xst = newSeeds(SN, 1);
-    float yst = newSeeds(SN, 2);
-    float zst = newSeeds(SN, 3);
-    AddSeedParticle(xst, yst, zst,
-      seedref.xdim(), seedref.ydim(), seedref.zdim());
-  }
-  particle_fifo_->Finish();
+  particlegen_thread_ = new std::thread([=]
+    { AddParticles(newSeeds, Seeds.Nrows(),
+                   seedref.xdim(), seedref.ydim(), seedref.zdim()); });
 
   return particle_fifo_;
+}
+
+void ParticleGenerator::AddParticles(float* newSeeds, int count,
+                                     float xdim, float ydim, float zdim)
+{
+  float x, y, z;
+  for (int i = 0; i < count; ++i)
+  {
+    x = newSeeds[3*i];
+    y = newSeeds[3*i+1];
+    z = newSeeds[3*i+2];
+    AddSeedParticle(x, y, z, xdim, ydim, zdim);
+  }
+  particle_fifo_->Finish();
+  delete[] newSeeds;
 }
 
 void ParticleGenerator::AddSeedParticle(

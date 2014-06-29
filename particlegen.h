@@ -8,6 +8,7 @@
  */
 
 #include "fifo.h"
+#include "newimage/newimageall.h"
 #include "oclptxhandler.h"
 
 #include <thread>
@@ -23,6 +24,7 @@ class ParticleGenerator
   std::thread *particlegen_thread_;
   char *coords_filename_;
 
+  void AddParticles(float* newSeeds, int count, float xdim, float ydim, float zdim);
   void AddSeedParticle(float x, float y, float z,
     float xdim, float ydim, float zdim);
 };

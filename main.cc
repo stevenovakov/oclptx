@@ -159,6 +159,8 @@ int main(int argc, char **argv)
         kNumReducers);
   }
 
+  sleep(1); // XXX: Give the fifo time to fill up.
+
   while (particles_fifo->count())
   {
     printf("Processed %i/%i.\r", particles_fifo->count()/2, total_particles);
