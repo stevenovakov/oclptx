@@ -1,0 +1,9 @@
+OPT: Try making global->local->private memory transfers explicit.  According to
+     nvidia the tools are *not* smart about it.
+OPT: Jeff noticed that the sim slows down gradually (from 1600/s to <1000/s
+     in 1,000,000 particles) Investigate why things slow down as time
+     progresses.
+OPT: Replace the summing kernel with a double-track mechanism.  In theory,
+     since the summing kernel consumes >95% of our time, this could by,
+     removing that, and replacing it with double-everything-else, improve
+     performance by 10x (a lot!)
