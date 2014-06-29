@@ -61,6 +61,7 @@ int main(int argc, char **argv)
   particles_fifo = particle_gen.Init();
   end_timer("load particles");
 
+  puts("Setting up OpenCL...");
   start_timer();
 
   const unsigned short int * rubbish_mask = 
@@ -69,9 +70,6 @@ int main(int argc, char **argv)
     sample_manager.GetTerminationMaskToArray();
   std::vector<unsigned short int*>* waypoints = 
     sample_manager.GetWayMasksToVector();
-
-  int total_particles = particles_fifo->count() / 2;
-  printf("Processing %i particles...\n", total_particles);
 
   env.AvailableGPUMem(
     sample_manager.GetFDataPtr(),
@@ -136,11 +134,6 @@ int main(int argc, char **argv)
   OclPtxHandler *handler = new OclPtxHandler[num_dev];
   std::thread *gpu_managers[num_dev];
 
-  end_timer("initialize");
-
-  puts("Tracking");
-  start_timer();
-
   for (int i = 0; i < num_dev; ++i)
   {
     handler[i].Init(env.GetContext(),
@@ -159,14 +152,32 @@ int main(int argc, char **argv)
         kNumReducers);
   }
 
-  sleep(1); // XXX: Give the fifo time to fill up.
+  end_timer("set up OpenCL");
 
-  while (particles_fifo->count())
+  puts("Tracking...");
+  start_timer();
+
+  int64_t count = 0;
+  float percent;
+  float rate;
+  int64_t total = particle_gen.total_particles();
+  while (count < total)
   {
-    printf("Processed %i/%i.\r", particles_fifo->count()/2, total_particles);
+    count = particles_fifo->count();
+    percent = (100. * count) / total;
+    t_end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> track_time = (t_end - t_start);
+
+    rate = count / track_time.count();
+
+    // Internally, we count each particle twice (once per direction).  The
+    // user doesn't expect that, so we correct it here by dividing by two.
+    printf("Processed %li/%li. [%2.2f%%] [%.f particles/sec]\r",
+           count / 2, total / 2, percent, rate / 2);
     fflush(stdout);
-    sleep(1);
+    usleep(100000);  // .1s
   }
+  printf("\n");
 
   for (int i = 0; i < num_dev; ++i)
   {

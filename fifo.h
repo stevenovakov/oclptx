@@ -67,12 +67,14 @@ template<typename T> class Fifo
   void Push(T *val);
   void Finish();
   T *Pop();
-  int count();
+  int64_t count();
  private:
   int order_;
   int head_;  // front of queue---points to open slot
   int tail_;  // back of queue---points to full slot
   T **fifo_;
+
+  int64_t count_;  // How many particles have passed through?
 
   std::mutex head_mutex_;
   std::mutex tail_mutex_;
@@ -82,7 +84,8 @@ template<typename T> class Fifo
 
 template<typename T> Fifo<T>::Fifo(int count):
   head_(0),
-  tail_(0)
+  tail_(0),
+  count_(0)
 {
   // log base 2
   order_ = 1;
@@ -137,19 +140,15 @@ template<typename T> T *Fifo<T>::Pop()
 
   tail_ = (tail_ + 1) & ((1 << order_) - 1);
 
-  // lock_guard releases tail_mutex automatically
+  __sync_fetch_and_add(&count_, 1);
+
   full_cv_.notify_one();
   return retval;
 }
 
-template<typename T> int Fifo<T>::count()
+template<typename T> int64_t Fifo<T>::count()
 {
-  int count = (head_ - tail_) & ((1 << order_) - 1);
-
-  if (count == 1 && fifo_[tail_] == NULL)
-    return 0;
-  else
-    return count;
+  return count_;
 }
 
 #endif  // FIFO_H_

@@ -66,6 +66,8 @@ Fifo<struct OclPtxHandler::particle_data> *ParticleGenerator::Init()
   if (Seeds.Ncols() != 3 && Seeds.Nrows() == 3)
     Seeds = Seeds.t();
 
+  total_particles_ = 2 * opts.nparticles.value() * Seeds.Nrows();
+
   float *newSeeds = new float[Seeds.Nrows() * 3];
 
   // convert coordinates from nifti (external) to newimage (internal)
@@ -81,15 +83,22 @@ Fifo<struct OclPtxHandler::particle_data> *ParticleGenerator::Init()
     newSeeds[3*n+2] = v(3);
   }
 
-  int count = opts.nparticles.value() * Seeds.Nrows();
   particle_fifo_ =
-      new Fifo<struct OclPtxHandler::particle_data>(2 * count);
+      new Fifo<struct OclPtxHandler::particle_data>(total_particles_);
 
+  // TODO(jeff): First off: what are Seeds/seedref?  Second off: Copying like
+  // this might be bad.  Figure out the values we need explicitly, then copy
+  // those in.
   particlegen_thread_ = new std::thread([=]
     { AddParticles(newSeeds, Seeds.Nrows(),
                    seedref.xdim(), seedref.ydim(), seedref.zdim()); });
 
   return particle_fifo_;
+}
+
+int64_t ParticleGenerator::total_particles()
+{
+  return total_particles_;
 }
 
 void ParticleGenerator::AddParticles(float* newSeeds, int count,

@@ -19,10 +19,12 @@ class ParticleGenerator
   ParticleGenerator();
   ~ParticleGenerator();
   Fifo<struct OclPtxHandler::particle_data> *Init();
+
+  int64_t total_particles();
  private:
   Fifo<struct OclPtxHandler::particle_data> *particle_fifo_;
   std::thread *particlegen_thread_;
-  char *coords_filename_;
+  int64_t total_particles_;
 
   void AddParticles(float* newSeeds, int count, float xdim, float ydim, float zdim);
   void AddSeedParticle(float x, float y, float z,
