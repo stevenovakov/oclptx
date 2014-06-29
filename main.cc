@@ -20,6 +20,22 @@
 
 cl_ulong8 rng_zero = {{0,}};
 
+std::chrono::high_resolution_clock::time_point t_end;
+std::chrono::high_resolution_clock::time_point t_start;
+
+void start_timer()
+{
+  t_start = std::chrono::high_resolution_clock::now();
+}
+
+void end_timer(const char *verb)
+{
+  t_end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<float> delta_t = t_end - t_start;
+
+  printf("Time to %s: %fs\n", verb, delta_t.count());
+}
+
 int main(int argc, char **argv)
 {
   const int kStepsPerKernel = 1000;
@@ -33,11 +49,19 @@ int main(int argc, char **argv)
   env.NewCLCommandQueues();
 
   // Startup the samplemanager
+  puts("Loading samples...");
+  start_timer();
   SampleManager sample_manager;
   sample_manager.ParseCommandLine(argc, argv);
+  end_timer("load samples");
 
+  puts("Loading particles...");
+  start_timer();
   ParticleGenerator particle_gen;
   particles_fifo = particle_gen.Init();
+  end_timer("load particles");
+
+  start_timer();
 
   const unsigned short int * rubbish_mask = 
     sample_manager.GetExclusionMaskToArray();
@@ -68,9 +92,6 @@ int main(int argc, char **argv)
     stop_mask,
     waypoints
   );
-
-  auto t_end = std::chrono::high_resolution_clock::now();
-  auto t_start = std::chrono::high_resolution_clock::now();
 
   global_fd = fopen("./path_output", "w");
   if (NULL == global_fd)
@@ -115,8 +136,10 @@ int main(int argc, char **argv)
   OclPtxHandler *handler = new OclPtxHandler[num_dev];
   std::thread *gpu_managers[num_dev];
 
-  // may want to change the location of this later
-  t_start = std::chrono::high_resolution_clock::now();
+  end_timer("initialize");
+
+  puts("Tracking");
+  start_timer();
 
   for (int i = 0; i < num_dev; ++i)
   {
@@ -148,10 +171,7 @@ int main(int argc, char **argv)
     gpu_managers[i]->join();
   }
 
-  t_end = std::chrono::high_resolution_clock::now();
-
-  std::chrono::duration<float> delta_t = t_end - t_start;
-  printf("Time to track [s]: %f\n", delta_t.count());
+  end_timer("track");
 
   env.PdfsToFile("pdf_out");
 
