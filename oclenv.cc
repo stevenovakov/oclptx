@@ -198,7 +198,7 @@ void OclEnv::OclInit()
 
 void OclEnv::OclDeviceInfo()
 {
-  std::cout<<"\nLocal OpenCL Devices\n\n";
+  std::cout<<"\nLocal OpenCL Devices\n";
 
   size_t siT[3];
   cl_uint print_int;
@@ -217,7 +217,7 @@ void OclEnv::OclDeviceInfo()
     dit->getInfo(CL_DEVICE_MAX_WORK_ITEM_SIZES, &siT);
 
 
-    std::cout<<"\tDEVICE\n\n";
+    std::cout<<"\tDEVICE\n";
     std::cout<<"\tDevice Name: " << print_string << "\n";
     std::cout<<"\tMax Compute Units: " << print_int << "\n";
     std::cout<<"\tMax Work Group Size (x*y*z): " << siT[0] << "\n";
@@ -564,7 +564,7 @@ uint32_t OclEnv::AvailableGPUMem(
   this->env_data.aniso_const = ptx_options.usef.value();
   if (this->env_data.aniso_const)
   {
-    printf("\nUsing Anisotropic Constraint for Tracking\n\n");
+    printf("\nUsing Anisotropic Constraint for Tracking\n");
     num_samp = 3;
   }
 
@@ -665,10 +665,10 @@ uint32_t OclEnv::AvailableGPUMem(
 
   this->env_data.euler_streamline = ptx_options.modeuler.value();
   if (this->env_data.euler_streamline)
-    printf("\nUsing Modified Euler Integration Method\n\n");
+    printf("\nUsing Modified Euler Integration Method\n");
 
   // Step Length
-  printf("Step Length: %f\n\n", ptx_options.steplength.value());
+  printf("Step Length: %f\n", ptx_options.steplength.value());
 
   // PRNG?
 
@@ -679,11 +679,8 @@ uint32_t OclEnv::AvailableGPUMem(
   this->env_data.save_paths = ptx_options.save_paths.value();
   
   if (this->env_data.save_paths)
-    printf("Saving Path Data\n\n");
+    printf("Saving Path Data\n");
 
-  printf("/**************************************************\n");
-  printf("\tOCLENV::AVAILABLEGPUMEM\n");
-  printf("/**************************************************\n\n");
   printf("Voxel Dims (x,y,z): %u, %u, %u\n",
     f_data->nx, f_data->ny, f_data->nz);
   printf("Num Samples: %u\n", f_data->ns);

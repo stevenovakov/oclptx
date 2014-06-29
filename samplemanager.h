@@ -102,6 +102,7 @@ class SampleManager
 
   private:
     void LoadBedpostData(const std::string& aBasename);
+    void Progress();
     void LoadBedpostDataHelper(
       const std::string& aThetaSampleName,
       const std::string& aPhiSampleName,
@@ -153,6 +154,8 @@ class SampleManager
     //Input Constants
     int _nParticles; //Default 5000
     int _nMaxSteps; //Default 2000
+
+    int loaded_;
 };
 
 #endif  // SAMPLEMANAGER_H_

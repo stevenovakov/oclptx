@@ -51,6 +51,12 @@ std::string SampleManager::IntTostring(const int& value)
     return s.str();
 }
 
+void SampleManager::Progress()
+{
+  printf("Loading buffer %i\r", ++loaded_);
+  fflush(stdout);
+}
+
 //Private method: Used for loading data directly into member containers
 void SampleManager::LoadBedpostDataHelper(
   const std::string& aThetaSampleName,
@@ -68,11 +74,13 @@ void SampleManager::LoadBedpostDataHelper(
   NEWIMAGE::read_volume4D(loadedVolume4DPhi, aPhiSampleName);
   NEWIMAGE::read_volume4D(loadedVolume4Df, afSampleName);
 
-
+  Progress();
   PopulateTHETA(loadedVolume4DTheta,
     _thetaData, loadedVolume4DTheta[0], aFiberNum, false);
+  Progress();
   PopulatePHI(loadedVolume4DPhi,
     _phiData, loadedVolume4DPhi[0], aFiberNum, false);
+  Progress();
   PopulateF(loadedVolume4Df,
     _fData, loadedVolume4Df[0], aFiberNum, false);
 }
@@ -259,6 +267,7 @@ void SampleManager::LoadBedpostData(const std::string& aBasename)
       exit(1);
     }
   }
+  printf("\n");
 }
 
 void SampleManager::ParseCommandLine(int argc, char** argv)
@@ -452,8 +461,9 @@ cl_float4 SampleManager::brain_mask_dim()
                     1.}};
 }
 
-SampleManager::SampleManager():_oclptxOptions(
-  oclptxOptions::getInstance())
+SampleManager::SampleManager():
+  _oclptxOptions(oclptxOptions::getInstance()),
+  loaded_(0)
 {}
 
 SampleManager::~SampleManager()
