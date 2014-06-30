@@ -55,12 +55,6 @@ int main(int argc, char **argv)
   sample_manager.ParseCommandLine(argc, argv);
   end_timer("load samples");
 
-  puts("Loading particles...");
-  start_timer();
-  ParticleGenerator particle_gen;
-  particles_fifo = particle_gen.Init();
-  end_timer("load particles");
-
   puts("Setting up OpenCL...");
   start_timer();
 
@@ -134,6 +128,8 @@ int main(int argc, char **argv)
   OclPtxHandler *handler = new OclPtxHandler[num_dev];
   std::thread *gpu_managers[num_dev];
 
+  int total_particles = 0;
+
   for (int i = 0; i < num_dev; ++i)
   {
     handler[i].Init(env.GetContext(),
@@ -145,6 +141,14 @@ int main(int argc, char **argv)
                     env.GetEnvData(),
                     env.GetDevicePdf(i));
 
+    total_particles += handler[i].particles_per_side();
+  }
+
+  ParticleGenerator particle_gen;
+  particles_fifo = particle_gen.Init(total_particles);
+
+  for (int i = 0; i < num_dev; ++i)
+  {
     gpu_managers[i] = new std::thread(
         threading::RunThreads,
         &handler[i],

@@ -55,7 +55,7 @@ ParticleGenerator::~ParticleGenerator()
   delete particle_fifo_;
 }
 
-Fifo<struct OclPtxHandler::particle_data> *ParticleGenerator::Init()
+Fifo<struct OclPtxHandler::particle_data> *ParticleGenerator::Init(int fifo_size)
 {
   oclptxOptions& opts = oclptxOptions::getInstance();
   NEWIMAGE::volume<short int> seedref;
@@ -84,7 +84,7 @@ Fifo<struct OclPtxHandler::particle_data> *ParticleGenerator::Init()
   }
 
   particle_fifo_ =
-      new Fifo<struct OclPtxHandler::particle_data>(total_particles_);
+      new Fifo<struct OclPtxHandler::particle_data>(fifo_size);
 
   // TODO(jeff): First off: what are Seeds/seedref?  Second off: Copying like
   // this might be bad.  Figure out the values we need explicitly, then copy

@@ -18,7 +18,7 @@ class ParticleGenerator
  public:
   ParticleGenerator();
   ~ParticleGenerator();
-  Fifo<struct OclPtxHandler::particle_data> *Init();
+  Fifo<struct OclPtxHandler::particle_data> *Init(int fifo_size);
 
   int64_t total_particles();
  private:
