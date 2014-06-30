@@ -33,6 +33,7 @@
 #include <fstream>
 #include <vector>
 #include <cmath>
+#include <algorithm>
 //#include <mutex>
 //#include <thread>
 
@@ -188,11 +189,14 @@ void OclEnv::OclInit()
 
   this->ocl_platforms.at(0);
 
+  // cl::Context test_context = cl::Context(CL_DEVICE_TYPE_GPU, con_prop);
+  // std::vector<cl::Device> test_device_list =
+  //   this->ocl_context.getInfo<CL_CONTEXT_DEVICES>();
+
   this->ocl_context = cl::Context(CL_DEVICE_TYPE_GPU, con_prop);
   // GPU DEVICES ONLY, FOR CPU, (don't use CPU unless informed, not
   // quite the same physical interface):
   // this->oclContext = cl::Context(CL_DEVICE_TYPE_CPU, conProp);
-
   this->ocl_devices = this->ocl_context.getInfo<CL_CONTEXT_DEVICES>();
 }
 
@@ -235,23 +239,65 @@ unsigned int OclEnv::HowManyDevices()
 {
   return this->ocl_devices.size();
 }
+
+unsigned int OclEnv::HowManyCQ()
+{
+  return this->ocl_device_queues.size();
+}
+
 //
 //
 //
-void OclEnv::NewCLCommandQueues()
+void OclEnv::NewCLCommandQueues(std::string gpu_select)
 {
   this->ocl_device_queues.clear();
 
-  for (unsigned int k = 0; k < this->ocl_devices.size(); k++ )
+  if (gpu_select == "")
   {
-    std::cout<<"Create CommQueue, Kernel, Device: "<<k<<"\n";
+    for (uint32_t k = 0; k < this->ocl_devices.size(); k++ )
+    {
+      std::cout<<"Create CommQueue, Kernel, Device: "<<k<<"\n";
 
-    this->ocl_device_queues.push_back(
-      cl::CommandQueue(
-        this->ocl_context,
-        this->ocl_devices[k]
-      )
-    );
+      this->ocl_device_queues.push_back(
+        cl::CommandQueue(
+          this->ocl_context,
+          this->ocl_devices[k]
+        )
+      );
+    }
+  }
+  else
+  {
+    std::vector<uint32_t> gpu_list;
+    uint32_t next_item;
+    std::string parse_string = gpu_select;
+
+    for (uint32_t s = 0; s < gpu_select.size(); s++)
+    {
+      if (s%2 != 0) // ignore commas, NOT TRUE CSV, DOESNT WORK FOR >10 DEVICES
+        continue;
+      
+      next_item = std::atoi(string(1, gpu_select[s]).c_str());
+
+      if ( (std::find(gpu_list.begin(), gpu_list.end(), next_item)
+        == gpu_list.end()) && (next_item < this->ocl_devices.size()))
+        // protect against adding same device twice (bad...)
+      {
+        gpu_list.push_back(next_item);
+      }
+    }
+
+    for (uint32_t k = 0; k < gpu_list.size(); k++ )
+    {
+      std::cout<<"Create CommQueue, Kernel, Device: "<< gpu_list.at(k) <<"\n";
+
+      this->ocl_device_queues.push_back(
+        cl::CommandQueue(
+          this->ocl_context,
+          this->ocl_devices[gpu_list.at(k)]
+        )
+      );
+    }
   }
 }
 

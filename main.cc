@@ -43,11 +43,6 @@ int main(int argc, char **argv)
   FILE *global_fd;
   Fifo<struct OclPtxHandler::particle_data> *particles_fifo;
 
-  // Create our oclenv
-  OclEnv env;
-  env.OclInit();
-  env.NewCLCommandQueues();
-
   // Startup the samplemanager
   puts("Loading samples...");
   start_timer();
@@ -58,11 +53,17 @@ int main(int argc, char **argv)
   puts("Setting up OpenCL...");
   start_timer();
 
-  const unsigned short int * rubbish_mask = 
+  // Create our oclenv
+  OclEnv env;
+  env.OclInit();
+  env.NewCLCommandQueues(
+    sample_manager.GetOclptxOptions().gpuselect.value());
+
+  const unsigned short int * rubbish_mask =
     sample_manager.GetExclusionMaskToArray();
-  const unsigned short int * stop_mask = 
+  const unsigned short int * stop_mask =
     sample_manager.GetTerminationMaskToArray();
-  std::vector<unsigned short int*>* waypoints = 
+  std::vector<unsigned short int*>* waypoints =
     sample_manager.GetWayMasksToVector();
 
   env.AvailableGPUMem(
@@ -122,7 +123,7 @@ int main(int argc, char **argv)
     sample_manager.GetOclptxOptions().randfib.value(),
     sample_manager.GetOclptxOptions().fibthresh.value()
     }; // num waymasks.
-  int num_dev = env.HowManyDevices();
+  int num_dev = env.HowManyCQ();
 
   // Create a new oclptxhandler.
   OclPtxHandler *handler = new OclPtxHandler[num_dev];

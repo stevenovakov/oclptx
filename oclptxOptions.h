@@ -149,6 +149,8 @@ class oclptxOptions {
     Option<float>             mem_risk_frac;
     Option<bool>              norng;
 
+    Option<std::string>       gpuselect;
+
     // hidden options
     FmribOption<std::string>      prefdirfile;
     // inside this mask, pick orientation closest to whatever is in here
@@ -365,6 +367,10 @@ inline oclptxOptions::oclptxOptions():
   std::string("Deterministic tracking only (zero sample, no vol frac."),
     false, no_argument),
 
+  gpuselect(std::string("--gpuselect"), "",
+    std::string("Run with specified gpu devices ONLY."),
+      false, requires_argument),
+
   prefdirfile(std::string("--prefdir"), std::string(""),
        std::string("Prefered orientation preset in a 4D mask"),
        false, requires_argument),
@@ -476,6 +482,7 @@ inline oclptxOptions::oclptxOptions():
 
     options.add(mem_risk_frac);
     options.add(norng);
+    options.add(gpuselect);
   }
   catch(X_OptionError& e)
   {

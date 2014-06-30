@@ -5,3 +5,6 @@ oclptx
 lint
 *.swp
 core*
+*.txt
+*.dat
+*.png

@@ -64,6 +64,7 @@ class OclEnv{
     
     cl::Device * GetDevice(uint32_t device_num);
     uint32_t HowManyDevices();
+    uint32_t HowManyCQ();
     
     cl::CommandQueue * GetCq(uint32_t device_num);
     cl::Kernel * GetKernel(uint32_t kernel_num);
@@ -86,7 +87,7 @@ class OclEnv{
 
     void OclDeviceInfo();
 
-    void NewCLCommandQueues();
+    void NewCLCommandQueues(std::string gpu_select);
 
     void CreateKernels(std::string kernel_name);
 
