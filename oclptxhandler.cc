@@ -41,7 +41,8 @@ void OclPtxHandler::Init(
   struct OclPtxHandler::particle_attrs *attrs,
   FILE *path_dump_fd,
   EnvironmentData *env_dat,
-  cl::Buffer *global_pdf)
+  cl::Buffer *global_pdf,
+  uint32_t dev_id)
 {
   context_ = cc;
   cq_ = cq;
@@ -53,6 +54,8 @@ void OclPtxHandler::Init(
   attrs_ = *attrs;
 
   gpu_global_pdf_ = global_pdf;
+
+  this->device_id = dev_id;
 
   attrs_.particles_per_side = env_dat_->dynamic_mem_left / ParticleSize() / 2;
   printf("Allocating %i particles\n", attrs_.particles_per_side * 2);
@@ -371,6 +374,8 @@ void OclPtxHandler::RunKernel(int side)
   cl::NDRange particles_to_compute(attrs_.particles_per_side);
   cl::NDRange particle_offset(attrs_.particles_per_side * side);
 
+  uint32_t d = this->device_id;
+
   ptx_kernel_->setArg(
       0,
       sizeof(struct OclPtxHandler::particle_attrs),
@@ -384,16 +389,16 @@ void OclPtxHandler::RunKernel(int side)
   SetInterpArg(7, gpu_exclusion_);
   SetInterpArg(8, gpu_loopcheck_);
 
-  SetInterpArg(9, env_dat_->f_samples_buffers[0]);
-  SetInterpArg(10, env_dat_->phi_samples_buffers[0]);
-  SetInterpArg(11, env_dat_->theta_samples_buffers[0]);
-  SetInterpArg(12, env_dat_->f_samples_buffers[1]);
-  SetInterpArg(13, env_dat_->phi_samples_buffers[1]);
-  SetInterpArg(14, env_dat_->theta_samples_buffers[1]);
-  SetInterpArg(15, env_dat_->brain_mask_buffer);
-  SetInterpArg(16, env_dat_->waypoint_masks_buffer);
-  SetInterpArg(17, env_dat_->termination_mask_buffer);
-  SetInterpArg(18, env_dat_->exclusion_mask_buffer);
+  SetInterpArg(9, env_dat_->f_samples_buffers[d][0]);
+  SetInterpArg(10, env_dat_->phi_samples_buffers[d][0]);
+  SetInterpArg(11, env_dat_->theta_samples_buffers[d][0]);
+  SetInterpArg(12, env_dat_->f_samples_buffers[d][1]);
+  SetInterpArg(13, env_dat_->phi_samples_buffers[d][1]);
+  SetInterpArg(14, env_dat_->theta_samples_buffers[d][1]);
+  SetInterpArg(15, env_dat_->brain_mask_buffer[d]);
+  SetInterpArg(16, env_dat_->waypoint_masks_buffer[d]);
+  SetInterpArg(17, env_dat_->termination_mask_buffer[d]);
+  SetInterpArg(18, env_dat_->exclusion_mask_buffer[d]);
 
   ret = cq_->enqueueNDRangeKernel(
     *(ptx_kernel_),

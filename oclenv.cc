@@ -79,29 +79,47 @@ OclEnv::~OclEnv()
 {
   if (this->env_data.f_samples_buffers != NULL)
   {
-    for (uint32_t s = 0; s < 2; s++)
+    for (uint32_t d = 0; d < this->selected_gpus.size(); d++)
     {
-      if(this->env_data.f_samples_buffers[s] != NULL)
-        delete this->env_data.f_samples_buffers[s];
-      if(this->env_data.phi_samples_buffers[s] != NULL)
-        delete this->env_data.phi_samples_buffers[s];
-      if(this->env_data.theta_samples_buffers[s] != NULL)
-        delete this->env_data.theta_samples_buffers[s];
+      for (uint32_t s = 0; s < 2; s++)
+      {
+        if(this->env_data.f_samples_buffers[d][s] != NULL)
+          delete this->env_data.f_samples_buffers[d][s];
+        if(this->env_data.phi_samples_buffers[d][s] != NULL)
+          delete this->env_data.phi_samples_buffers[d][s];
+        if(this->env_data.theta_samples_buffers[d][s] != NULL)
+          delete this->env_data.theta_samples_buffers[d][s];
+      }
+
+      if(this->env_data.f_samples_buffers[d] != NULL)
+        delete[] this->env_data.f_samples_buffers[d];
+      if(this->env_data.phi_samples_buffers[d] != NULL)
+        delete[] this->env_data.phi_samples_buffers[d];
+      if(this->env_data.theta_samples_buffers[d] != NULL)
+        delete[] this->env_data.theta_samples_buffers[d];
+
+      if (this->env_data.exclusion_mask_buffer[d] != NULL)
+        delete this->env_data.exclusion_mask_buffer[d];
+      if (this->env_data.termination_mask_buffer[d] != NULL)
+        delete this->env_data.termination_mask_buffer[d];
+      if (this->env_data.waypoint_masks_buffer[d] != NULL)
+        delete this->env_data.waypoint_masks_buffer[d];
+
     }
-    
+
     delete[] this->env_data.f_samples_buffers;
     delete[] this->env_data.phi_samples_buffers;
     delete[] this->env_data.theta_samples_buffers;
-  }
 
-  delete this->env_data.brain_mask_buffer;
-  
-  if (this->env_data.exclusion_mask_buffer != NULL)
-    delete this->env_data.exclusion_mask_buffer;
-  if (this->env_data.termination_mask_buffer != NULL)
-    delete this->env_data.termination_mask_buffer;
-  if (this->env_data.waypoint_masks_buffer != NULL)
-    delete this->env_data.waypoint_masks_buffer;
+    delete[] this->env_data.brain_mask_buffer;
+    
+    if (this->env_data.exclusion_mask_buffer != NULL)
+      delete[] this->env_data.exclusion_mask_buffer;
+    if (this->env_data.termination_mask_buffer != NULL)
+      delete[] this->env_data.termination_mask_buffer;
+    if (this->env_data.waypoint_masks_buffer != NULL)
+      delete[] this->env_data.waypoint_masks_buffer;
+  }
 
   for (uint32_t i = 0; i < this->device_global_pdf_buffers.size(); i++)
     delete device_global_pdf_buffers.at(i);
@@ -124,22 +142,22 @@ static void die(int reason)
 //
 //*********************************************************************
 
-cl::Context * OclEnv::GetContext()
+cl::Context * OclEnv::GetContext(uint32_t device)
 {
-  return &(this->ocl_context);
+  return &(this->ocl_contexts.at(device));
 }
 
-cl::CommandQueue * OclEnv::GetCq(unsigned int device_num)
+cl::CommandQueue * OclEnv::GetCq(uint32_t device_num)
 {
   return &(this->ocl_device_queues.at(device_num));
 }
 
-cl::Kernel * OclEnv::GetKernel(unsigned int kernel_num)
+cl::Kernel * OclEnv::GetKernel(uint32_t kernel_num)
 {
   return &(this->ocl_kernel_set.at(kernel_num));
 }
 
-cl::Kernel * OclEnv::GetSumKernel(unsigned int kernel_num)
+cl::Kernel * OclEnv::GetSumKernel(uint32_t kernel_num)
 {
   return &(this->sum_kernel_set.at(kernel_num));
 }
@@ -183,15 +201,23 @@ void OclEnv::OclInit()
 
   this->ocl_platforms.at(0);
 
-  // cl::Context test_context = cl::Context(CL_DEVICE_TYPE_GPU, con_prop);
-  // std::vector<cl::Device> test_device_list =
-  //   this->ocl_context.getInfo<CL_CONTEXT_DEVICES>();
+  cl::Context test_context = cl::Context(CL_DEVICE_TYPE_GPU, con_prop);
+  std::vector<cl::Device> test_device_list =
+    test_context.getInfo<CL_CONTEXT_DEVICES>();
 
-  this->ocl_context = cl::Context(CL_DEVICE_TYPE_GPU, con_prop);
-  // GPU DEVICES ONLY, FOR CPU, (don't use CPU unless informed, not
-  // quite the same physical interface):
-  // this->oclContext = cl::Context(CL_DEVICE_TYPE_CPU, conProp);
-  this->ocl_devices = this->ocl_context.getInfo<CL_CONTEXT_DEVICES>();
+  uint32_t num_dev = test_device_list.size();
+
+  for (uint32_t d = 0; d < num_dev; d++)
+  {
+    this->ocl_contexts.push_back(
+      cl::Context(CL_DEVICE_TYPE_GPU, con_prop));
+    // GPU DEVICES ONLY, FOR CPU, (don't use CPU unless informed, not
+    // quite the same physical interface):
+    // this->oclContext = cl::Context(CL_DEVICE_TYPE_CPU, conProp);
+    this->ocl_devices.push_back(
+      this->ocl_contexts.back().getInfo<CL_CONTEXT_DEVICES>().at(d)
+    );
+  }
 }
 
 void OclEnv::OclDeviceInfo()
@@ -245,24 +271,27 @@ unsigned int OclEnv::HowManyCQ()
 void OclEnv::NewCLCommandQueues(std::string gpu_select)
 {
   this->ocl_device_queues.clear();
+  this->selected_gpus.clear();
 
   if (gpu_select == "")
   {
-    for (uint32_t k = 0; k < this->ocl_devices.size(); k++ )
+    for (uint32_t k = 0; k < this->ocl_contexts.size(); k++ )
     {
       std::cout<<"Create CommQueue, Kernel, Device: "<<k<<"\n";
 
       this->ocl_device_queues.push_back(
         cl::CommandQueue(
-          this->ocl_context,
+          this->ocl_contexts[k],
           this->ocl_devices[k]
         )
       );
+
+      this->selected_gpus.push_back(k);
     }
   }
   else
   {
-    std::vector<uint32_t> gpu_list;
+    std::vector<uint32_t> * gpu_list = &(this->selected_gpus);
     uint32_t next_item;
     std::string parse_string = gpu_select;
 
@@ -273,22 +302,22 @@ void OclEnv::NewCLCommandQueues(std::string gpu_select)
       
       next_item = std::atoi(string(1, gpu_select[s]).c_str());
 
-      if ( (std::find(gpu_list.begin(), gpu_list.end(), next_item)
-        == gpu_list.end()) && (next_item < this->ocl_devices.size()))
+      if ( (std::find(gpu_list->begin(), gpu_list->end(), next_item)
+        == gpu_list->end()) && (next_item < this->ocl_contexts.size()))
         // protect against adding same device twice (bad...)
       {
-        gpu_list.push_back(next_item);
+        gpu_list->push_back(next_item);
       }
     }
 
-    for (uint32_t k = 0; k < gpu_list.size(); k++ )
+    for (uint32_t k = 0; k < gpu_list->size(); k++ )
     {
-      std::cout<<"Create CommQueue, Kernel, Device: "<< gpu_list.at(k) <<"\n";
+      std::cout<<"Create CommQueue, Kernel, Device: "<< gpu_list->at(k) <<"\n";
 
       this->ocl_device_queues.push_back(
         cl::CommandQueue(
-          this->ocl_context,
-          this->ocl_devices[gpu_list.at(k)]
+          this->ocl_contexts[gpu_list->at(k)],
+          this->ocl_devices[gpu_list->at(k)]
         )
       );
     }
@@ -365,8 +394,11 @@ void OclEnv::CreateKernels( std::string kernel_name )
                             (std::istreambuf_iterator<char>()));
 
   printf("Build Options: %s\n", define_list.c_str());
+
   //
   // Build Program files here
+  //
+  // CAREFUL : this code assumes every device is identical
   //
 
   cl::Program::Sources main_source(
@@ -379,7 +411,7 @@ void OclEnv::CreateKernels( std::string kernel_name )
     std::make_pair(sum_code.c_str(), sum_code.length())
   );
 
-  cl::Program main_program(this->ocl_context, main_source);
+  cl::Program main_program(cl::Program(this->ocl_contexts[0], main_source));
 
   err = main_program.build(this->ocl_devices, define_list.c_str());
 
@@ -399,7 +431,7 @@ void OclEnv::CreateKernels( std::string kernel_name )
     exit(EXIT_FAILURE);
   }
 
-  cl::Program sum_program(this->ocl_context, sum_source);
+  cl::Program sum_program(cl::Program(this->ocl_contexts[0], sum_source));
 
   err = sum_program.build(this->ocl_devices, define_list.c_str());
 
@@ -423,7 +455,7 @@ void OclEnv::CreateKernels( std::string kernel_name )
   //
   // Compile Kernels from Program
   //
-  for( unsigned int k = 0; k < this->ocl_device_queues.size(); k++)
+  for( unsigned int k = 0; k < this->selected_gpus.size(); k++)
   {
     if (kernel_name == "standard" )
     {
@@ -755,6 +787,9 @@ uint32_t OclEnv::AvailableGPUMem(
   return 1;
 }
 
+//
+//
+//
 
 void OclEnv::AllocateSamples(
   const BedpostXData* f_data,
@@ -767,26 +802,73 @@ void OclEnv::AllocateSamples(
 )
 {
   uint32_t n_dirs = this->env_data.bpx_dirs;
+  uint32_t n_dev = this->selected_gpus.size();
   cl_int ret;
 
-  this->env_data.f_samples_buffers = new cl::Buffer*[2];
-  this->env_data.phi_samples_buffers = new cl::Buffer*[2];
-  this->env_data.theta_samples_buffers = new cl::Buffer*[2];
+  // Instantiate the context-separate containers
 
-  for (uint32_t n = 0; n < 2; n++)
+  this->env_data.f_samples_buffers = new cl::Buffer**[n_dev];
+  this->env_data.phi_samples_buffers = new cl::Buffer**[n_dev];
+  this->env_data.theta_samples_buffers = new cl::Buffer**[n_dev];
+
+  this->env_data.brain_mask_buffer = new cl::Buffer*[n_dev];
+  this->env_data.waypoint_masks_buffer = new cl::Buffer*[n_dev];
+  this->env_data.exclusion_mask_buffer = new cl::Buffer*[n_dev];
+  this->env_data.termination_mask_buffer = new cl::Buffer*[n_dev];
+
+  for (uint32_t d = 0; d < n_dev; d++)
   {
-    this->env_data.f_samples_buffers[n] = NULL;
-    this->env_data.phi_samples_buffers[n] = NULL;
-    this->env_data.theta_samples_buffers[n] = NULL;
+    this->env_data.f_samples_buffers[d] = new cl::Buffer*[2];
+    this->env_data.phi_samples_buffers[d] = new cl::Buffer*[2];
+    this->env_data.theta_samples_buffers[d] = new cl::Buffer*[2];
+
+    for (uint32_t n = 0; n < 2; n++)
+    {
+      this->env_data.f_samples_buffers[d][n] = NULL;
+      this->env_data.phi_samples_buffers[d][n] = NULL;
+      this->env_data.theta_samples_buffers[d][n] = NULL;
+    }
+
+    this->env_data.brain_mask_buffer[d] = NULL;
+    this->env_data.waypoint_masks_buffer[d] = NULL;
+    this->env_data.exclusion_mask_buffer[d] = NULL;
+    this->env_data.termination_mask_buffer[d] = NULL;
   }
 
-  for (uint32_t s = 0; s < n_dirs; s++)
+  for (uint32_t d = 0; d < n_dev; d++)
   {
-    if (this->env_data.aniso_const)
+    printf("Creating Buffers : Device %u\n", d);
+
+    for (uint32_t s = 0; s < n_dirs; s++)
     {
-      this->env_data.f_samples_buffers[s] = new
+      if (this->env_data.aniso_const)
+      {
+        this->env_data.f_samples_buffers[d][s] = new
+          cl::Buffer(
+            this->ocl_contexts[this->selected_gpus.at(d)],
+            CL_MEM_READ_ONLY,
+            this->env_data.single_sample_mem_size,
+            NULL,
+            &ret
+          );
+        if (CL_SUCCESS != ret)
+          die(ret);
+      }
+
+      this->env_data.theta_samples_buffers[d][s] = new
         cl::Buffer(
-          this->ocl_context,
+          this->ocl_contexts[this->selected_gpus.at(d)],
+          CL_MEM_READ_ONLY,
+          this->env_data.single_sample_mem_size,
+          NULL,
+          &ret
+        );
+      if (CL_SUCCESS != ret)
+        die(ret);
+
+      this->env_data.phi_samples_buffers[d][s] = new
+        cl::Buffer(
+          this->ocl_contexts[this->selected_gpus.at(d)],
           CL_MEM_READ_ONLY,
           this->env_data.single_sample_mem_size,
           NULL,
@@ -796,45 +878,22 @@ void OclEnv::AllocateSamples(
         die(ret);
     }
 
-    this->env_data.theta_samples_buffers[s] = new
+    this->env_data.brain_mask_buffer[d] = new
       cl::Buffer(
-        this->ocl_context,
+        this->ocl_contexts[this->selected_gpus.at(d)],
         CL_MEM_READ_ONLY,
-        this->env_data.single_sample_mem_size,
+        this->env_data.mask_mem_size,
         NULL,
         &ret
       );
     if (CL_SUCCESS != ret)
       die(ret);
-
-    this->env_data.phi_samples_buffers[s] = new
-      cl::Buffer(
-        this->ocl_context,
-        CL_MEM_READ_ONLY,
-        this->env_data.single_sample_mem_size,
-        NULL,
-        &ret
-      );
-    if (CL_SUCCESS != ret)
-      die(ret);
-  }
-
-  this->env_data.brain_mask_buffer = new
-    cl::Buffer(
-      this->ocl_context,
-      CL_MEM_READ_ONLY,
-      this->env_data.mask_mem_size,
-      NULL,
-      &ret
-    );
-  if (CL_SUCCESS != ret)
-    die(ret);
 
     if (exclusion_mask != NULL)
     {
-      this->env_data.exclusion_mask_buffer = new
+      this->env_data.exclusion_mask_buffer[d] = new
         cl::Buffer(
-          this->ocl_context,
+          this->ocl_contexts[this->selected_gpus.at(d)],
           CL_MEM_READ_ONLY,
           this->env_data.mask_mem_size,
           NULL,
@@ -846,9 +905,9 @@ void OclEnv::AllocateSamples(
 
     if (termination_mask != NULL)
     {
-      this->env_data.termination_mask_buffer = new
+      this->env_data.termination_mask_buffer[d] = new
         cl::Buffer(
-          this->ocl_context,
+          this->ocl_contexts[this->selected_gpus.at(d)],
           CL_MEM_READ_ONLY,
           this->env_data.mask_mem_size,
           NULL,
@@ -860,9 +919,9 @@ void OclEnv::AllocateSamples(
 
     if (this->env_data.n_waypts > 0)
     {
-      this->env_data.waypoint_masks_buffer = new
+      this->env_data.waypoint_masks_buffer[d] = new
         cl::Buffer(
-          this->ocl_context,
+          this->ocl_contexts[this->selected_gpus.at(d)],
           CL_MEM_READ_ONLY,
           this->env_data.n_waypts * this->env_data.mask_mem_size,
           NULL,
@@ -876,7 +935,7 @@ void OclEnv::AllocateSamples(
     {
       this->device_global_pdf_buffers.push_back(
         new cl::Buffer(
-          this->ocl_context,
+          this->ocl_contexts[this->selected_gpus.at(d)],
           CL_MEM_WRITE_ONLY,
           this->env_data.global_pdf_mem_size,
           NULL,
@@ -884,49 +943,27 @@ void OclEnv::AllocateSamples(
         )
       );
     }
+  }
 
-    uint32_t *global_init =
-      new uint32_t[this->env_data.global_pdf_size];
-    for (uint32_t j = 0; j < this->env_data.global_pdf_size; j++)
-      global_init[j] = 0;
+  //  Instantiating/Copying Buffers
 
-    for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
+  uint32_t *global_init =
+    new uint32_t[this->env_data.global_pdf_size];
+  for (uint32_t j = 0; j < this->env_data.global_pdf_size; j++)
+    global_init[j] = 0;
+
+  for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
+  {
+    for (uint32_t s = 0; s < n_dirs; s++)
     {
-      for (uint32_t s = 0; s < n_dirs; s++)
+      if (this->env_data.aniso_const)
       {
-        if (this->env_data.aniso_const)
-        {
-          ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
-            *(this->env_data.f_samples_buffers[s]),
-            CL_FALSE,
-            static_cast<unsigned int>(0),
-            this->env_data.single_sample_mem_size,
-            f_data->data.at(s),
-            NULL,
-            NULL
-          );
-          if (CL_SUCCESS != ret)
-            die(ret);
-        }
-
         ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
-          *(this->env_data.theta_samples_buffers[s]),
+          *(this->env_data.f_samples_buffers[d][s]),
           CL_FALSE,
           static_cast<unsigned int>(0),
           this->env_data.single_sample_mem_size,
-          theta_data->data.at(s),
-          NULL,
-          NULL
-        );
-        if (CL_SUCCESS != ret)
-          die(ret);
-
-        ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
-          *(this->env_data.phi_samples_buffers[s]),
-          CL_FALSE,
-          static_cast<unsigned int>(0),
-          this->env_data.single_sample_mem_size,
-          phi_data->data.at(s),
+          f_data->data.at(s),
           NULL,
           NULL
         );
@@ -935,85 +972,109 @@ void OclEnv::AllocateSamples(
       }
 
       ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
-        *(this->env_data.brain_mask_buffer),
+        *(this->env_data.theta_samples_buffers[d][s]),
+        CL_FALSE,
+        static_cast<unsigned int>(0),
+        this->env_data.single_sample_mem_size,
+        theta_data->data.at(s),
+        NULL,
+        NULL
+      );
+      if (CL_SUCCESS != ret)
+        die(ret);
+
+      ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        *(this->env_data.phi_samples_buffers[d][s]),
+        CL_FALSE,
+        static_cast<unsigned int>(0),
+        this->env_data.single_sample_mem_size,
+        phi_data->data.at(s),
+        NULL,
+        NULL
+      );
+      if (CL_SUCCESS != ret)
+        die(ret);
+    }
+
+    ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
+      *(this->env_data.brain_mask_buffer[d]),
+      CL_FALSE,
+      static_cast<unsigned int>(0),
+      this->env_data.mask_mem_size,
+      const_cast<unsigned short int*>(brain_mask),
+      NULL,
+      NULL
+    );
+    if (CL_SUCCESS != ret)
+      die(ret);
+
+    if (exclusion_mask != NULL)
+    {
+      ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        *(this->env_data.exclusion_mask_buffer[d]),
         CL_FALSE,
         static_cast<unsigned int>(0),
         this->env_data.mask_mem_size,
-        const_cast<unsigned short int*>(brain_mask),
+        const_cast<unsigned short int*>(exclusion_mask),
         NULL,
         NULL
       );
       if (CL_SUCCESS != ret)
         die(ret);
+    }
 
-      if (exclusion_mask != NULL)
-      {
-        ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
-          *(this->env_data.exclusion_mask_buffer),
-          CL_FALSE,
-          static_cast<unsigned int>(0),
-          this->env_data.mask_mem_size,
-          const_cast<unsigned short int*>(exclusion_mask),
-          NULL,
-          NULL
-        );
-        if (CL_SUCCESS != ret)
-          die(ret);
-      }
-
-      if (termination_mask != NULL)
-      {
-        ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
-          *(this->env_data.termination_mask_buffer),
-          CL_FALSE,
-          static_cast<unsigned int>(0),
-          this->env_data.mask_mem_size,
-          const_cast<unsigned short int*>(termination_mask),
-          NULL,
-          NULL
-        );
-        if (CL_SUCCESS != ret)
-          die(ret);
-      }
-
-      for (uint32_t w = 0; w < this->env_data.n_waypts; w++)
-      {
-        printf("w: %u, addr:  %hu\n", w, waypoint_masks->at(w));
-        ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
-          *(this->env_data.waypoint_masks_buffer),
-          CL_FALSE,
-          w * this->env_data.mask_mem_size,
-          this->env_data.mask_mem_size,
-          waypoint_masks->at(w),
-          NULL,
-          NULL
-        );
-        if (CL_SUCCESS != ret)
-          die(ret);
-      }
-
-      this->ocl_device_queues.at(d).enqueueWriteBuffer(
-        *(this->device_global_pdf_buffers.at(d)),
+    if (termination_mask != NULL)
+    {
+      ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        *(this->env_data.termination_mask_buffer[d]),
         CL_FALSE,
         static_cast<unsigned int>(0),
-        this->env_data.global_pdf_mem_size,
-        global_init,
+        this->env_data.mask_mem_size,
+        const_cast<unsigned short int*>(termination_mask),
         NULL,
         NULL
       );
-
-      ret = this->ocl_device_queues.at(d).flush();
       if (CL_SUCCESS != ret)
         die(ret);
     }
 
-    // can maybe move this to oclptxhandler, for slight performance improvement
-    for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
+    for (uint32_t w = 0; w < this->env_data.n_waypts; w++)
     {
-      ret = this->ocl_device_queues.at(d).finish();
+      ret = this->ocl_device_queues.at(d).enqueueWriteBuffer(
+        *(this->env_data.waypoint_masks_buffer[d]),
+        CL_FALSE,
+        w * this->env_data.mask_mem_size,
+        this->env_data.mask_mem_size,
+        waypoint_masks->at(w),
+        NULL,
+        NULL
+      );
       if (CL_SUCCESS != ret)
         die(ret);
     }
+
+    this->ocl_device_queues.at(d).enqueueWriteBuffer(
+      *(this->device_global_pdf_buffers.at(d)),
+      CL_FALSE,
+      static_cast<unsigned int>(0),
+      this->env_data.global_pdf_mem_size,
+      global_init,
+      NULL,
+      NULL
+    );
+
+    ret = this->ocl_device_queues.at(d).flush();
+    if (CL_SUCCESS != ret)
+      die(ret);
+  }
+
+  // can maybe move this to oclptxhandler, for slight performance improvement
+  for (uint32_t d = 0; d < this->ocl_device_queues.size(); d++)
+  {
+    ret = this->ocl_device_queues.at(d).finish();
+    if (CL_SUCCESS != ret)
+      die(ret);
+  }
 }
 
 void OclEnv::PdfsToFile(std::string filename)

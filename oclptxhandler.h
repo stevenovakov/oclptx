@@ -55,7 +55,8 @@ class OclPtxHandler{
       struct particle_attrs *attrs,
       FILE *path_dump_fd,
       EnvironmentData *env_dat,
-      cl::Buffer *global_pdf);
+      cl::Buffer *global_pdf,
+      uint32_t dev_id);
   ~OclPtxHandler();
 
   int particles_per_side();
@@ -82,6 +83,8 @@ class OclPtxHandler{
   cl::CommandQueue* cq_;
   cl::Kernel* ptx_kernel_;
   cl::Kernel* sum_kernel_;
+
+  uint32_t device_id;
 
   // Particle Data
   cl::Buffer *gpu_data_;  // Type particle_data

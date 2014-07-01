@@ -170,14 +170,14 @@ struct EnvironmentData
   // These are allocated/deallocated by OclEnv
   //
 
-  cl::Buffer** f_samples_buffers;
-  cl::Buffer** phi_samples_buffers;
-  cl::Buffer** theta_samples_buffers;
-  cl::Buffer* brain_mask_buffer;
+  cl::Buffer*** f_samples_buffers;
+  cl::Buffer*** phi_samples_buffers;
+  cl::Buffer*** theta_samples_buffers;
+  cl::Buffer** brain_mask_buffer;
 
-  cl::Buffer* waypoint_masks_buffer;
-  cl::Buffer* exclusion_mask_buffer;
-  cl::Buffer* termination_mask_buffer;
+  cl::Buffer** waypoint_masks_buffer;
+  cl::Buffer** exclusion_mask_buffer;
+  cl::Buffer** termination_mask_buffer;
 };
 
 #endif

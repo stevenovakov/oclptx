@@ -60,7 +60,7 @@ class OclEnv{
     // Container Set/Get
     //
 
-    cl::Context * GetContext();
+    cl::Context * GetContext(uint32_t device);
     
     cl::Device * GetDevice(uint32_t device_num);
     uint32_t HowManyDevices();
@@ -126,13 +126,14 @@ class OclEnv{
     //
     // OpenCL Objects
     //
-    cl::Context ocl_context;
+    std::vector<cl::Context> ocl_contexts;
 
     std::vector<cl::Platform> ocl_platforms;
 
     std::vector<cl::Device> ocl_devices;
     
     std::vector<cl::CommandQueue> ocl_device_queues;
+    std::vector<uint32_t> selected_gpus;
     //std::vector<MutexWrapper> ocl_device_queue_mutexs;
 
     std::vector<cl::Kernel> ocl_kernel_set;

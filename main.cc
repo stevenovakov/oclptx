@@ -116,16 +116,17 @@ int main(int argc, char **argv)
   // may want to change the location of this later
   t_start = std::chrono::high_resolution_clock::now();
 
-  for (int i = 0; i < num_dev; ++i)
+  for (uint32_t i = 0; i < num_dev; ++i)
   {
-    handler[i].Init(env.GetContext(),
+    handler[i].Init(env.GetContext(i),
                     env.GetCq(i),
                     env.GetKernel(i),
                     env.GetSumKernel(i),
                     &attrs,
                     global_fd,
                     env.GetEnvData(),
-                    env.GetDevicePdf(i));
+                    env.GetDevicePdf(i),
+                    i);
 
     gpu_managers[i] = new std::thread(
         threading::RunThreads,
