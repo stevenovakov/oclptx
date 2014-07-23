@@ -55,6 +55,14 @@ ParticleGenerator::~ParticleGenerator()
   delete particle_fifo_;
 }
 
+struct ParticleGenerator::add_particle_args {
+  float *newSeeds;
+  int count;
+  float xdim;
+  float ydim;
+  float zdim;
+};
+
 Fifo<struct OclPtxHandler::particle_data> *ParticleGenerator::Init(int fifo_size)
 {
   oclptxOptions& opts = oclptxOptions::getInstance();
@@ -86,12 +94,12 @@ Fifo<struct OclPtxHandler::particle_data> *ParticleGenerator::Init(int fifo_size
   particle_fifo_ =
       new Fifo<struct OclPtxHandler::particle_data>(fifo_size);
 
-  // TODO(jeff): First off: what are Seeds/seedref?  Second off: Copying like
-  // this might be bad.  Figure out the values we need explicitly, then copy
-  // those in.
-  particlegen_thread_ = new std::thread([=]
-    { AddParticles(newSeeds, Seeds.Nrows(),
-                   seedref.xdim(), seedref.ydim(), seedref.zdim()); });
+  struct add_particle_args args = {newSeeds,
+                                   Seeds.Nrows(),
+                                   seedref.xdim(),
+                                   seedref.ydim(),
+                                   seedref.zdim()};
+  particlegen_thread_ = new std::thread(&ParticleGenerator::AddParticles, this, args);
 
   return particle_fifo_;
 }
@@ -101,19 +109,18 @@ int64_t ParticleGenerator::total_particles()
   return total_particles_;
 }
 
-void ParticleGenerator::AddParticles(float* newSeeds, int count,
-                                     float xdim, float ydim, float zdim)
+void ParticleGenerator::AddParticles(struct add_particle_args args)
 {
   float x, y, z;
-  for (int i = 0; i < count; ++i)
+  for (int i = 0; i < args.count; ++i)
   {
-    x = newSeeds[3*i];
-    y = newSeeds[3*i+1];
-    z = newSeeds[3*i+2];
-    AddSeedParticle(x, y, z, xdim, ydim, zdim);
+    x = args.newSeeds[3*i];
+    y = args.newSeeds[3*i+1];
+    z = args.newSeeds[3*i+2];
+    AddSeedParticle(x, y, z, args.xdim, args.ydim, args.zdim);
   }
   particle_fifo_->Finish();
-  delete[] newSeeds;
+  delete[] args.newSeeds;
 }
 
 void ParticleGenerator::AddSeedParticle(

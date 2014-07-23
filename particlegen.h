@@ -26,7 +26,8 @@ class ParticleGenerator
   std::thread *particlegen_thread_;
   int64_t total_particles_;
 
-  void AddParticles(float* newSeeds, int count, float xdim, float ydim, float zdim);
+  struct add_particle_args;
+  void AddParticles(struct add_particle_args);
   void AddSeedParticle(float x, float y, float z,
     float xdim, float ydim, float zdim);
 };
