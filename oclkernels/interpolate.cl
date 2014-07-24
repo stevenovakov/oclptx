@@ -106,10 +106,6 @@ __kernel void OclPtxInterpolate(
   float loopcheck_product;
 #endif // LOOPCHECK
 
-  global float* target_f = f_samples;
-  global float* target_theta = theta_samples;
-  global float* target_phi = phi_samples;
-
   for (step = 0; step < attrs.steps_per_kernel; ++step)
   {
     particle_pos = state[glid].position;
@@ -138,7 +134,7 @@ __kernel void OclPtxInterpolate(
       current_select_vertex.s2;
 
 #ifdef ANISOTROPIC
-    f = target_f[diffusion_index];
+    f = f_samples[diffusion_index];
     rng_output = Rand(&(state[glid].rng));
     if (f*kRandMax < rng_output)
     {
@@ -150,8 +146,8 @@ __kernel void OclPtxInterpolate(
 #endif // ANISOTROPIC
 
     // find next step location
-    theta = target_theta[diffusion_index];
-    phi = target_phi[diffusion_index];
+    theta = theta_samples[diffusion_index];
+    phi = phi_samples[diffusion_index];
     
     new_dr.s0 = cos( phi ) * sin( theta );
     new_dr.s1 = sin( phi ) * sin( theta );
@@ -190,7 +186,7 @@ __kernel void OclPtxInterpolate(
       current_select_vertex.s2;
 
 #ifdef ANISOTROPIC
-    f = target_f[diffusion_index];
+    f = f_samples[diffusion_index];
     if (f * kRandMax < Rand(&(state[glid].rng)))
     {
       particle_done[glid] = ANISO_BREAK;
@@ -201,8 +197,8 @@ __kernel void OclPtxInterpolate(
 #endif // ANISOTROPIC
 
     // find next step location
-    theta = target_theta[diffusion_index];
-    phi = target_phi[diffusion_index];
+    theta = theta_samples[diffusion_index];
+    phi = phi_samples[diffusion_index];
     
     dr2.s0 = cos( phi ) * sin( theta );
     dr2.s1 = sin( phi ) * sin( theta );
@@ -220,15 +216,8 @@ __kernel void OclPtxInterpolate(
     // update particle position
     temp_pos = particle_pos + new_dr;
 
-    //
-    // Curvature Threshold
-    //
-
-    // normalize for curvature threshold
-    new_dr = new_dr /
-             (new_dr.s0 * new_dr.s0
-            + new_dr.s1 * new_dr.s1
-            + new_dr.s2 * new_dr.s2);
+    /* Curvature threshold */
+    new_dr = normalize(new_dr);
 
     if (particle_steps[glid] > 1 
       && dot(new_dr, state[glid].dr) < attrs.curvature_threshold)
@@ -251,7 +240,7 @@ __kernel void OclPtxInterpolate(
     // Brain Mask Test - Checks NEAREST vertex.
     mask_index =
       round(temp_pos.s0)*(attrs.sample_nz*attrs.sample_ny) +
-        round(temp_pos.s1)*(attrs.sample_nz) + round(temp_pos.s2);
+      round(temp_pos.s1)*(attrs.sample_nz) + round(temp_pos.s2);
 
     bounds_test = brain_mask[mask_index];
     if (bounds_test == 0)
