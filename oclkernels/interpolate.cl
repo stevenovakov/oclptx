@@ -14,6 +14,44 @@
 //    index = x*(ny*nz*ns*ndir) + y*(nz*ns*ndir) + z*(ns*ndir) + s*ndir
 //    here ndir = 1, and is not included
 //
+float3 get_f_theta_phi(global float *f_samples,
+                       global float *theta_samples,
+                       global float *phi_samples,
+                       float3 particle_pos,
+                       const struct particle_attrs attrs,
+                       global rng_t *rng)
+{
+  // calculate current index in diffusion space
+  ulong3 rng_output;
+  float f, theta, phi;
+  uint diffusion_index;
+  uint sample;
+
+  uint3 current_select_vertex = convert_uint3(floor(particle_pos));
+  float3 volume_fraction = particle_pos - convert_float3(current_select_vertex);
+  float3 vol_frac = volume_fraction * kRandMax;
+
+  // Pick Sample
+  sample = Rand(rng) % attrs.num_samples;
+
+  // Volume Fraction Selection
+  rng_output = (ulong3) (Rand(rng), Rand(rng), Rand(rng));
+
+  current_select_vertex += (convert_float3(rng_output) > vol_frac)? 1: 0;
+
+  // pick flow vertex
+  diffusion_index =
+    sample*(attrs.sample_nz*attrs.sample_ny*attrs.sample_nx)+
+    current_select_vertex.s0*(attrs.sample_nz*attrs.sample_ny) +
+    current_select_vertex.s1*(attrs.sample_nz) +
+    current_select_vertex.s2;
+
+  f = f_samples[diffusion_index];
+  theta = theta_samples[diffusion_index];
+  phi = phi_samples[diffusion_index];
+
+  return (float3) (f, theta, phi);
+}
 
 __kernel void OclPtxInterpolate(
   struct particle_attrs attrs,  /* RO */
@@ -53,11 +91,6 @@ __kernel void OclPtxInterpolate(
     
   uint step;
   
-  uint3 current_select_vertex;
-  float3 volume_fraction;
-  
-  uint diffusion_index;
-  uint sample;
   
   // last location of particle
   float3 particle_pos;
@@ -74,10 +107,8 @@ __kernel void OclPtxInterpolate(
                          attrs.sample_ny * 1.0,
                          attrs.sample_nz * 1.0);
   
-  float f, phi, theta;
+  float3 f_theta_phi;
 
-  ulong3 rng_output;
-  float3 vol_frac;
   uint mask_index;
   //unsigned int termination_mask_index;
   ushort bounds_test;
@@ -109,34 +140,12 @@ __kernel void OclPtxInterpolate(
   for (step = 0; step < attrs.steps_per_kernel; ++step)
   {
     particle_pos = state[glid].position;
-    // calculate current index in diffusion space
-    current_select_vertex = convert_uint3(floor(particle_pos));
 
-    volume_fraction = particle_pos - convert_float3(current_select_vertex);
-
-    // Pick Sample
-    sample = Rand(&(state[glid].rng)) % attrs.num_samples;
-
-    // Volume Fraction Selection
-    rng_output = (ulong3) (Rand(&(state[glid].rng)),
-                           Rand(&(state[glid].rng)),
-                           Rand(&(state[glid].rng)));
-
-    vol_frac = volume_fraction * kRandMax;
-
-    current_select_vertex += (convert_float3(rng_output) > vol_frac)? 1: 0;
-
-    // pick flow vertex
-    diffusion_index =
-      sample*(attrs.sample_nz*attrs.sample_ny*attrs.sample_nx)+
-      current_select_vertex.s0*(attrs.sample_nz*attrs.sample_ny) +
-      current_select_vertex.s1*(attrs.sample_nz) +
-      current_select_vertex.s2;
+    f_theta_phi = get_f_theta_phi(f_samples, theta_samples, phi_samples,
+                                  particle_pos, attrs, &(state[glid].rng));
 
 #ifdef ANISOTROPIC
-    f = f_samples[diffusion_index];
-    rng_output = Rand(&(state[glid].rng));
-    if (f*kRandMax < rng_output)
+    if (f_theta_phi.s0 * kRandMax < Rand(&(state[glid].rng)))
     {
       particle_done[glid] = ANISO_BREAK;
       if (0 == step)
@@ -144,14 +153,10 @@ __kernel void OclPtxInterpolate(
       break;
     }
 #endif // ANISOTROPIC
-
-    // find next step location
-    theta = theta_samples[diffusion_index];
-    phi = phi_samples[diffusion_index];
     
-    new_dr.s0 = cos( phi ) * sin( theta );
-    new_dr.s1 = sin( phi ) * sin( theta );
-    new_dr.s2 = cos( theta );
+    new_dr.s0 = cos( f_theta_phi.s2 ) * sin( f_theta_phi.s1 );
+    new_dr.s1 = sin( f_theta_phi.s2 ) * sin( f_theta_phi.s1 );
+    new_dr.s2 = cos( f_theta_phi.s1 );
     
     // jump (aligns direction to prevent zig-zagging)
     if (dot(new_dr, state[glid].dr) < 0.0 )
@@ -164,30 +169,11 @@ __kernel void OclPtxInterpolate(
     // update particle position
     temp_pos += new_dr;
 
-    current_select_vertex = convert_uint3(floor(temp_pos));
-    volume_fraction = temp_pos - convert_float3(current_select_vertex);
-    // Pick Sample
-    sample = Rand(&(state[glid].rng)) % attrs.num_samples;
-
-    // Volume Fraction Selection
-    rng_output = (ulong3) (Rand(&(state[glid].rng)),
-                           Rand(&(state[glid].rng)),
-                           Rand(&(state[glid].rng)));
-
-    vol_frac = volume_fraction * kRandMax;
-
-    current_select_vertex += (convert_float3(rng_output) > vol_frac)? 1: 0;
-
-    // pick flow vertex
-    diffusion_index =
-      sample*(attrs.sample_nz*attrs.sample_ny*attrs.sample_nx)+
-      current_select_vertex.s0*(attrs.sample_nz*attrs.sample_ny) +
-      current_select_vertex.s1*(attrs.sample_nz) +
-      current_select_vertex.s2;
+    f_theta_phi = get_f_theta_phi(f_samples, theta_samples, phi_samples,
+                                  temp_pos, &attrs, &(state[glid].rng));
 
 #ifdef ANISOTROPIC
-    f = f_samples[diffusion_index];
-    if (f * kRandMax < Rand(&(state[glid].rng)))
+    if (f_theta_phi.s0 * kRandMax < Rand(&(state[glid].rng)))
     {
       particle_done[glid] = ANISO_BREAK;
       if (0 == step)
@@ -195,14 +181,10 @@ __kernel void OclPtxInterpolate(
       break;
     }
 #endif // ANISOTROPIC
-
-    // find next step location
-    theta = theta_samples[diffusion_index];
-    phi = phi_samples[diffusion_index];
     
-    dr2.s0 = cos( phi ) * sin( theta );
-    dr2.s1 = sin( phi ) * sin( theta );
-    dr2.s2 = cos( theta );
+    dr2.s0 = cos( f_theta_phi.s2 ) * sin( f_theta_phi.s1 );
+    dr2.s1 = sin( f_theta_phi.s2 ) * sin( f_theta_phi.s1 );
+    dr2.s2 = cos( f_theta_phi.s1 );
 
     // jump (aligns direction to prevent zig-zagging)
     if (dot(dr2, state[glid].dr) < 0.0 )
