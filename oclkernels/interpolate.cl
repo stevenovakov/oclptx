@@ -69,18 +69,12 @@ __kernel void OclPtxInterpolate(
   float3 dr2 = (float3) (0.0f);
 #endif
   
-  float xmin, xmax, ymin, ymax, zmin, zmax;
-  xmin = 0.0;
-  ymin = 0.0;
-  zmin = 0.0;
-  xmax = attrs.sample_nx*1.0;
-  ymax = attrs.sample_ny*1.0;
-  zmax = attrs.sample_nz*1.0;
+  float3 min = (float3) (0.0f);
+  float3 max = (float3) (attrs.sample_nx * 1.0,
+                         attrs.sample_ny * 1.0,
+                         attrs.sample_nz * 1.0);
   
   float f, phi, theta;
-#ifdef TWO_DIR
-  float f2, phi2, theta2;
-#endif
   float jump_dot;
 
 #ifdef PRNG
@@ -123,17 +117,11 @@ __kernel void OclPtxInterpolate(
   {
     particle_pos = state[glid].position;
     // calculate current index in diffusion space
-    current_select_vertex.s0 = floor(particle_pos.s0);
-    current_select_vertex.s1 = floor(particle_pos.s1);
-    current_select_vertex.s2 = floor(particle_pos.s2);
+    current_select_vertex = convert_uint3(floor(particle_pos));
 
-    volume_fraction.s0 = particle_pos.s0 - (float) current_select_vertex.s0;
-    volume_fraction.s1 = particle_pos.s1 - (float) current_select_vertex.s1;
-    volume_fraction.s2 = particle_pos.s2 - (float) current_select_vertex.s2;
-    //
+    volume_fraction = particle_pos - convert_float3(current_select_vertex);
+
     // Pick Sample
-    //
-
     rng_output = Rand(&(state[glid].rng));
     sample = rng_output % attrs.num_samples;
 
@@ -170,39 +158,6 @@ __kernel void OclPtxInterpolate(
       current_select_vertex.s1*(attrs.sample_nz) +
       current_select_vertex.s2;
 
-#ifdef TWO_DIR
-    // TODO STEVE: rethink this, if deemed necessary.
-    //
-
-    // // reset fiber direction
-    // target_f = f_samples;
-    // target_theta = theta_samples;
-    // target_phi = phi_samples;
-
-    // f = f_samples[diffusion_index];
-    // f2 = f_samples_2[diffusion_index];
-    // if (f > attrs.fibthresh && f2 > attrs.fibthresh)
-    // {
-    //   rng_output = Rand(&(state[glid].rng)) % 2;
-    //   if (rng_output > 0)
-    //   {
-    //     target_f = f_samples_2;
-    //     target_theta = theta_samples_2;
-    //     target_phi = phi_samples_2;
-    //   }
-    // }
-    // else
-    // {
-    //   if (f2 > attrs.fibthresh)
-    //   {
-    //     target_f = f_samples_2;
-    //     target_theta = theta_samples_2;
-    //     target_phi = phi_samples_2
-    //   }
-    // }
-
-#endif // TWO_DIR
-
 #ifdef ANISOTROPIC
     f = target_f[diffusion_index];
     rng_output = Rand(&(state[glid].rng));
@@ -224,14 +179,8 @@ __kernel void OclPtxInterpolate(
     new_dr.s2 = cos( theta );
     
     // jump (aligns direction to prevent zig-zagging)
-    jump_dot = new_dr.s0 * state[glid].dr.s0
-             + new_dr.s1 * state[glid].dr.s1
-             + new_dr.s2 * state[glid].dr.s2;
-
-    if (jump_dot < 0.0 )
-    {
-      new_dr = new_dr*-1.0;
-    }
+    if (dot(new_dr, state[glid].dr) < 0.0 )
+      new_dr *= -1.;
 
     new_dr = new_dr / attrs.brain_mask_dim;
     new_dr = new_dr * attrs.step_length;
@@ -283,10 +232,6 @@ __kernel void OclPtxInterpolate(
       current_select_vertex.s0*(attrs.sample_nz*attrs.sample_ny) +
       current_select_vertex.s1*(attrs.sample_nz) +
       current_select_vertex.s2;
-
-#ifdef TWO_DIR
-  //
-#endif // TWO_DIR
 
 #ifdef ANISOTROPIC
     f = target_f[diffusion_index];
@@ -350,21 +295,16 @@ __kernel void OclPtxInterpolate(
       break;
     }
 
-    //
-    // Complete out of bounds test (just in case)
-    //
-    if ((temp_pos.s0 > xmax) || (xmin > temp_pos.s0) ||
-        (temp_pos.s1 > ymax) || (ymin > temp_pos.s1) ||
-        (temp_pos.s2 > zmax) || (zmin > temp_pos.s2))
+    // Out of bounds?
+    if (any(temp_pos > max || min > temp_pos))
     {
       particle_done[glid] = BREAK_INVALID;
       if (0 == step)
         particle_steps[glid] = 0;
       break;
     }
-    //
+
     // Brain Mask Test - Checks NEAREST vertex.
-    //
     mask_index =
       round(temp_pos.s0)*(attrs.sample_nz*attrs.sample_ny) +
         round(temp_pos.s1)*(attrs.sample_nz) + round(temp_pos.s2);
