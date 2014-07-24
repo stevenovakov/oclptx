@@ -27,8 +27,8 @@
 struct particle_data
 {
   rng_t rng; //RW
-  float4 position;
-  float4 dr;
+  float3 position;
+  float3 dr;
 } __attribute__((aligned(64)));
 
 // Struct full of useful constants.

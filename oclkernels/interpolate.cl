@@ -20,7 +20,7 @@ __kernel void OclPtxInterpolate(
   __global struct particle_data *state,  /* RW */
 
   // Debugging info
-  __global float4 *particle_paths, //RW
+  __global float3 *particle_paths, //RW
   __global ushort *particle_steps, //RW
 
   // Output
@@ -28,7 +28,7 @@ __kernel void OclPtxInterpolate(
   __global uint *particle_pdfs, //RW
   __global ushort *particle_waypoints, //W
   __global ushort *particle_exclusion, //W
-  __global float4 *particle_loopcheck_lastdir, //RW
+  __global float3 *particle_loopcheck_lastdir, //RW
 
   // Global Data
   __global float *f_samples, //R
@@ -60,14 +60,13 @@ __kernel void OclPtxInterpolate(
   uint sample;
   
   // last location of particle
-  float4 particle_pos;
-  particle_pos.s3 = 0.0;
+  float3 particle_pos;
 
-  float4 temp_pos = state[glid].position; //dx, dy, dz
-  float4 new_dr = (float4) (0.0f);
+  float3 temp_pos = state[glid].position; //dx, dy, dz
+  float3 new_dr = (float3) (0.0f);
 
 #ifdef EULER_STREAMLINE
-  float4 dr2 = (float4) (0.0f);
+  float3 dr2 = (float3) (0.0f);
 #endif
   
   float xmin, xmax, ymin, ymax, zmin, zmax;
@@ -112,7 +111,7 @@ __kernel void OclPtxInterpolate(
   uint loopcheck_dir_size = attrs.lx * attrs.ly * attrs.lz;
 
   uint loopcheck_index;
-  float4 last_loopcheck_dr;
+  float3 last_loopcheck_dr;
   float loopcheck_product;
 #endif // LOOPCHECK
 
