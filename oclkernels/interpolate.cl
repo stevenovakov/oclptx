@@ -23,7 +23,9 @@ float3 get_f_theta_phi(global float *f_samples,
 {
   // calculate current index in diffusion space
   ulong3 rng_output;
-  float f, theta, phi;
+  float f = 0.;
+  float theta = 0.;
+  float phi = 0.;
   uint diffusion_index;
   uint sample;
 
@@ -46,7 +48,8 @@ float3 get_f_theta_phi(global float *f_samples,
     current_select_vertex.s1*(attrs.sample_nz) +
     current_select_vertex.s2;
 
-  f = f_samples[diffusion_index];
+  if (f_samples)
+    f = f_samples[diffusion_index];
   theta = theta_samples[diffusion_index];
   phi = phi_samples[diffusion_index];
 
@@ -84,49 +87,26 @@ __kernel void OclPtxInterpolate(
   uint glid = get_global_id(0);
   
   uint path_index;
-
-#ifdef WAYPOINTS
-  uint mask_size = attrs.sample_nx * attrs.sample_ny * attrs.sample_nz;
-#endif
-    
   uint step;
-  
-  
-  // last location of particle
-  float3 particle_pos;
-
-  float3 temp_pos = state[glid].position; //dx, dy, dz
+  uint mask_index;
+  ushort bounds_test;
+  uint vertex_num;
+  uint entry_num;
+  uint shift_num;
+  float3 f_theta_phi;
+  float3 temp_pos = state[glid].position;
   float3 new_dr = (float3) (0.0f);
-
-#ifdef EULER_STREAMLINE
-  float3 dr2 = (float3) (0.0f);
-#endif
-  
   float3 min = (float3) (0.0f);
   float3 max = (float3) (attrs.sample_nx * 1.0,
                          attrs.sample_ny * 1.0,
                          attrs.sample_nz * 1.0);
-  
-  float3 f_theta_phi;
 
-  uint mask_index;
-  //unsigned int termination_mask_index;
-  ushort bounds_test;
-
-  uint vertex_num;
-  uint entry_num;
-  uint shift_num;
-
-  // No new valid data.  Likely the host is out of data.  We need to avoid
-  // screwing it up.
-
-  if (particle_done[glid])
-  {
-    particle_done[glid] = STILL_FINISHED;
-    particle_steps[glid] = 0;
-    return;
-  }
-
+#ifdef WAYPOINTS
+  uint mask_size = attrs.sample_nx * attrs.sample_ny * attrs.sample_nz;
+#endif
+#ifdef EULER_STREAMLINE
+  float3 dr2 = (float3) (0.0f);
+#endif
 #ifdef LOOPCHECK
   uint3 loopcheck_voxel;
 
@@ -137,12 +117,20 @@ __kernel void OclPtxInterpolate(
   float loopcheck_product;
 #endif // LOOPCHECK
 
+  // No new valid data.  Likely the host is out of data.  We need to avoid
+  // screwing it up.
+  if (particle_done[glid])
+  {
+    particle_done[glid] = STILL_FINISHED;
+    particle_steps[glid] = 0;
+    return;
+  }
+
+
   for (step = 0; step < attrs.steps_per_kernel; ++step)
   {
-    particle_pos = state[glid].position;
-
     f_theta_phi = get_f_theta_phi(f_samples, theta_samples, phi_samples,
-                                  particle_pos, attrs, &(state[glid].rng));
+                                  temp_pos, attrs, &(state[glid].rng));
 
 #ifdef ANISOTROPIC
     if (f_theta_phi.s0 * kRandMax < Rand(&(state[glid].rng)))
@@ -196,7 +184,7 @@ __kernel void OclPtxInterpolate(
     new_dr = 0.5*(new_dr + dr2);
 #endif  /* EULER_STREAMLINE */
     // update particle position
-    temp_pos = particle_pos + new_dr;
+    temp_pos = state[glid].position + new_dr;
 
     /* Curvature threshold */
     new_dr = normalize(new_dr);
