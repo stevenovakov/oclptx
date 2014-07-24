@@ -75,12 +75,9 @@ __kernel void OclPtxInterpolate(
                          attrs.sample_nz * 1.0);
   
   float f, phi, theta;
-  float jump_dot;
 
-#ifdef PRNG
-  ulong rng_output;
-  float vol_frac;
-#endif
+  ulong3 rng_output;
+  float3 vol_frac;
   uint mask_index;
   //unsigned int termination_mask_index;
   ushort bounds_test;
@@ -122,34 +119,16 @@ __kernel void OclPtxInterpolate(
     volume_fraction = particle_pos - convert_float3(current_select_vertex);
 
     // Pick Sample
-    rng_output = Rand(&(state[glid].rng));
-    sample = rng_output % attrs.num_samples;
+    sample = Rand(&(state[glid].rng)) % attrs.num_samples;
 
     // Volume Fraction Selection
+    rng_output = (ulong3) (Rand(&(state[glid].rng)),
+                           Rand(&(state[glid].rng)),
+                           Rand(&(state[glid].rng)));
 
-    rng_output = Rand(&(state[glid].rng));
-    vol_frac = volume_fraction.s0 * kRandMax;
+    vol_frac = volume_fraction * kRandMax;
 
-    if (rng_output > vol_frac)
-    {
-      current_select_vertex.s0 += 1;
-    }
-
-    rng_output = Rand(&(state[glid].rng));
-    vol_frac = volume_fraction.s1 * kRandMax;
-
-    if (rng_output > vol_frac)
-    {
-      current_select_vertex.s1 += 1;
-    }
-
-    rng_output = Rand(&(state[glid].rng));
-    vol_frac = volume_fraction.s2 * kRandMax;
-
-    if (rng_output > vol_frac)
-    {
-      current_select_vertex.s2 += 1;
-    }
+    current_select_vertex += (convert_float3(rng_output) > vol_frac)? 1: 0;
 
     // pick flow vertex
     diffusion_index =
@@ -189,43 +168,20 @@ __kernel void OclPtxInterpolate(
     // update particle position
     temp_pos += new_dr;
 
-    current_select_vertex.s0 = floor(temp_pos.s0);
-    current_select_vertex.s1 = floor(temp_pos.s1);
-    current_select_vertex.s2 = floor(temp_pos.s2);
-
-    volume_fraction.s0 = temp_pos.s0 - (float) current_select_vertex.s0;
-    volume_fraction.s1 = temp_pos.s1 - (float) current_select_vertex.s1;
-    volume_fraction.s2 = temp_pos.s2 - (float) current_select_vertex.s2;
-    //
+    current_select_vertex = convert_uint3(floor(temp_pos));
+    volume_fraction = temp_pos - convert_float3(current_select_vertex);
     // Pick Sample
-    //
-    rng_output = Rand(&(state[glid].rng));
-    sample = rng_output % attrs.num_samples;
+    sample = Rand(&(state[glid].rng)) % attrs.num_samples;
 
     // Volume Fraction Selection
-    rng_output = Rand(&(state[glid].rng));
-    vol_frac = volume_fraction.s0 * kRandMax;
+    rng_output = (ulong3) (Rand(&(state[glid].rng)),
+                           Rand(&(state[glid].rng)),
+                           Rand(&(state[glid].rng)));
 
-    if (rng_output > vol_frac)
-    {
-      current_select_vertex.s0 += 1;
-    }
+    vol_frac = volume_fraction * kRandMax;
 
-    rng_output = Rand(&(state[glid].rng));
-    vol_frac = volume_fraction.s1 * kRandMax;
+    current_select_vertex += (convert_float3(rng_output) > vol_frac)? 1: 0;
 
-    if (rng_output > vol_frac)
-    {
-      current_select_vertex.s1 += 1;
-    }
-
-    rng_output = Rand(&(state[glid].rng));
-    vol_frac = volume_fraction.s2 * kRandMax;
-
-    if (rng_output > vol_frac)
-    {
-      current_select_vertex.s2 += 1;
-    }
     // pick flow vertex
     diffusion_index =
       sample*(attrs.sample_nz*attrs.sample_ny*attrs.sample_nx)+
@@ -235,8 +191,7 @@ __kernel void OclPtxInterpolate(
 
 #ifdef ANISOTROPIC
     f = target_f[diffusion_index];
-    rng_output = Rand(&(state[glid].rng));
-    if (f*kRandMax < rng_output)
+    if (f * kRandMax < Rand(&(state[glid].rng)))
     {
       particle_done[glid] = ANISO_BREAK;
       if (0 == step)
@@ -253,23 +208,15 @@ __kernel void OclPtxInterpolate(
     dr2.s1 = sin( phi ) * sin( theta );
     dr2.s2 = cos( theta );
 
-    //
     // jump (aligns direction to prevent zig-zagging)
-    //
-    jump_dot = dr2.s0*state[glid].dr.s0 +
-                dr2.s1*state[glid].dr.s1 +
-                  dr2.s2*state[glid].dr.s2;
-
-    if (jump_dot < 0.0 )
-    {
-      dr2 = dr2*-1.0;
-    }
+    if (dot(dr2, state[glid].dr) < 0.0 )
+      dr2 *= -1.;
 
     dr2 = dr2 / attrs.brain_mask_dim;
     dr2 = dr2 * attrs.step_length;
 
     new_dr = 0.5*(new_dr + dr2);
-#endif
+#endif  /* EULER_STREAMLINE */
     // update particle position
     temp_pos = particle_pos + new_dr;
 
@@ -282,12 +229,9 @@ __kernel void OclPtxInterpolate(
              (new_dr.s0 * new_dr.s0
             + new_dr.s1 * new_dr.s1
             + new_dr.s2 * new_dr.s2);
-    
-    jump_dot = new_dr.s0 * state[glid].dr.s0
-             + new_dr.s1 * state[glid].dr.s1
-             + new_dr.s2 * state[glid].dr.s2;
 
-    if (particle_steps[glid] > 1 && jump_dot < attrs.curvature_threshold)
+    if (particle_steps[glid] > 1 
+      && dot(new_dr, state[glid].dr) < attrs.curvature_threshold)
     {
       particle_done[glid] = BREAK_CURV;
       if (0 == step)
