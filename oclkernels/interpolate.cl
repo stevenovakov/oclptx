@@ -56,6 +56,17 @@ float3 get_f_theta_phi(global float *f_samples,
   return (float3) (f, theta, phi);
 }
 
+float3 f_theta_phi_to_xyz(float3 f_theta_phi)
+{
+  float3 xyz;
+
+  xyz.s0 = cos(f_theta_phi.s2) * sin(f_theta_phi.s1);
+  xyz.s1 = sin(f_theta_phi.s2) * sin(f_theta_phi.s1);
+  xyz.s2 = cos(f_theta_phi.s1);
+
+  return xyz;
+}
+
 __kernel void OclPtxInterpolate(
   struct particle_attrs attrs,  /* RO */
   __global struct particle_data *state,  /* RW */
@@ -126,7 +137,6 @@ __kernel void OclPtxInterpolate(
     return;
   }
 
-
   for (step = 0; step < attrs.steps_per_kernel; ++step)
   {
     f_theta_phi = get_f_theta_phi(f_samples, theta_samples, phi_samples,
@@ -141,10 +151,8 @@ __kernel void OclPtxInterpolate(
       break;
     }
 #endif // ANISOTROPIC
-    
-    new_dr.s0 = cos( f_theta_phi.s2 ) * sin( f_theta_phi.s1 );
-    new_dr.s1 = sin( f_theta_phi.s2 ) * sin( f_theta_phi.s1 );
-    new_dr.s2 = cos( f_theta_phi.s1 );
+
+    new_dr = f_theta_phi_to_xyz(f_theta_phi);
     
     // jump (aligns direction to prevent zig-zagging)
     if (dot(new_dr, state[glid].dr) < 0.0 )
@@ -155,7 +163,7 @@ __kernel void OclPtxInterpolate(
 
 #ifdef EULER_STREAMLINE
     // update particle position
-    temp_pos += new_dr;
+    temp_pos = state[glid].position + new_dr;
 
     f_theta_phi = get_f_theta_phi(f_samples, theta_samples, phi_samples,
                                   temp_pos, &attrs, &(state[glid].rng));
@@ -170,9 +178,7 @@ __kernel void OclPtxInterpolate(
     }
 #endif // ANISOTROPIC
     
-    dr2.s0 = cos( f_theta_phi.s2 ) * sin( f_theta_phi.s1 );
-    dr2.s1 = sin( f_theta_phi.s2 ) * sin( f_theta_phi.s1 );
-    dr2.s2 = cos( f_theta_phi.s1 );
+    dr2 = f_theta_phi_to_xyz(f_theta_phi);
 
     // jump (aligns direction to prevent zig-zagging)
     if (dot(dr2, state[glid].dr) < 0.0 )
@@ -183,6 +189,7 @@ __kernel void OclPtxInterpolate(
 
     new_dr = 0.5*(new_dr + dr2);
 #endif  /* EULER_STREAMLINE */
+
     // update particle position
     temp_pos = state[glid].position + new_dr;
 
@@ -254,9 +261,7 @@ __kernel void OclPtxInterpolate(
 #endif  // WAYPOINTS
 
 #ifdef LOOPCHECK
-  loopcheck_voxel.s0 = round(temp_pos.s0)/5;
-  loopcheck_voxel.s1 = round(temp_pos.s1)/5;
-  loopcheck_voxel.s2 = round(temp_pos.s2)/5;
+  loopcheck_voxel = convert_uint3(round(temp_pos) / 5);
 
   loopcheck_index = loopcheck_voxel.s0*(attrs.ly*attrs.lz) +
     loopcheck_voxel.s1*attrs.lz + loopcheck_voxel.s2;
