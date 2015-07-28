@@ -5,12 +5,10 @@ PROJNAME=fdt
 DBGFLAGS=-g -O0
 USRCXXFLAGS=-std=c++0x -MMD -MP
 
-# TODO: Move LIB_OPENCL and INC_OPENCL into systemvars.mk
-# test b/w AMD/Nvidia hardware?
-LIB_OPENCL=/usr/local/cuda/lib64
-#LIB_OPENCL=/opt/AMD-APP-SDK-v2.8-RC-lnx64/lib/x86_64
-INC_OPENCL=/usr/local/cuda/include
-#INC_OPENCL=/opt/AMD-APP-SDK-v2.8-RC-lnx64/include
+# LIB_OPENCL and INC_OPENCL should be shell variables pointing to, for example,
+# /usr/local/cuda/lib64 and /usr/local/cuda/include, for CUDA 7.0
+# the first should point to libOpenCL.so and the second to the directory with
+# cl.hpp, etc
 
 USRINCFLAGS = -I${INC_NEWMAT} -I${INC_NEWRAN} -I${INC_CPROB} -I${INC_PROB} -I${INC_BOOST} -I${INC_ZLIB} -I${INC_OPENCL}
 USRLDFLAGS = -L${LIB_NEWMAT} -L${LIB_NEWRAN} -L${LIB_CPROB} -L${LIB_PROB} -L${LIB_ZLIB} -L${LIB_OPENCL}
